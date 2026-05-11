@@ -9,8 +9,12 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     headerSection
+                    dailyGoalSection
                     statsSection
                     streakSection
+                    if !progress.weakTopics.isEmpty {
+                        weakTopicsSection
+                    }
                     quickActionsSection
                     topicsOverviewSection
                 }
@@ -25,24 +29,56 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Header
+
     private var headerSection: some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            HStack {
-                Image(systemName: "network")
-                    .font(.title2)
-                    .foregroundStyle(.blue)
-                Spacer()
-                VStack(alignment: .trailing) {
-                    Text("AmirNet Plus")
-                        .font(.title.bold())
-                    Text("הכנה לבחינת אמירנט")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+        HStack {
+            Image(systemName: "network")
+                .font(.title2)
+                .foregroundStyle(.blue)
+            Spacer()
+            VStack(alignment: .trailing) {
+                Text(progress.userName.isEmpty ? "AmirNet Plus" : "שלום, \(progress.userName)")
+                    .font(.title.bold())
+                Text("הכנה לבחינת אמירנט")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.top, 8)
         }
+        .padding(.top, 8)
     }
+
+    // MARK: - Daily Goal
+
+    private var dailyGoalSection: some View {
+        let today = progress.todayAnswered
+        let goal = progress.dailyGoal
+        let done = today >= goal
+
+        return VStack(alignment: .trailing, spacing: 8) {
+            HStack {
+                HStack(spacing: 4) {
+                    Text("\(today)/\(goal)")
+                        .font(.callout.bold())
+                        .foregroundStyle(done ? .green : .blue)
+                    Text("שאלות היום")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(done ? "יעד יומי הושג! 🎯" : "יעד יומי")
+                    .font(.caption.bold())
+                    .foregroundStyle(done ? .green : .primary)
+            }
+            ProgressView(value: Double(min(today, goal)), total: Double(goal))
+                .tint(done ? .green : .blue)
+        }
+        .padding()
+        .background(done ? Color.green.opacity(0.08) : Color(.background), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(done ? .green.opacity(0.3) : .clear, lineWidth: 1))
+        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+    }
+
+    // MARK: - Stats
 
     private var statsSection: some View {
         HStack(spacing: 12) {
@@ -64,26 +100,30 @@ struct HomeView: View {
                 icon: "books.vertical.fill",
                 color: .purple
             )
+            StatCard(
+                value: "\(progress.bookmarkedQuestionIDs.count)",
+                label: "שמורות",
+                icon: "bookmark.fill",
+                color: .orange
+            )
         }
     }
 
     private var coveredTopicsCount: Int {
-        TopicID.allCases.filter { topic in
-            (progress.topicProgress[topic.rawValue]?.answeredCount ?? 0) > 0
-        }.count
+        TopicID.allCases.filter { (progress.topicProgress[$0.rawValue]?.answeredCount ?? 0) > 0 }.count
     }
+
+    // MARK: - Streak
 
     private var streakSection: some View {
         HStack(spacing: 16) {
             Image(systemName: "flame.fill")
-                .font(.title2)
-                .foregroundStyle(.orange)
+                .font(.title2).foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(progress.streakDays) ימי רצף")
                     .font(.headline)
-                Text("המשך ללמוד כדי לשמור על הרצף!")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(progress.streakDays > 0 ? "כל הכבוד! המשך לשמור על הרצף" : "התחל לימוד היום!")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -92,28 +132,80 @@ struct HomeView: View {
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(.orange.opacity(0.3), lineWidth: 1))
     }
 
+    // MARK: - Weak Topics Alert
+
+    private var weakTopicsSection: some View {
+        VStack(alignment: .trailing, spacing: 10) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Spacer()
+                Text("נושאים לחיזוק")
+                    .font(.headline)
+            }
+            ForEach(progress.weakTopics.prefix(2), id: \.self) { topicRaw in
+                if let topic = TopicID(rawValue: topicRaw),
+                   let tp = progress.topicProgress[topicRaw] {
+                    HStack {
+                        Text("\(Int(tp.percentage))%")
+                            .font(.caption.bold()).foregroundStyle(.orange)
+                        ProgressView(value: tp.percentage, total: 100).tint(.orange)
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Text(topic.displayName).font(.caption)
+                            Image(systemName: topic.icon).font(.caption)
+                                .foregroundStyle(colorFromString(topic.color))
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(.orange.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(.orange.opacity(0.2), lineWidth: 1))
+    }
+
+    // MARK: - Quick Actions
+
     private var quickActionsSection: some View {
         VStack(alignment: .trailing, spacing: 12) {
             SectionHeader(title: "פעולות מהירות")
-            Button {
-                showQuiz = true
-            } label: {
-                HStack {
-                    Spacer()
-                    Text("התחל בחינה מהירה (10 שאלות)")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                    Image(systemName: "play.fill")
-                        .foregroundStyle(.white)
+            HStack(spacing: 10) {
+                QuickActionButton(
+                    title: "בחינה מהירה",
+                    subtitle: "10 שאלות",
+                    icon: "play.fill",
+                    color: .blue
+                ) { showQuiz = true }
+
+                if !progress.weakTopics.isEmpty,
+                   let firstWeak = progress.weakTopics.first,
+                   let topic = TopicID(rawValue: firstWeak) {
+                    NavigationLink(destination: TopicDetailView(topic: topic)) {
+                        QuickActionContent(
+                            title: "חזק חולשות",
+                            subtitle: topic.displayName,
+                            icon: "exclamationmark.triangle.fill",
+                            color: .orange
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .padding()
-                .background(
-                    LinearGradient(colors: [.blue, .indigo], startPoint: .leading, endPoint: .trailing),
-                    in: RoundedRectangle(cornerRadius: 14)
-                )
+
+                NavigationLink(destination: BookmarksView()) {
+                    QuickActionContent(
+                        title: "שמורות",
+                        subtitle: "\(progress.bookmarkedQuestionIDs.count) שאלות",
+                        icon: "bookmark.fill",
+                        color: .orange
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
     }
+
+    // MARK: - Topics Overview
 
     private var topicsOverviewSection: some View {
         VStack(alignment: .trailing, spacing: 12) {
@@ -122,6 +214,44 @@ struct HomeView: View {
                 TopicProgressRow(topic: topic, progress: progress.topicProgress[topic.rawValue])
             }
         }
+    }
+}
+
+// MARK: - Supporting Views
+
+struct QuickActionButton: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            QuickActionContent(title: title, subtitle: subtitle, icon: icon, color: color)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct QuickActionContent: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.title3).foregroundStyle(color)
+            Text(title)
+                .font(.caption.bold())
+            Text(subtitle)
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -134,13 +264,11 @@ struct StatCard: View {
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(color)
+                .font(.title3).foregroundStyle(color)
             Text(value)
                 .font(.title2.bold())
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
@@ -161,8 +289,7 @@ struct TopicProgressRow: View {
         VStack(alignment: .trailing, spacing: 8) {
             HStack {
                 Text("\(answered) שאלות")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 HStack(spacing: 8) {
                     Text(topic.displayName)
@@ -174,8 +301,7 @@ struct TopicProgressRow: View {
             GeometryReader { geo in
                 ZStack(alignment: .trailing) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(.systemFill))
-                        .frame(height: 6)
+                        .fill(Color(.systemFill)).frame(height: 6)
                     RoundedRectangle(cornerRadius: 4)
                         .fill(topicColor)
                         .frame(width: geo.size.width * percentage / 100, height: 6)
@@ -194,8 +320,7 @@ struct SectionHeader: View {
         HStack {
             Spacer()
             Text(title)
-                .font(.headline)
-                .foregroundStyle(.primary)
+                .font(.headline).foregroundStyle(.primary)
         }
     }
 }
@@ -213,6 +338,5 @@ func colorFromString(_ name: String) -> Color {
 }
 
 #Preview {
-    HomeView()
-        .environment(UserProgress())
+    HomeView().environment(UserProgress())
 }

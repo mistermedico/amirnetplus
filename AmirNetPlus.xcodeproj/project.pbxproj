@@ -20,6 +20,10 @@
 		B001001E /* QuizResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B001001F /* QuizResultsView.swift */; };
 		B0010020 /* ProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0010021 /* ProgressView.swift */; };
 		B0010022 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B0010023 /* Assets.xcassets */; };
+		B0010060 /* AdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0010061 /* AdminView.swift */; };
+		B0010062 /* StudyPlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0010063 /* StudyPlanView.swift */; };
+		B0010064 /* BookmarksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0010065 /* BookmarksView.swift */; };
+		B0010066 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0010067 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +40,10 @@
 		B001001F /* QuizResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizResultsView.swift; sourceTree = "<group>"; };
 		B0010021 /* ProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressView.swift; sourceTree = "<group>"; };
 		B0010023 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B0010061 /* AdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminView.swift; sourceTree = "<group>"; };
+		B0010063 /* StudyPlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyPlanView.swift; sourceTree = "<group>"; };
+		B0010065 /* BookmarksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksView.swift; sourceTree = "<group>"; };
+		B0010067 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B0010030 /* AmirNetPlus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AmirNetPlus.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -90,6 +98,10 @@
 				B001001D /* QuizView.swift */,
 				B001001F /* QuizResultsView.swift */,
 				B0010021 /* ProgressView.swift */,
+				B0010061 /* AdminView.swift */,
+				B0010063 /* StudyPlanView.swift */,
+				B0010065 /* BookmarksView.swift */,
+				B0010067 /* SettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -192,6 +204,10 @@
 				B001001C /* QuizView.swift in Sources */,
 				B001001E /* QuizResultsView.swift in Sources */,
 				B0010020 /* ProgressView.swift in Sources */,
+				B0010060 /* AdminView.swift in Sources */,
+				B0010062 /* StudyPlanView.swift in Sources */,
+				B0010064 /* BookmarksView.swift in Sources */,
+				B0010066 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -204,7 +220,6 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -266,7 +281,6 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
