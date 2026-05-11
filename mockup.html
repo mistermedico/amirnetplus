@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AmirNet Plus – הדמיית מסכים</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    background: #1a1a2e;
+    color: #1c1c1e;
+    min-height: 100vh;
+    padding: 40px 20px;
+    direction: rtl;
+  }
+
+  h1 {
+    text-align: center;
+    color: #fff;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #8e8e93;
+    font-size: 15px;
+    margin-bottom: 40px;
+  }
+
+  /* Navigation tabs */
+  .screen-nav {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 36px;
+    flex-wrap: wrap;
+  }
+  .screen-nav button {
+    background: #2c2c3e;
+    color: #ebebf5cc;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    direction: rtl;
+    transition: all 0.2s;
+  }
+  .screen-nav button.active, .screen-nav button:hover {
+    background: #0a84ff;
+    color: #fff;
+  }
+
+  /* iPhone frame */
+  .phone-grid {
+    display: flex;
+    gap: 28px;
+    justify-content: center;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .phone-wrap {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .phone-wrap.visible { display: flex; }
+
+  .phone-label {
+    color: #ebebf5;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .phone {
+    width: 320px;
+    height: 693px;
+    background: #000;
+    border-radius: 50px;
+    padding: 14px;
+    box-shadow: 0 0 0 2px #3a3a3c, 0 30px 80px rgba(0,0,0,0.6);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 28px;
+    background: #000;
+    border-radius: 0 0 18px 18px;
+    z-index: 10;
+  }
+
+  .screen {
+    width: 100%;
+    height: 100%;
+    border-radius: 38px;
+    overflow: hidden;
+    background: #f2f2f7;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* Status bar */
+  .statusbar {
+    height: 44px;
+    background: inherit;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 20px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 5;
+  }
+  .statusbar .time { font-size: 15px; font-weight: 700; }
+  .statusbar .icons { display: flex; gap: 5px; align-items: center; font-size: 11px; }
+
+  /* Navigation bar */
+  .navbar {
+    padding: 4px 16px 8px;
+    background: inherit;
+    flex-shrink: 0;
+  }
+  .navbar .title { font-size: 30px; font-weight: 700; line-height: 1.1; }
+  .navbar .title-inline { font-size: 17px; font-weight: 600; text-align: center; padding: 4px 0; }
+
+  /* Scroll content */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scrollbar-width: none;
+  }
+  .content::-webkit-scrollbar { display: none; }
+
+  /* Tab bar */
+  .tabbar {
+    height: 82px;
+    background: rgba(242,242,247,0.95);
+    backdrop-filter: blur(10px);
+    border-top: 0.5px solid #c6c6c8;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 8px;
+    flex-shrink: 0;
+  }
+  .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+  }
+  .tab .tab-icon { font-size: 22px; line-height: 1; }
+  .tab .tab-label { font-size: 10px; font-weight: 500; color: #8e8e93; }
+  .tab.active .tab-label { color: #007aff; }
+  .tab.active .tab-icon { filter: none; }
+
+  /* Cards */
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .card-sm {
+    background: #fff;
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  /* Typography */
+  .h1 { font-size: 22px; font-weight: 700; }
+  .h2 { font-size: 17px; font-weight: 600; }
+  .h3 { font-size: 15px; font-weight: 600; }
+  .body { font-size: 14px; }
+  .caption { font-size: 12px; color: #8e8e93; }
+  .caption2 { font-size: 11px; color: #8e8e93; }
+
+  /* Layout helpers */
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row-between { display: flex; align-items: center; justify-content: space-between; }
+  .col { display: flex; flex-direction: column; gap: 4px; }
+  .spacer { flex: 1; }
+  .text-right { text-align: right; }
+  .text-center { text-align: center; }
+
+  /* Progress bar */
+  .progress-track {
+    height: 6px;
+    background: #e5e5ea;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: #007aff;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-blue { background: #007aff1a; color: #007aff; }
+  .badge-green { background: #34c75a1a; color: #34c759; }
+  .badge-orange { background: #ff95001a; color: #ff9500; }
+  .badge-red { background: #ff3b301a; color: #ff3b30; }
+  .badge-purple { background: #af52de1a; color: #af52de; }
+  .badge-gray { background: #8e8e931a; color: #8e8e93; }
+
+  /* Colors */
+  .blue { color: #007aff; }
+  .green { color: #34c759; }
+  .orange { color: #ff9500; }
+  .red { color: #ff3b30; }
+  .purple { color: #af52de; }
+  .secondary { color: #8e8e93; }
+  .tertiary { color: #c7c7cc; }
+
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .stat-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 10px 6px;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .stat-card .val { font-size: 18px; font-weight: 700; }
+  .stat-card .lbl { font-size: 10px; color: #8e8e93; margin-top: 2px; }
+  .stat-card .ico { font-size: 16px; margin-bottom: 4px; }
+
+  /* Circle progress */
+  .circle-wrap {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    flex-shrink: 0;
+  }
+  .circle-wrap svg { transform: rotate(-90deg); }
+  .circle-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .circle-center .pct { font-size: 16px; font-weight: 700; }
+  .circle-center .lbl { font-size: 9px; color: #8e8e93; }
+
+  /* Option button */
+  .option-btn {
+    background: #fff;
+    border-radius: 12px;
+    padding: 11px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .option-btn.correct { background: #34c7590d; border: 1.5px solid #34c759; }
+  .option-btn.wrong { background: #ff3b300d; border: 1.5px solid #ff3b30; }
+  .option-idx {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #f2f2f7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #8e8e93;
+    flex-shrink: 0;
+  }
+
+  /* Divider */
+  .divider { height: 0.5px; background: #e5e5ea; margin: 4px 0; }
+
+  /* Topic row */
+  .topic-row {
+    background: #fff;
+    border-radius: 12px;
+    padding: 11px 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  /* List row */
+  .list-row {
+    background: #fff;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 0.5px solid #e5e5ea;
+  }
+  .list-row:first-child { border-radius: 14px 14px 0 0; }
+  .list-row:last-child { border-radius: 0 0 14px 14px; border-bottom: none; }
+  .list-row:only-child { border-radius: 14px; border-bottom: none; }
+
+  .icon-box {
+    width: 36px; height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  /* Gradient header */
+  .grad-header {
+    padding: 14px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Bottom action bar */
+  .action-bar {
+    background: #fff;
+    border-top: 0.5px solid #e5e5ea;
+    padding: 10px 14px 0;
+  }
+  .btn-primary {
+    background: #007aff;
+    color: #fff;
+    border-radius: 12px;
+    padding: 13px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .btn-grad {
+    background: linear-gradient(135deg, #007aff, #5856d6);
+    color: #fff;
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  /* Streak banner */
+  .streak-banner {
+    background: #ff95001a;
+    border: 1px solid #ff950033;
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* Achievement */
+  .ach-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ach-cell {
+    background: #fff;
+    border-radius: 12px;
+    padding: 10px;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .ach-cell.locked { opacity: 0.4; }
+  .ach-icon { font-size: 24px; margin-bottom: 4px; }
+  .ach-name { font-size: 11px; font-weight: 700; }
+  .ach-desc { font-size: 10px; color: #8e8e93; }
+
+  /* Score circle large */
+  .score-ring {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 0;
+  }
+  .score-ring .big-pct { font-size: 40px; font-weight: 800; line-height: 1; }
+  .score-ring .grade { font-size: 15px; font-weight: 600; color: #8e8e93; }
+
+  /* Form */
+  .form-field {
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .form-row {
+    padding: 11px 14px;
+    border-bottom: 0.5px solid #e5e5ea;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .form-row:last-child { border-bottom: none; }
+  .form-section-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6c6c70;
+    text-transform: uppercase;
+    padding: 0 4px;
+    margin-bottom: 4px;
+    letter-spacing: 0.4px;
+  }
+
+  /* Management row */
+  .mgmt-row {
+    background: #fff;
+    border-radius: 0;
+    padding: 11px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 0.5px solid #e5e5ea;
+    gap: 12px;
+  }
+  .mgmt-row:first-child { border-radius: 14px 14px 0 0; }
+  .mgmt-row:last-child { border-radius: 0 0 14px 14px; border-bottom: none; }
+
+  /* Weak topic strip */
+  .weak-strip {
+    background: #ff95000d;
+    border: 1px solid #ff950022;
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+
+  /* Plan card */
+  .plan-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px;
+    border: 1.5px solid #34c75933;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  /* Bookmark card */
+  .bmark-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    gap: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  /* Dark mode screen for management */
+  .screen-light { background: #f2f2f7; }
+
+  /* Chart bars */
+  .chart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 70px;
+    padding: 0 4px;
+  }
+  .bar {
+    flex: 1;
+    background: #007aff;
+    border-radius: 3px 3px 0 0;
+    opacity: 0.8;
+    min-height: 4px;
+  }
+</style>
+</head>
+<body>
+
+<h1>AmirNet Plus</h1>
+<p class="subtitle">הדמיית מסכי האפליקציה — iOS 17 · SwiftUI · עברית RTL</p>
+
+<!-- Nav buttons -->
+<div class="screen-nav">
+  <button class="active" onclick="show('home')">🏠 בית</button>
+  <button onclick="show('topics')">📚 נושאים</button>
+  <button onclick="show('quiz')">🎯 בחינה</button>
+  <button onclick="show('quizactive')">⚡ בחינה פעילה</button>
+  <button onclick="show('results')">🏆 תוצאות</button>
+  <button onclick="show('progress')">📊 התקדמות</button>
+  <button onclick="show('plan')">📅 תכנון</button>
+  <button onclick="show('bookmarks')">🔖 שמורות</button>
+  <button onclick="show('admin')">⚙️ ניהול</button>
+  <button onclick="show('settings')">🔧 הגדרות</button>
+  <button onclick="showAll()">👁 הכל</button>
+</div>
+
+<div class="phone-grid" id="grid">
+
+  <!-- ===== SCREEN 1: HOME ===== -->
+  <div class="phone-wrap visible" id="s-home">
+    <div class="phone-label">🏠 מסך בית</div>
+    <div class="phone">
+      <div class="screen screen-light">
+        <div class="statusbar"><span class="time">9:41</span><span class="icons">●●● 🔋</span></div>
+
+        <div class="content">
+          <!-- Header -->
+          <div class="row-between" style="padding:4px 0">
+            <span style="font-size:22px">🌐</span>
+            <div class="col" style="align-items:flex-end">
+              <span class="h1">שלום, יוסי</span>
+              <span class="caption">הכנה לבחינת אמירנט</span>
+            </div>
+          </div>
+
+          <!-- Daily goal -->
+          <div class="card">
+            <div class="row-between">
+              <div class="row"><span class="caption">18/20</span><span class="caption" style="margin-right:4px">שאלות היום</span></div>
+              <span class="body" style="font-weight:700">יעד יומי</span>
+            </div>
+            <div class="progress-track" style="margin-top:8px"><div class="progress-fill" style="width:90%;background:#007aff"></div></div>
+          </div>
+
+          <!-- Stats -->
+          <div class="stats-grid">
+            <div class="stat-card"><div class="ico blue">❓</div><div class="val blue">142</div><div class="lbl">שאלות</div></div>
+            <div class="stat-card"><div class="ico green">✅</div><div class="val green">78%</div><div class="lbl">הצלחה</div></div>
+            <div class="stat-card"><div class="ico purple">📚</div><div class="val purple">4</div><div class="lbl">נושאים</div></div>
+            <div class="stat-card"><div class="ico orange">🔖</div><div class="val orange">12</div><div class="lbl">שמורות</div></div>
+          </div>
+
+          <!-- Streak -->
+          <div class="streak-banner">
+            <span style="font-size:26px">🔥</span>
+            <div class="col">
+              <span class="h3">7 ימי רצף</span>
+              <span class="caption">כל הכבוד! המשך לשמור על הרצף</span>
+            </div>
+          </div>
+
+          <!-- Weak topics -->
+          <div class="weak-strip">
+            <div class="row-between" style="margin-bottom:8px">
+              <span style="font-size:14px">⚠️</span>
+              <span class="h3 orange">נושאים לחיזוק</span>
+            </div>
+            <div class="row-between" style="margin-bottom:4px">
+              <span class="caption green">48%</span>
+              <span class="body">אבטחת מידע</span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:48%;background:#ff9500"></div></div>
+          </div>
+
+          <!-- Quick actions -->
+          <div>
+            <div class="row-between" style="margin-bottom:8px"><div></div><span class="h3">פעולות מהירות</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div class="card-sm text-center col" style="align-items:center;gap:4px">
+                <span class="blue" style="font-size:18px">▶</span>
+                <span style="font-size:11px;font-weight:700">בחינה מהירה</span>
+                <span class="caption2">10 שאלות</span>
+              </div>
+              <div class="card-sm text-center col" style="align-items:center;gap:4px;background:#ff95000d">
+                <span class="orange" style="font-size:18px">⚠️</span>
+                <span style="font-size:11px;font-weight:700">חזק חולשות</span>
+                <span class="caption2">אבטחה</span>
+              </div>
+              <div class="card-sm text-center col" style="align-items:center;gap:4px;background:#ff95000d">
+                <span class="orange" style="font-size:18px">🔖</span>
+                <span style="font-size:11px;font-weight:700">שמורות</span>
+                <span class="caption2">12 שאלות</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Topics mini -->
+          <div>
+            <div class="row-between" style="margin-bottom:8px"><div></div><span class="h3">סקירת נושאים</span></div>
+            <div class="col" style="gap:6px">
+              <div class="topic-row"><div class="row-between"><span class="caption">24 שאלות</span><div class="row"><span class="body">רשתות תקשורת</span><span class="blue" style="font-size:14px">🌐</span></div></div><div class="progress-track"><div class="progress-fill" style="width:72%;background:#007aff"></div></div></div>
+              <div class="topic-row"><div class="row-between"><span class="caption">18 שאלות</span><div class="row"><span class="body">אבטחת מידע</span><span class="red" style="font-size:14px">🔒</span></div></div><div class="progress-track"><div class="progress-fill" style="width:48%;background:#ff3b30"></div></div></div>
+              <div class="topic-row"><div class="row-between"><span class="caption">0 שאלות</span><div class="row"><span class="body">ענן ווירטואליזציה</span><span style="color:#32ade6;font-size:14px">☁️</span></div></div><div class="progress-track"><div class="progress-fill" style="width:0%"></div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tab active"><div class="tab-icon">🏠</div><div class="tab-label" style="color:#007aff">בית</div></div>
+          <div class="tab"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+          <div class="tab"><div class="tab-icon">✅</div><div class="tab-label">בחינה</div></div>
+          <div class="tab"><div class="tab-icon">📅</div><div class="tab-label">תכנון</div></div>
+          <div class="tab"><div class="tab-icon">🔖</div><div class="tab-label">שמורות</div></div>
+          <div class="tab"><div class="tab-icon">⚙️</div><div class="tab-label">ניהול</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 2: TOPICS ===== -->
+  <div class="phone-wrap" id="s-topics">
+    <div class="phone-label">📚 נושאים</div>
+    <div class="phone">
+      <div class="screen screen-light">
+        <div class="statusbar"><span class="time">9:41</span><span class="icons">●●● 🔋</span></div>
+        <div class="navbar"><div class="title">נושאים</div></div>
+
+        <div class="content">
+          <!-- Topic cards -->
+          <div class="card col" style="gap:10px">
+            <div class="row-between">
+              <div class="col">
+                <span class="caption">10/10 שאלות</span>
+                <div class="row" style="gap:4px"><span class="badge badge-green">72%</span><span class="badge badge-green">קל x4</span><span class="badge badge-orange">בינוני x4</span></div>
+              </div>
+              <div class="row" style="gap:10px">
+                <div class="col" style="align-items:flex-end">
+                  <span class="h3">רשתות תקשורת</span>
+                  <span class="caption">מודל OSI, TCP/IP, ניתוב</span>
+                </div>
+                <div class="icon-box" style="background:#007aff1a;font-size:20px">🌐</div>
+              </div>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:72%;background:#007aff"></div></div>
+          </div>
+
+          <div class="card col" style="gap:10px;border:1.5px solid #ff3b301a">
+            <div class="row-between">
+              <div class="col">
+                <span class="caption">8/8 שאלות</span>
+                <div class="row" style="gap:4px"><span class="badge badge-red">48%</span><span class="badge badge-green">קל x3</span><span class="badge badge-orange">בינוני x4</span></div>
+              </div>
+              <div class="row" style="gap:10px">
+                <div class="col" style="align-items:flex-end">
+                  <span class="h3">אבטחת מידע</span>
+                  <span class="caption">חומות אש, הצפנה, VPN</span>
+                </div>
+                <div class="icon-box" style="background:#ff3b301a;font-size:20px">🔒</div>
+              </div>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:48%;background:#ff3b30"></div></div>
+            <div class="row-between">
+              <span class="caption blue">← לחץ לפרטים</span>
+              <span class="caption orange">⚠️ לחיזוק</span>
+            </div>
+          </div>
+
+          <div class="card col" style="gap:10px">
+            <div class="row-between">
+              <div class="col">
+                <span class="caption">0/8 שאלות</span>
+              </div>
+              <div class="row" style="gap:10px">
+                <div class="col" style="align-items:flex-end">
+                  <span class="h3">מערכות הפעלה</span>
+                  <span class="caption">Windows Server, Linux</span>
+                </div>
+                <div class="icon-box" style="background:#34c7591a;font-size:20px">🖥️</div>
+              </div>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:0%"></div></div>
+          </div>
+
+          <div class="card col" style="gap:10px">
+            <div class="row-between">
+              <div class="col">
+                <span class="caption">5/7 שאלות</span>
+                <span class="badge badge-blue">63%</span>
+              </div>
+              <div class="row" style="gap:10px">
+                <div class="col" style="align-items:flex-end">
+                  <span class="h3">פרוטוקולים</span>
+                  <span class="caption">HTTP, DNS, DHCP, FTP</span>
+                </div>
+                <div class="icon-box" style="background:#af52de1a;font-size:20px">↔️</div>
+              </div>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:63%;background:#af52de"></div></div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tab"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+          <div class="tab active"><div class="tab-icon">📚</div><div class="tab-label" style="color:#007aff">נושאים</div></div>
+          <div class="tab"><div class="tab-icon">✅</div><div class="tab-label">בחינה</div></div>
+          <div class="tab"><div class="tab-icon">📅</div><div class="tab-label">תכנון</div></div>
+          <div class="tab"><div class="tab-icon">🔖</div><div class="tab-label">שמורות</div></div>
+          <div class="tab"><div class="tab-icon">⚙️</div><div class="tab-label">ניהול</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 3: QUIZ SETUP ===== -->
+  <div class="phone-wrap" id="s-quiz">
+    <div class="phone-label">🎯 הגדרות בחינה</div>
+    <div class="phone">
+      <div class="screen screen-light">
+        <div class="statusbar"><span class="time">9:41</span><span class="icons">●●● 🔋</span></div>
+        <div class="navbar"><div class="title">הגדרות בחינה</div></div>
+
+        <div class="content">
+          <!-- Header card -->
+          <div class="card" style="background:linear-gradient(135deg,#007aff0d,#5856d60d)">
+            <div class="row-between">
+              <span style="font-size:44px;opacity:0.8">✅</span>
+              <div class="col" style="align-items:flex-end">
+                <span class="h2">בחינת אמירנט</span>
+                <span class="caption">הגדר את הבחינה שלך</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Count -->
+          <div>
+            <div class="form-section-header">מספר שאלות</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+              <div class="btn-primary" style="padding:10px;border-radius:10px;font-size:14px">10</div>
+              <div class="card-sm text-center body" style="padding:10px">20</div>
+              <div class="card-sm text-center body" style="padding:10px">30</div>
+              <div class="card-sm text-center body" style="padding:10px">50</div>
+            </div>
+          </div>
+
+          <!-- Topic -->
+          <div>
+            <div class="form-section-header">נושא</div>
+            <div class="form-field">
+              <div class="form-row">
+                <span class="caption">40 שאלות</span>
+                <div class="row" style="gap:8px">
+                  <div class="col" style="align-items:flex-end"><span class="body">כל הנושאים</span><span class="caption">שאלות מעורבות</span></div>
+                  <div class="icon-box" style="background:#007aff1a;font-size:16px">⊞</div>
+                  <span class="blue" style="font-size:14px">✓</span>
+                </div>
+              </div>
+              <div class="form-row">
+                <span></span>
+                <div class="row" style="gap:8px">
+                  <div class="col" style="align-items:flex-end"><span class="body">רשתות תקשורת</span><span class="caption">10 שאלות</span></div>
+                  <div class="icon-box" style="background:#007aff1a;font-size:16px">🌐</div>
+                </div>
+              </div>
+              <div class="form-row">
+                <span></span>
+                <div class="row" style="gap:8px">
+                  <div class="col" style="align-items:flex-end"><span class="body">אבטחת מידע</span><span class="caption">8 שאלות</span></div>
+                  <div class="icon-box" style="background:#ff3b301a;font-size:16px">🔒</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mode -->
+          <div>
+            <div class="form-section-header">מצב בחינה</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div class="card" style="border:1.5px solid #007aff44;background:#007aff08;text-align:center">
+                <div style="font-size:22px;margin-bottom:4px">⏱</div>
+                <div class="h3 blue">מצב בחינה</div>
+                <div class="caption">ראה תוצאות בסוף</div>
+              </div>
+              <div class="card text-center">
+                <div style="font-size:22px;margin-bottom:4px">💡</div>
+                <div class="h3">מצב לימוד</div>
+                <div class="caption">הסבר אחרי כל שאלה</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="btn-grad"><span>▶</span><span>התחל בחינה</span></div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tab"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+          <div class="tab"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+          <div class="tab active"><div class="tab-icon">✅</div><div class="tab-label" style="color:#007aff">בחינה</div></div>
+          <div class="tab"><div class="tab-icon">📅</div><div class="tab-label">תכנון</div></div>
+          <div class="tab"><div class="tab-icon">🔖</div><div class="tab-label">שמורות</div></div>
+          <div class="tab"><div class="tab-icon">⚙️</div><div class="tab-label">ניהול</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 4: ACTIVE QUIZ ===== -->
+  <div class="phone-wrap" id="s-quizactive">
+    <div class="phone-label">⚡ בחינה פעילה</div>
+    <div class="phone">
+      <div class="screen screen-light">
+        <div class="statusbar"><span class="time">9:41</span><span class="icons">●●● 🔋</span></div>
+        <div style="padding:6px 16px 8px;background:#f2f2f7">
+          <div class="row-between">
+            <span class="caption red" style="font-size:13px">יציאה</span>
+            <span class="h3">3 / 10</span>
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div style="height:4px;background:#e5e5ea"><div style="height:4px;background:#007aff;width:30%;border-radius:2px"></div></div>
+
+        <div class="content">
+          <!-- Question card -->
+          <div class="card col" style="gap:10px">
+            <div class="row-between">
+              <span class="badge badge-orange">בינוני</span>
+              <span class="caption">רשתות תקשורת</span>
+            </div>
+            <p class="h3 text-right" style="line-height:1.4">כמה שכבות יש במודל OSI, ואיזו שכבה אחראית על ניתוב בין רשתות?</p>
+          </div>
+
+          <!-- Options -->
+          <div class="option-btn"><span class="spacer"></span><span class="body">5 שכבות, שכבה 2</span><div class="option-idx">א</div></div>
+          <div class="option-btn"><span class="spacer"></span><span class="body">6 שכבות, שכבה 3</span><div class="option-idx">ב</div></div>
+          <div class="option-btn correct"><span class="green" style="font-size:16px">✓</span><span class="spacer"></span><span class="body">7 שכבות, שכבה 3</span><div class="option-idx" style="background:#34c7591a;color:#34c759">ג</div></div>
+          <div class="option-btn wrong"><span class="red" style="font-size:16px">✗</span><span class="spacer"></span><span class="body">7 שכבות, שכבה 4</span><div class="option-idx" style="background:#ff3b301a;color:#ff3b30">ד</div></div>
+
+          <!-- Explanation (study mode) -->
+          <div style="background:#ff95000d;border-radius:12px;padding:12px">
+            <div class="row-between" style="margin-bottom:6px">
+              <div></div>
+              <div class="row"><span>💡</span><span class="body orange" style="font-weight:700">הסבר</span></div>
+            </div>
+            <p class="caption text-right" style="line-height:1.5">מודל OSI מורכב מ-7 שכבות. שכבה 3 (שכבת הרשת) אחראית על ניתוב בין רשתות שונות באמצעות IP.</p>
+          </div>
+        </div>
+
+        <div class="action-bar" style="padding:10px 14px 0">
+          <div class="btn-primary">הבא →</div>
+        </div>
+        <div style="height:16px;background:#fff"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 5: RESULTS ===== -->
+  <div class="phone-wrap" id="s-results">
+    <div class="phone-label">🏆 תוצאות</div>
+    <div class="phone">
+      <div class="screen screen-light">
+        <div class="statusbar"><span class="time">9:41</span><span class="icons">●●● 🔋</span></div>
+        <div class="navbar"><div class="title-inline">תוצאות הבחינה</div></div>
+
+        <div class="content">
+          <!-- Score ring -->
+          <div class="score-ring card">
+            <svg width="130" height="130" viewBox="0 0 130 130">
+              <circle cx="65" cy="65" r="55" fill="none" stroke="#e5e5ea" stroke-width="14"/>
+              <circle cx="65" cy="65" r="55" fill="none" stroke="#34c759" stroke-width="14"
+                stroke-dasharray="346" stroke-dashoffset="69" stroke-linecap="round"
+                transform="rotate(-90,65,65)"/>
+            </svg>
+            <div style="position:relative;margin-top:-92px;text-align:center;z-index:1">
+              <div style="font-size:14px">⭐</div>
+              <div class="big-pct green">80%</div>
+              <div class="grade">טוב מאוד</div>
+            </div>
+            <div style="margin-top:60px" class="caption text-center">8 מתוך 10 תשובות נכונות</div>
+          </div>
+
+          <!-- Stats strip -->
+          <div class="card">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0">
+              <div class="text-center col" style="align-items:center;gap:2px;padding:8px 0">
+                <span style="font-size:20px;font-weight:800;color:#34c759">8</span>
+                <span class="caption">נכון</span>
+              </div>
+              <div class="text-center col" style="align-items:center;gap:2px;padding:8px 0;border-right:0.5px solid #e5e5ea;border-left:0.5px solid #e5e5ea">
+                <span style="font-size:20px;font-weight:800;color:#ff3b30">2</span>
+                <span class="caption">שגוי</span>
+              </div>
+              <div class="text-center col" style="align-items:center;gap:2px;padding:8px 0">
+                <span style="font-size:20px;font-weight:800;color:#007aff">4:23</span>
+                <span class="caption">זמן</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Toggle details -->
+          <div class="card row-between">
+            <div style="width:44px;height:26px;background:#34c759;border-radius:13px;padding:2px;display:flex;align-items:center;justify-content:flex-end"><div style="width:22px;height:22px;background:#fff;border-radius:50%"></div></div>
+            <span class="body">הצג פירוט תשובות</span>
+          </div>
+
+          <!-- Answer rows -->
+          <div class="col" style="gap:6px">
+            <div class="card-sm row-between">
+              <span class="green" style="font-size:16px">✓</span>
+              <span class="body text-right" style="flex:1;margin-right:8px">כמה שכבות יש במודל OSI?</span>
+              <span class="secondary">1</span>
+            </div>
+            <div class="card-sm row-between">
+              <span class="red" style="font-size:16px">✗</span>
+              <span class="body text-right" style="flex:1;margin-right:8px">מה תפקיד פרוטוקול ARP?</span>
+              <span class="secondary">2</span>
+            </div>
+            <div class="card-sm row-between">
+              <span class="green" style="font-size:16px">✓</span>
+              <span class="body text-right" style="flex:1;margin-right:8px">מה הפורט של HTTPS?</span>
+              <span class="secondary">3</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="card-sm text-center body" style="padding:12px">🔄 נסה שוב</div>
+            <div class="btn-primary" style="padding:12px">סיום ✓</div>
+          </div>
+          <div style="height:10px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 6: PROGRESS ===== -->
+  <div class="phone-wrap" id="s-progress">
+    <div class="phone-label">📊 התקדמות</div>
+    <div class="phone">
+      <div class="screen screen-light">
+        <div class="statusbar"><span class="time">9:41</span><span class="icons">●●● 🔋</span></div>
+        <div class="navbar"><div class="title">התקדמות</div></div>
+
+        <div class="content">
+          <!-- Overall card -->
+          <div class="card">
+            <div class="row-between" style="margin-bottom:10px">
+              <div class="col">
+                <span class="h3">סה"כ התקדמות</span>
+                <span class="caption">142 שאלות נענו</span>
+              </div>
+              <div class="circle-wrap">
+                <svg width="72" height="72" viewBox="0 0 72 72">
+                  <circle cx="36" cy="36" r="28" fill="none" stroke="#e5e5ea" stroke-width="10"/>
+                  <circle cx="36" cy="36" r="28" fill="none" stroke="#34c759" stroke-width="10"
+                    stroke-dasharray="176" stroke-dashoffset="39" stroke-linecap="round"
+                    transform="rotate(-90,36,36)"/>
+                </svg>
+                <div class="circle-center"><span class="pct green">78%</span><span class="lbl">הצלחה</span></div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr">
+              <div class="text-center col" style="align-items:center;gap:2px">
+                <span style="font-weight:700;color:#34c759;font-size:17px">111</span><span class="caption">נכון</span>
+              </div>
+              <div style="background:#e5e5ea"></div>
+              <div class="text-center col" style="align-items:center;gap:2px">
+                <span style="font-weight:700;color:#ff3b30;font-size:17px">31</span><span class="caption">שגוי</span>
+              </div>
+              <div style="background:#e5e5ea"></div>
+              <div class="text-center col" style="align-items:center;gap:2px">
+                <span style="font-weight:700;color:#ff9500;font-size:17px">7</span><span class="caption">ימי רצף</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart -->
+          <div class="card col" style="gap:8px">
+            <div class="row-between"><div></div><span class="h3">פעילות 30 ימים</span></div>
+            <div class="chart-bars">
+              <div class="bar" style="height:20%"></div>
+              <div class="bar" style="height:35%"></div>
+              <div class="bar" style="height:55%"></div>
+              <div class="bar" style="height:40%"></div>
+              <div class="bar" style="height:70%"></div>
+              <div class="bar" style="height:45%"></div>
+              <div class="bar" style="height:90%"></div>
+              <div class="bar" style="height:60%"></div>
+              <div class="bar" style="height:80%"></div>
+              <div class="bar" style="height:100%;background:#34c759"></div>
+            </div>
+            <div class="row-between"><span class="caption2">לפני 9 ימים</span><span class="caption2">היום</span></div>
+          </div>
+
+          <!-- Topic breakdown -->
+          <div>
+            <div class="row-between" style="margin-bottom:8px"><div></div><span class="h3">פירוט לפי נושא</span></div>
+            <div class="col" style="gap:6px">
+              <div class="card-sm"><div class="row-between"><div class="row" style="gap:4px"><span class="caption green" style="width:30px">72%</span><span class="caption">10/10</span></div><div class="row" style="gap:6px"><span class="body">רשתות</span><span class="blue">🌐</span></div></div><div class="progress-track"><div class="progress-fill" style="width:72%;background:#007aff"></div></div></div>
+              <div class="card-sm"><div class="row-between"><div class="row" style="gap:4px"><span class="caption orange" style="width:30px">48%</span><span class="caption">8/8</span></div><div class="row" style="gap:6px"><span class="body">אבטחה</span><span class="red">🔒</span></div></div><div class="progress-track"><div class="progress-fill" style="width:48%;background:#ff3b30"></div></div></div>
+              <div class="card-sm"><div class="row-between"><div class="row" style="gap:4px"><span class="caption green" style="width:30px">88%</span><span class="caption">8/8</span></div><div class="row" style="gap:6px"><span class="body">מ"ה</span><span class="green">🖥️</span></div></div><div class="progress-track"><div class="progress-fill" style="width:88%;background:#34c759"></div></div></div>
+            </div>
+          </div>
+
+          <!-- Achievements -->
+          <div>
+            <div class="row-between" style="margin-bottom:8px"><div></div><span class="h3">הישגים</span></div>
+            <div class="ach-grid">
+              <div class="ach-cell"><div class="ach-icon">⭐</div><div class="ach-name">מתחיל</div><div class="ach-desc">10 שאלות</div></div>
+              <div class="ach-cell"><div class="ach-icon">🔥</div><div class="ach-name">3 ימי רצף</div><div class="ach-desc">3 ימים ברצף</div></div>
+              <div class="ach-cell"><div class="ach-icon">🏆</div><div class="ach-name">ציון גבוה</div><div class="ach-desc">80%+ ב-20 שאלות</div></div>
+              <div class="ach-cell locked"><div class="ach-icon">🔥</div><div class="ach-name">שבוע רצף</div><div class="ach-desc">7 ימים ברצף</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tab"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+          <div class="tab"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+          <div class="tab"><div class="tab-icon">✅</div><div class="tab-label">בחינה</div></div>
+          <div class="tab"><div class="tab-icon">📅</div><div class="tab-label">תכנון</div></div>
+          <div class="tab"><div class="tab-icon">🔖</div><div class="tab-label">שמורות</div></div>
+          <div class="tab"><div class="tab-icon">⚙️</div><div class="tab-label">ניהול</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 7: STUDY PLAN ===== -->
+  <div class="phone-wrap" id="s-plan">
+    <div class="phone-label">📅 תכנון לימודים</div>
+    <div class="phone">
+      <div class="screen screen-light">
+        <div class="statusbar"><span class="time">9:41</span><span class="icons">●●● 🔋</span></div>
+        <div class="navbar"><div class="row-between" style="padding:0"><span class="title">תכנון</span><span class="blue" style="font-size:22px">＋</span></div></div>
+
+        <div class="content">
+          <!-- Active plan -->
+          <div style="background:linear-gradient(135deg,#34c7590d,#007aff0d);border:1px solid #34c75933;border-radius:14px;padding:14px">
+            <div class="row-between" style="margin-bottom:8px">
+              <div class="row" style="gap:6px"><span class="badge badge-green">פעילה ✓</span><span class="caption green">12 ימים נותרו</span></div>
+              <div class="col" style="align-items:flex-end">
+                <span class="caption secondary">תוכנית פעילה</span>
+                <span class="h3">הכנה לאמירנט 2025</span>
+              </div>
+              <span style="font-size:24px">📅</span>
+            </div>
+            <div class="row-between"><span></span><span class="caption">יעד: 15 יוני 2025</span></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;flex-direction:row-reverse">
+              <span class="badge badge-blue">רשתות</span>
+              <span class="badge badge-red">אבטחה</span>
+              <span class="badge badge-purple">פרוטוקולים</span>
+            </div>
+            <div class="row-between" style="margin-bottom:4px"><span class="caption">18/20 שאלות היום</span><span class="caption">יעד יומי</span></div>
+            <div class="progress-track"><div class="progress-fill" style="width:90%"></div></div>
+          </div>
+
+          <!-- Daily goal card -->
+          <div class="card row-between">
+            <div class="row" style="gap:6px"><span style="font-size:20px;font-weight:800;color:#007aff">18/20</span><span class="caption">שאלות היום</span></div>
+            <div class="progress-track" style="flex:1;margin:0 10px"></div>
+            <span style="font-size:22px">🎯</span>
+          </div>
+
+          <!-- Another plan -->
+          <div class="plan-card" style="border-color:#e5e5ea">
+            <div class="row-between" style="margin-bottom:6px">
+              <div></div>
+              <div class="col" style="align-items:flex-end">
+                <span class="h3">חזרה על אבטחה</span>
+                <span class="caption">יעד: 1 יולי 2025 · 30 ימים</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-direction:row-reverse;margin-bottom:8px">
+              <span class="badge badge-red">אבטחת מידע</span>
+            </div>
+            <div class="row">
+              <button style="background:#ff3b3015;color:#ff3b30;border:none;padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer">מחק</button>
+              <button style="background:#007aff15;color:#007aff;border:none;padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer">ערוך</button>
+              <span class="spacer"></span>
+              <button style="background:#007aff;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">הפעל</button>
+            </div>
+          </div>
+
+          <!-- Weak topics -->
+          <div class="weak-strip">
+            <div class="row-between" style="margin-bottom:8px"><span>⚠️</span><span class="h3 orange">נושאים לחיזוק</span></div>
+            <div class="row-between" style="margin-bottom:4px"><span class="caption">48%</span><div class="row"><span class="body" style="font-size:13px">אבטחת מידע</span><span class="red" style="margin-right:4px">🔒</span></div></div>
+            <div class="progress-track"><div class="progress-fill" style="width:48%;background:#ff9500"></div></div>
+          </div>
+
+          <!-- History -->
+          <div>
+            <div class="row-between" style="margin-bottom:8px"><div></div><span class="h3">היסטוריית בחינות</span></div>
+            <div class="col" style="gap:6px">
+              <div class="card-sm row-between"><div class="col"><span class="caption2">היום 09:15</span><span class="caption2">4:23 דקות</span></div><span class="badge badge-blue">מעורב</span><div class="col" style="align-items:flex-end"><span class="h3 green">8/10</span><span class="caption green">80%</span></div></div>
+              <div class="card-sm row-between"><div class="col"><span class="caption2">אתמול 20:40</span><span class="caption2">6:11 דקות</span></div><span class="badge badge-red">אבטחה</span><div class="col" style="align-items:flex-end"><span class="h3 orange">12/20</span><span class="caption orange">60%</span></div></div>
+              <div class="card-sm row-between"><div class="col"><span class="caption2">3 ימים</span><span class="caption2">3:02 דקות</span></div><span class="badge badge-blue">רשתות</span><div class="col" style="align-items:flex-end"><span class="h3 green">9/10</span><span class="caption green">90%</span></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tab"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+          <div class="tab"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+          <div class="tab"><div class="tab-icon">✅</div><div class="tab-label">בחינה</div></div>
+          <div class="tab active"><div class="tab-icon">📅</div><div class="tab-label" style="color:#007aff">תכנון</div></div>
+          <div class="tab"><div class="tab-icon">🔖</div><div class="tab-label">שמורות</div></div>
+          <div class="tab"><div class="tab-icon">⚙️</div><div class="tab-label">ניהול</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 8: BOOKMARKS ===== -->
+  <div class="phone-wrap" id="s-bookmarks">
+    <div class="phone-label">🔖 שאלות שמורות</div>
+    <div class="phone">
+      <div class="screen screen-light">
+        <div class="statusbar"><span class="time">9:41</span><span class="icons">●●● 🔋</span></div>
+        <div class="navbar"><div class="row-between"><span class="title">שמורות</span><span class="blue" style="font-size:15px;font-weight:600">▶ תרגל</span></div></div>
+
+        <div class="content">
+          <!-- Search bar mock -->
+          <div style="background:#e5e5ea;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-direction:row-reverse">
+            <span class="secondary">🔍</span>
+            <span class="secondary" style="font-size:14px">חפש בשמורות...</span>
+          </div>
+
+          <!-- Count -->
+          <div class="row" style="justify-content:flex-end;gap:4px">
+            <span class="caption">12 שאלות שמורות</span>
+            <span class="orange">🔖</span>
+          </div>
+
+          <!-- Bookmark cards -->
+          <div class="bmark-card">
+            <div class="col" style="align-items:flex-start;gap:4px">
+              <span class="orange" style="font-size:18px">🔖</span>
+              <span class="purple" style="font-size:12px">📝</span>
+            </div>
+            <div class="col" style="flex:1;align-items:flex-end;gap:5px">
+              <span class="body text-right">מה ההבדל בין Symmetric ל-Asymmetric Encryption?</span>
+              <div class="row" style="gap:5px"><span class="badge badge-orange">בינוני</span><span class="badge badge-red">אבטחת מידע</span></div>
+              <span class="caption purple text-right">הערה: חשוב לבחינה! להבין את ההבדל המהותי</span>
+            </div>
+          </div>
+
+          <div class="bmark-card">
+            <div class="col" style="align-items:flex-start"><span class="orange" style="font-size:18px">🔖</span></div>
+            <div class="col" style="flex:1;align-items:flex-end;gap:5px">
+              <span class="body text-right">מה הוא Three-Way Handshake ב-TCP?</span>
+              <div class="row" style="gap:5px"><span class="badge badge-orange">בינוני</span><span class="badge badge-purple">פרוטוקולים</span></div>
+            </div>
+          </div>
+
+          <div class="bmark-card">
+            <div class="col" style="align-items:flex-start"><span class="orange" style="font-size:18px">🔖</span></div>
+            <div class="col" style="flex:1;align-items:flex-end;gap:5px">
+              <span class="body text-right">מה הוא RAID 5 ואיך הוא מגן על נתונים?</span>
+              <div class="row" style="gap:5px"><span class="badge badge-orange">בינוני</span><span class="badge badge-green">מ"ה</span></div>
+            </div>
+          </div>
+
+          <div class="bmark-card">
+            <div class="col" style="align-items:flex-start"><span class="orange" style="font-size:18px">🔖</span></div>
+            <div class="col" style="flex:1;align-items:flex-end;gap:5px">
+              <span class="body text-right">רשת 192.168.1.0/26 – כמה מארחים ניתן לחבר?</span>
+              <div class="row" style="gap:5px"><span class="badge badge-red">קשה</span><span class="badge badge-blue">רשתות</span></div>
+            </div>
+          </div>
+
+          <div class="bmark-card">
+            <div class="col" style="align-items:flex-start"><span class="orange" style="font-size:18px">🔖</span></div>
+            <div class="col" style="flex:1;align-items:flex-end;gap:5px">
+              <span class="body text-right">מה ההבדל בין IDS ל-IPS?</span>
+              <div class="row" style="gap:5px"><span class="badge badge-orange">בינוני</span><span class="badge badge-red">אבטחה</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tab"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+          <div class="tab"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+          <div class="tab"><div class="tab-icon">✅</div><div class="tab-label">בחינה</div></div>
+          <div class="tab"><div class="tab-icon">📅</div><div class="tab-label">תכנון</div></div>
+          <div class="tab active"><div class="tab-icon">🔖</div><div class="tab-label" style="color:#007aff">שמורות</div></div>
+          <div class="tab"><div class="tab-icon">⚙️</div><div class="tab-label">ניהול</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 9: ADMIN / MANAGEMENT ===== -->
+  <div class="phone-wrap" id="s-admin">
+    <div class="phone-label">⚙️ ניהול</div>
+    <div class="phone">
+      <div class="screen screen-light">
+        <div class="statusbar"><span class="time">9:41</span><span class="icons">●●● 🔋</span></div>
+        <div class="navbar"><div class="row-between"><span class="title">ניהול</span></div></div>
+
+        <div class="content">
+          <!-- Section: תוכן -->
+          <div class="form-section-header">תוכן ולמידה</div>
+          <div class="form-field">
+            <div class="mgmt-row">
+              <span class="secondary" style="font-size:12px">›</span>
+              <div class="col spacer" style="align-items:flex-end">
+                <span class="h3">ניהול שאלות</span>
+                <span class="caption">40 מובנות · 3 מותאמות</span>
+              </div>
+              <div class="icon-box" style="background:#007aff1a">✏️</div>
+            </div>
+            <div class="mgmt-row">
+              <span class="secondary" style="font-size:12px">›</span>
+              <div class="col spacer" style="align-items:flex-end">
+                <span class="h3">תוכניות לימוד</span>
+                <span class="caption">2 תוכניות · יעד: 20 שאלות/יום</span>
+              </div>
+              <div class="icon-box" style="background:#34c7591a">📅</div>
+            </div>
+            <div class="mgmt-row">
+              <span class="secondary" style="font-size:12px">›</span>
+              <div class="col spacer" style="align-items:flex-end">
+                <span class="h3">שאלות שמורות</span>
+                <span class="caption">12 שאלות שמורות</span>
+              </div>
+              <div class="icon-box" style="background:#ff95001a">🔖</div>
+            </div>
+          </div>
+
+          <!-- Section: ניתוח -->
+          <div class="form-section-header">ניתוח וסטטיסטיקות</div>
+          <div class="form-field">
+            <div class="mgmt-row">
+              <span class="secondary" style="font-size:12px">›</span>
+              <div class="col spacer" style="align-items:flex-end">
+                <span class="h3">התקדמות וגרפים</span>
+                <span class="caption">78% הצלחה · 15 בחינות</span>
+              </div>
+              <div class="icon-box" style="background:#af52de1a">📊</div>
+            </div>
+            <div class="mgmt-row">
+              <span class="secondary" style="font-size:12px">›</span>
+              <div class="col spacer" style="align-items:flex-end">
+                <span class="h3">היסטוריית בחינות</span>
+                <span class="caption">15 בחינות שהושלמו</span>
+              </div>
+              <div class="icon-box" style="background:#5856d61a">🕐</div>
+            </div>
+          </div>
+
+          <!-- Section: מערכת -->
+          <div class="form-section-header">מערכת</div>
+          <div class="form-field">
+            <div class="mgmt-row">
+              <span class="secondary" style="font-size:12px">›</span>
+              <div class="col spacer" style="align-items:flex-end">
+                <span class="h3">הגדרות</span>
+                <span class="caption">יוסי כהן</span>
+              </div>
+              <div class="icon-box" style="background:#8e8e931a">⚙️</div>
+            </div>
+          </div>
+
+          <!-- Quick summary -->
+          <div class="form-section-header">סיכום מהיר</div>
+          <div class="card col" style="gap:10px">
+            <div class="row-between">
+              <div class="col" style="align-items:flex-end">
+                <span class="h3">יוסי כהן</span>
+                <span class="caption">ביצועים כלליים</span>
+              </div>
+              <div class="circle-wrap">
+                <svg width="52" height="52" viewBox="0 0 52 52">
+                  <circle cx="26" cy="26" r="20" fill="none" stroke="#e5e5ea" stroke-width="6"/>
+                  <circle cx="26" cy="26" r="20" fill="none" stroke="#007aff" stroke-width="6"
+                    stroke-dasharray="126" stroke-dashoffset="28" stroke-linecap="round"
+                    transform="rotate(-90,26,26)"/>
+                </svg>
+                <div class="circle-center"><span style="font-size:11px;font-weight:700;color:#007aff">78%</span></div>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <div style="display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr 1px 1fr">
+              <div class="text-center col" style="align-items:center"><span style="font-weight:800;color:#ff9500;font-size:15px">7</span><span class="caption2">רצף</span></div>
+              <div style="background:#e5e5ea"></div>
+              <div class="text-center col" style="align-items:center"><span style="font-weight:800;color:#007aff;font-size:15px">142</span><span class="caption2">שאלות</span></div>
+              <div style="background:#e5e5ea"></div>
+              <div class="text-center col" style="align-items:center"><span style="font-weight:800;color:#ffd60a;font-size:15px">3</span><span class="caption2">הישגים</span></div>
+              <div style="background:#e5e5ea"></div>
+              <div class="text-center col" style="align-items:center"><span style="font-weight:800;color:#ff3b30;font-size:15px">1</span><span class="caption2">לחיזוק</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tab"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+          <div class="tab"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+          <div class="tab"><div class="tab-icon">✅</div><div class="tab-label">בחינה</div></div>
+          <div class="tab"><div class="tab-icon">📅</div><div class="tab-label">תכנון</div></div>
+          <div class="tab"><div class="tab-icon">🔖</div><div class="tab-label">שמורות</div></div>
+          <div class="tab active"><div class="tab-icon">⚙️</div><div class="tab-label" style="color:#007aff">ניהול</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 10: SETTINGS ===== -->
+  <div class="phone-wrap" id="s-settings">
+    <div class="phone-label">🔧 הגדרות</div>
+    <div class="phone">
+      <div class="screen screen-light">
+        <div class="statusbar"><span class="time">9:41</span><span class="icons">●●● 🔋</span></div>
+        <div class="navbar"><div class="row-between"><span class="title">הגדרות</span><span class="blue" style="font-size:14px;font-weight:600">שמור</span></div></div>
+
+        <div class="content">
+          <!-- Profile -->
+          <div class="form-section-header">פרופיל</div>
+          <div class="form-field">
+            <div class="form-row">
+              <span style="font-size:20px">👤</span>
+              <span class="spacer"></span>
+              <span class="body" style="color:#8e8e93">יוסי כהן</span>
+            </div>
+          </div>
+
+          <!-- Study -->
+          <div class="form-section-header">לימוד</div>
+          <div class="form-field">
+            <div class="form-row">
+              <div class="row" style="gap:6px">
+                <div style="width:28px;height:28px;background:#007aff1a;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px">－</div>
+                <span class="body">20</span>
+                <div style="width:28px;height:28px;background:#007aff1a;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#007aff">＋</div>
+              </div>
+              <span class="body">יעד יומי: 20 שאלות</span>
+            </div>
+            <div class="form-row">
+              <div style="width:44px;height:26px;background:#34c759;border-radius:13px;padding:2px;display:flex;align-items:center;justify-content:flex-end"><div style="width:22px;height:22px;background:#fff;border-radius:50%"></div></div>
+              <span class="body">תזכורות לימוד יומיות</span>
+            </div>
+          </div>
+
+          <!-- Stats -->
+          <div class="form-section-header">סטטיסטיקות</div>
+          <div class="form-field">
+            <div class="form-row"><span class="blue" style="font-weight:700">142</span><span class="body">שאלות נענו</span></div>
+            <div class="form-row"><span class="green" style="font-weight:700">111</span><span class="body">תשובות נכונות</span></div>
+            <div class="form-row"><span class="blue" style="font-weight:700">78%</span><span class="body">אחוז הצלחה</span></div>
+            <div class="form-row"><span class="orange" style="font-weight:700">7</span><span class="body">ימי רצף</span></div>
+            <div class="form-row"><span class="orange" style="font-weight:700">12</span><span class="body">שאלות שמורות</span></div>
+            <div class="form-row"><span class="blue" style="font-weight:700">3</span><span class="body">שאלות מותאמות</span></div>
+            <div class="form-row"><span class="green" style="font-weight:700">2</span><span class="body">תוכניות לימוד</span></div>
+            <div class="form-row"><span class="purple" style="font-weight:700">15</span><span class="body">בחינות שהושלמו</span></div>
+          </div>
+
+          <!-- Data -->
+          <div class="form-section-header">ניהול נתונים</div>
+          <div class="form-field">
+            <div class="form-row">
+              <span></span>
+              <div class="row"><span class="blue" style="font-size:14px">ייצא נתונים</span><span class="blue" style="font-size:14px">⬆</span></div>
+            </div>
+            <div class="form-row">
+              <span></span>
+              <div class="row"><span class="red" style="font-size:14px">↺ איפוס כל ההתקדמות</span></div>
+            </div>
+          </div>
+
+          <!-- About -->
+          <div class="form-section-header">אודות</div>
+          <div class="form-field">
+            <div class="form-row"><span></span><span class="secondary">AmirNet Plus 1.0</span></div>
+            <div class="form-row"><span></span><span class="secondary">iOS 17+ | SwiftUI</span></div>
+            <div class="form-row"><span></span><span class="secondary">הכנה לבחינת אמירנט</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /phone-grid -->
+
+<script>
+  function show(id) {
+    document.querySelectorAll('.phone-wrap').forEach(el => el.classList.remove('visible'));
+    const target = document.getElementById('s-' + id);
+    if (target) target.classList.add('visible');
+    document.querySelectorAll('.screen-nav button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+
+  function showAll() {
+    document.querySelectorAll('.phone-wrap').forEach(el => el.classList.add('visible'));
+    document.querySelectorAll('.screen-nav button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+</script>
+</body>
+</html>
