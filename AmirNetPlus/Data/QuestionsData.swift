@@ -1,10 +1,11 @@
 import Foundation
 
 struct QuestionsData {
-    static let all: [Question] = networking + security + operatingSystems + cloud + itManagement + protocols
+    static let all: [Question] = networkingHE + networkingEN + securityHE + securityEN + operatingSystemsHE + operatingSystemsEN + cloudHE + cloudEN + itManagementHE + itManagementEN + protocolsHE + protocolsEN
 
     // MARK: - Networking (רשתות תקשורת)
-    static let networking: [Question] = [
+    static let networking: [Question] = networkingHE + networkingEN
+    static let networkingHE: [Question] = [
         Question(
             questionText: "כמה שכבות יש במודל OSI?",
             options: ["5", "6", "7", "8"],
@@ -112,8 +113,173 @@ struct QuestionsData {
         ),
     ]
 
+    // MARK: - Networking EN – Sentence Completion
+    static let networkingEN: [Question] = [
+        Question(
+            questionText: "The ___ protocol automatically assigns IP addresses and network settings to devices.",
+            options: ["DHCP", "DNS", "FTP", "SMTP"],
+            correctIndex: 0,
+            explanation: "DHCP (Dynamic Host Configuration Protocol) automatically assigns IP address, subnet mask, default gateway and DNS server to devices on a network.",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "A ___ operates at Layer 3 of the OSI model and forwards packets between different networks.",
+            options: ["Router", "Switch", "Hub", "Bridge"],
+            correctIndex: 0,
+            explanation: "A Router operates at OSI Layer 3 (Network layer) and makes forwarding decisions based on IP addresses to route traffic between networks.",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "The ___ layer of the OSI model is responsible for end-to-end reliable data delivery.",
+            options: ["Transport", "Network", "Session", "Physical"],
+            correctIndex: 0,
+            explanation: "The Transport layer (Layer 4) handles end-to-end communication. TCP provides reliable delivery; UDP provides fast, connectionless delivery.",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "A MAC address is a ___ address assigned to a network interface card.",
+            options: ["physical (hardware)", "logical", "virtual", "dynamic"],
+            correctIndex: 0,
+            explanation: "A MAC (Media Access Control) address is a unique 48-bit physical hardware address burned into a NIC by the manufacturer.",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "VLANs are used to segment a network into separate ___ domains.",
+            options: ["broadcast", "collision", "routing", "multicast"],
+            correctIndex: 0,
+            explanation: "VLANs (Virtual LANs) logically segment a switched network into separate broadcast domains, improving security and performance.",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "NAT allows multiple devices on a private network to share a single ___ IP address.",
+            options: ["public", "private", "static", "loopback"],
+            correctIndex: 0,
+            explanation: "NAT (Network Address Translation) translates private IP addresses to a single public IP address, conserving public IP space.",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "The loopback address ___ is used by a host to refer to itself.",
+            options: ["127.0.0.1", "192.168.0.1", "10.0.0.1", "0.0.0.0"],
+            correctIndex: 0,
+            explanation: "127.0.0.1 is the loopback (localhost) address. Traffic sent to it stays on the local machine and is used to test the network stack.",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "OSPF is classified as a ___ routing protocol.",
+            options: ["link-state", "distance-vector", "path-vector", "static"],
+            correctIndex: 0,
+            explanation: "OSPF (Open Shortest Path First) is a link-state routing protocol. Each router builds a complete map of the network topology and calculates the shortest path.",
+            topic: .networking,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "Spanning Tree Protocol (STP) prevents ___ loops in switched networks.",
+            options: ["bridge/network", "routing", "broadcast", "multicast"],
+            correctIndex: 0,
+            explanation: "STP (Spanning Tree Protocol) prevents Layer 2 switching loops by blocking redundant paths, ensuring a loop-free topology.",
+            topic: .networking,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "A ___ connects two different network types and translates between their protocols at all OSI layers.",
+            options: ["Gateway", "Switch", "Hub", "Repeater"],
+            correctIndex: 0,
+            explanation: "A Gateway operates at all OSI layers and translates between incompatible protocols or network architectures.",
+            topic: .networking,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "The ___ command is used to display the routing table on a Windows machine.",
+            options: ["route print", "netstat -r", "ipconfig /all", "tracert"],
+            correctIndex: 0,
+            explanation: "'route print' displays the routing table on Windows. 'netstat -r' also works. The routing table shows how the system forwards packets to different networks.",
+            topic: .networking,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "In a /28 subnet, the number of usable host addresses is ___.",
+            options: ["14", "16", "30", "62"],
+            correctIndex: 0,
+            explanation: "/28 leaves 4 bits for hosts: 2^4 = 16 addresses total. Subtract the network and broadcast addresses: 16 – 2 = 14 usable hosts.",
+            topic: .networking,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "An IP address of 169.254.x.x indicates the device failed to obtain an address from ___.",
+            options: ["a DHCP server", "a DNS server", "the default gateway", "an FTP server"],
+            correctIndex: 0,
+            explanation: "169.254.0.0/16 is the APIPA (Automatic Private IP Addressing) range. Windows assigns an address in this range when it cannot reach a DHCP server.",
+            topic: .networking,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "The ___ layer of the OSI model handles data format translation and encryption/decryption.",
+            options: ["Presentation", "Session", "Application", "Transport"],
+            correctIndex: 0,
+            explanation: "The Presentation layer (Layer 6) handles data format translation, encryption/decryption, and compression so the Application layer receives usable data.",
+            topic: .networking,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "Full-Duplex communication allows data to be transmitted ___.",
+            options: ["in both directions simultaneously", "in one direction at a time", "wirelessly only", "without a switch"],
+            correctIndex: 0,
+            explanation: "Full-Duplex allows simultaneous bidirectional communication (like a phone call). Half-Duplex allows only one direction at a time (like a walkie-talkie).",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "The ___ protocol resolves IP addresses to MAC addresses within a local network.",
+            options: ["ARP", "DNS", "DHCP", "RARP"],
+            correctIndex: 0,
+            explanation: "ARP (Address Resolution Protocol) maps a known IP address to a MAC address by broadcasting a request on the local network segment.",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "QoS stands for Quality of ___.",
+            options: ["Service", "Speed", "Security", "System"],
+            correctIndex: 0,
+            explanation: "QoS (Quality of Service) refers to mechanisms that prioritize certain types of network traffic to guarantee performance for latency-sensitive applications.",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "A ___ is a network device that regenerates and retransmits signals to extend the network range.",
+            options: ["Repeater", "Router", "Switch", "Firewall"],
+            correctIndex: 0,
+            explanation: "A Repeater operates at OSI Layer 1 (Physical). It amplifies and retransmits signals to extend the reach of a network segment.",
+            topic: .networking,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "BGP (Border Gateway Protocol) is the routing protocol used to exchange routing information between ___.",
+            options: ["autonomous systems on the internet", "routers in a LAN", "VLANs on a switch", "wireless access points"],
+            correctIndex: 0,
+            explanation: "BGP is the core routing protocol of the internet, exchanging routing information between autonomous systems (AS) – large networks managed by different organisations.",
+            topic: .networking,
+            difficulty: .hard
+        ),
+        Question(
+            questionText: "In IPv6, the address space is ___ bits long.",
+            options: ["128", "32", "64", "256"],
+            correctIndex: 0,
+            explanation: "IPv6 uses 128-bit addresses (compared to 32-bit in IPv4), providing approximately 3.4 × 10^38 unique addresses.",
+            topic: .networking,
+            difficulty: .medium
+        ),
+    ]
+
     // MARK: - Security (אבטחת מידע)
-    static let security: [Question] = [
+    static let security: [Question] = securityHE + securityEN
+    static let securityHE: [Question] = [
         Question(
             questionText: "מה ההבדל בין Symmetric ל-Asymmetric Encryption?",
             options: [
@@ -220,8 +386,173 @@ struct QuestionsData {
         ),
     ]
 
+    // MARK: - Security EN – Sentence Completion
+    static let securityEN: [Question] = [
+        Question(
+            questionText: "The CIA triad in information security stands for Confidentiality, Integrity, and ___.",
+            options: ["Availability", "Authentication", "Authorization", "Accountability"],
+            correctIndex: 0,
+            explanation: "The CIA triad is the core model of information security. Confidentiality protects data from unauthorised access; Integrity ensures data is unaltered; Availability ensures systems are accessible.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "In ___ encryption, the same key is used for both encrypting and decrypting data.",
+            options: ["symmetric", "asymmetric", "public-key", "hybrid"],
+            correctIndex: 0,
+            explanation: "Symmetric encryption uses a single shared key (e.g. AES). It is faster than asymmetric encryption but requires a secure channel to exchange the key.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "___ is a social engineering attack that tricks users into revealing sensitive information via fake messages.",
+            options: ["Phishing", "Spoofing", "Sniffing", "Port scanning"],
+            correctIndex: 0,
+            explanation: "Phishing uses deceptive emails, websites, or messages that appear legitimate to steal credentials or sensitive data from unsuspecting users.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "IDS stands for Intrusion ___ System.",
+            options: ["Detection", "Defense", "Denial", "Delivery"],
+            correctIndex: 0,
+            explanation: "IDS (Intrusion Detection System) monitors network or system activity for malicious activity and sends alerts. Unlike IPS, it does not actively block threats.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "A ___ attack involves an attacker secretly intercepting and possibly altering communications between two parties.",
+            options: ["Man-in-the-Middle", "DoS", "Phishing", "SQL Injection"],
+            correctIndex: 0,
+            explanation: "In a Man-in-the-Middle (MitM) attack, the attacker positions themselves between the two communicating parties, able to read, modify or inject messages.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "A ___ firewall inspects packets based on the state of active network connections.",
+            options: ["stateful", "stateless", "packet-filtering", "application-proxy"],
+            correctIndex: 0,
+            explanation: "A stateful firewall tracks the state of each connection and makes decisions based on context (e.g. allowing return traffic for established sessions).",
+            topic: .security,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "Zero-day vulnerability refers to a security flaw that is ___ to the software vendor.",
+            options: ["unknown", "known and patched", "publicly documented", "reported to authorities"],
+            correctIndex: 0,
+            explanation: "A zero-day vulnerability is unknown to the vendor and therefore has no patch. Attackers who discover it have 'zero days' of warning before exploitation.",
+            topic: .security,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "Ransomware is malware that ___ the victim's files and demands payment for the decryption key.",
+            options: ["encrypts", "deletes", "copies to a remote server", "monitors activity on"],
+            correctIndex: 0,
+            explanation: "Ransomware encrypts a victim's files or entire disk, then demands a ransom (usually cryptocurrency) in exchange for the decryption key.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "A ___ is a trusted third party that issues digital certificates to verify identities online.",
+            options: ["Certificate Authority (CA)", "Domain Controller", "Firewall", "Load Balancer"],
+            correctIndex: 0,
+            explanation: "A Certificate Authority issues and signs digital certificates (e.g. SSL/TLS certificates) that bind a public key to an entity, enabling trust on the internet.",
+            topic: .security,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "The principle of ___ ensures users only have the minimum access rights needed to perform their job.",
+            options: ["Least Privilege", "Separation of Duties", "Defense in Depth", "Non-Repudiation"],
+            correctIndex: 0,
+            explanation: "The Principle of Least Privilege (PoLP) limits users and processes to only the permissions they need, reducing the attack surface.",
+            topic: .security,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "Multi-factor authentication (MFA) requires users to provide at least ___ form(s) of verification.",
+            options: ["two", "one", "three", "four"],
+            correctIndex: 0,
+            explanation: "MFA combines two or more factors: something you know (password), something you have (token), and something you are (biometric).",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "SSH uses port ___ by default for secure remote access.",
+            options: ["22", "23", "21", "443"],
+            correctIndex: 0,
+            explanation: "SSH (Secure Shell) uses TCP port 22 to provide encrypted remote login and command execution. Telnet (port 23) is the insecure predecessor.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "WPA2 secures wireless networks using ___ encryption.",
+            options: ["AES", "DES", "MD5", "SHA-1"],
+            correctIndex: 0,
+            explanation: "WPA2 uses AES (Advanced Encryption Standard) with CCMP for encryption. WEP and the older WPA used RC4, which is now considered insecure.",
+            topic: .security,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "A ___ attack attempts to gain access by systematically trying every possible password combination.",
+            options: ["Brute Force", "Phishing", "Man-in-the-Middle", "DoS"],
+            correctIndex: 0,
+            explanation: "A Brute Force attack tries all possible combinations until the correct password is found. Account lockout policies and strong passwords mitigate this risk.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "A ___ is a network segment that acts as a buffer zone between a trusted internal network and the internet.",
+            options: ["DMZ (Demilitarised Zone)", "VLAN", "NAT", "VPN tunnel"],
+            correctIndex: 0,
+            explanation: "A DMZ hosts public-facing services (web, email servers) isolated from the internal network. Even if the DMZ is compromised, the internal network remains protected.",
+            topic: .security,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "A ___ is a program that appears legitimate but contains hidden malicious code.",
+            options: ["Trojan horse", "Worm", "Virus", "Adware"],
+            correctIndex: 0,
+            explanation: "A Trojan horse disguises itself as legitimate software. Unlike viruses or worms it does not self-replicate, but can open backdoors or steal data.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "HTTPS uses ___ to secure the HTTP communication.",
+            options: ["TLS (Transport Layer Security)", "IPsec", "ARP", "SNMP"],
+            correctIndex: 0,
+            explanation: "HTTPS wraps HTTP inside TLS (formerly SSL), providing encryption, authentication, and integrity protection for web traffic.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "SQL Injection is an attack that inserts malicious ___ into an input field to manipulate a database.",
+            options: ["SQL code", "HTML tags", "JavaScript", "Shell commands"],
+            correctIndex: 0,
+            explanation: "SQL Injection exploits poor input validation by inserting SQL statements that the database executes, potentially exposing or modifying data.",
+            topic: .security,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "The process of converting plaintext into unreadable ciphertext is called ___.",
+            options: ["encryption", "hashing", "encoding", "compression"],
+            correctIndex: 0,
+            explanation: "Encryption transforms plaintext into ciphertext using an algorithm and key. It is reversible (decryptable), unlike hashing which is a one-way process.",
+            topic: .security,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "A VPN creates an encrypted ___ through a public network to secure communications.",
+            options: ["tunnel", "bridge", "VLAN", "proxy"],
+            correctIndex: 0,
+            explanation: "A VPN (Virtual Private Network) encapsulates and encrypts traffic in a tunnel over the internet, giving remote users secure access to private network resources.",
+            topic: .security,
+            difficulty: .easy
+        ),
+    ]
+
     // MARK: - Operating Systems (מערכות הפעלה)
-    static let operatingSystems: [Question] = [
+    static let operatingSystems: [Question] = operatingSystemsHE + operatingSystemsEN
+    static let operatingSystemsHE: [Question] = [
         Question(
             questionText: "מה הוא Active Directory?",
             options: [
@@ -318,8 +649,133 @@ struct QuestionsData {
         ),
     ]
 
+    // MARK: - Operating Systems EN – Sentence Completion
+    static let operatingSystemsEN: [Question] = [
+        Question(
+            questionText: "The ___ command in Linux is used to change the permissions of a file or directory.",
+            options: ["chmod", "chown", "chgrp", "ls -l"],
+            correctIndex: 0,
+            explanation: "chmod (change mode) sets read/write/execute permissions for owner, group and others. Example: chmod 755 file gives rwxr-xr-x.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "In Windows, the ___ tool provides centralised management of users, computers, and policies in a domain.",
+            options: ["Active Directory", "Task Manager", "Registry Editor", "Device Manager"],
+            correctIndex: 0,
+            explanation: "Active Directory (AD) is Microsoft's directory service. It stores information about objects (users, computers, groups) and enforces security policies across the domain.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "A ___ in Linux is a background process that runs without direct user interaction.",
+            options: ["daemon", "shell", "kernel module", "cron"],
+            correctIndex: 0,
+            explanation: "Daemons are background processes in Linux/Unix (e.g. httpd, sshd). They start at boot and handle system or network services without a controlling terminal.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "The ___ file system is the default for modern Windows installations and supports large files and fine-grained permissions.",
+            options: ["NTFS", "FAT32", "exFAT", "ext4"],
+            correctIndex: 0,
+            explanation: "NTFS (New Technology File System) supports files larger than 4 GB, Access Control Lists (ACLs), journaling, compression and encryption (EFS).",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "RAID ___ uses disk mirroring to provide fault tolerance, but does not improve read/write performance.",
+            options: ["1", "0", "5", "10"],
+            correctIndex: 0,
+            explanation: "RAID 1 mirrors data identically on two disks. If one fails, the other contains a full copy. It provides fault tolerance but uses 50% of total disk capacity.",
+            topic: .operatingSystems,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "The Windows ___ is a hierarchical database that stores configuration settings for the OS, hardware, and applications.",
+            options: ["Registry", "Task Scheduler", "Event Viewer", "BIOS"],
+            correctIndex: 0,
+            explanation: "The Windows Registry stores low-level settings for Windows and applications. It is organised into keys and values, and can be edited with regedit.exe.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "In Active Directory, a ___ is the fundamental administrative boundary that groups computers, users and resources.",
+            options: ["domain", "workgroup", "forest root", "site"],
+            correctIndex: 0,
+            explanation: "A domain is the core unit of AD. All objects in a domain share the same directory database and security policies. Multiple domains can form a forest.",
+            topic: .operatingSystems,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "The ___ command in Windows checks and repairs file system errors on a disk.",
+            options: ["chkdsk", "diskpart", "format", "defrag"],
+            correctIndex: 0,
+            explanation: "chkdsk (Check Disk) scans the file system and disk surface for errors and attempts to fix them. Running with /f flag fixes errors; /r locates bad sectors.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "GPO stands for Group Policy ___.",
+            options: ["Object", "Operation", "Override", "Objective"],
+            correctIndex: 0,
+            explanation: "A Group Policy Object (GPO) is a collection of settings that control the working environment of user accounts and computer accounts in Active Directory.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "In Linux, the ___ command displays currently running processes and system resource usage in real time.",
+            options: ["top", "ps", "df", "ls"],
+            correctIndex: 0,
+            explanation: "top shows a dynamic real-time view of running processes, CPU usage, memory usage and more. Press 'q' to quit. htop is a more user-friendly alternative.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "The ___ command in Linux is used to change the ownership of a file.",
+            options: ["chown", "chmod", "chgrp", "ls"],
+            correctIndex: 0,
+            explanation: "chown (change owner) changes the user and/or group ownership of a file. Example: chown user:group filename.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "Hyper-V is Microsoft's built-in ___.",
+            options: ["hypervisor (virtualisation platform)", "antivirus engine", "backup agent", "network monitor"],
+            correctIndex: 0,
+            explanation: "Hyper-V is a Type-1 (bare-metal) hypervisor built into Windows Server and Windows 10/11 Pro/Enterprise, allowing you to create and run virtual machines.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "In Linux, the file ___ contains information about all local user accounts.",
+            options: ["/etc/passwd", "/etc/shadow", "/etc/hosts", "/etc/fstab"],
+            correctIndex: 0,
+            explanation: "/etc/passwd stores basic user account info (username, UID, home directory, shell). Encrypted passwords are stored separately in /etc/shadow.",
+            topic: .operatingSystems,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "PowerShell is Microsoft's command-line shell and ___ framework for task automation.",
+            options: ["scripting", "networking", "virtualisation", "backup"],
+            correctIndex: 0,
+            explanation: "PowerShell is a cross-platform task automation tool consisting of a command-line shell and scripting language built on .NET, widely used for Windows administration.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "BIOS stands for Basic Input/Output ___.",
+            options: ["System", "Software", "Service", "Standard"],
+            correctIndex: 0,
+            explanation: "BIOS (Basic Input/Output System) is firmware stored on a chip on the motherboard. It initialises hardware during boot and loads the operating system bootloader.",
+            topic: .operatingSystems,
+            difficulty: .easy
+        ),
+    ]
+
     // MARK: - Cloud & Virtualization (ענן ווירטואליזציה)
-    static let cloud: [Question] = [
+    static let cloud: [Question] = cloudHE + cloudEN
+    static let cloudHE: [Question] = [
         Question(
             questionText: "מה ההבדל בין IaaS, PaaS ו-SaaS?",
             options: [
@@ -413,8 +869,133 @@ struct QuestionsData {
         ),
     ]
 
+    // MARK: - Cloud EN – Sentence Completion
+    static let cloudEN: [Question] = [
+        Question(
+            questionText: "IaaS stands for Infrastructure as a ___.",
+            options: ["Service", "System", "Solution", "Server"],
+            correctIndex: 0,
+            explanation: "IaaS (Infrastructure as a Service) provides virtualised computing resources over the internet – virtual machines, storage and networking – on a pay-as-you-go basis.",
+            topic: .cloud,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "AWS S3 is primarily used for ___ storage.",
+            options: ["object", "block", "file", "database"],
+            correctIndex: 0,
+            explanation: "Amazon S3 (Simple Storage Service) is an object storage service. Data is stored as objects (files + metadata) in buckets, ideal for backups, media, and static websites.",
+            topic: .cloud,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "In cloud computing, ___ refers to the ability to automatically add or remove resources based on demand.",
+            options: ["elasticity", "reliability", "durability", "portability"],
+            correctIndex: 0,
+            explanation: "Elasticity means cloud resources expand when load increases and shrink when it drops, ensuring cost-efficient performance without manual intervention.",
+            topic: .cloud,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "Docker containers share the host's ___, making them significantly lighter than virtual machines.",
+            options: ["OS kernel", "CPU cores", "RAM modules", "disk controller"],
+            correctIndex: 0,
+            explanation: "Unlike VMs, containers share the host OS kernel. They package only the application and its dependencies, making them faster to start and much smaller in size.",
+            topic: .cloud,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "A ___ cloud combines both public and private cloud environments, allowing data and applications to move between them.",
+            options: ["hybrid", "community", "distributed", "federated"],
+            correctIndex: 0,
+            explanation: "A hybrid cloud links on-premises or private cloud infrastructure with public cloud services, enabling flexibility, cost optimisation and data sovereignty.",
+            topic: .cloud,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "Kubernetes is an open-source platform for ___ containerised workloads and services.",
+            options: ["orchestrating", "building", "testing", "encrypting"],
+            correctIndex: 0,
+            explanation: "Kubernetes (K8s) automates deployment, scaling, and management of containerised applications. It groups containers into pods and manages their lifecycle.",
+            topic: .cloud,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "SLA stands for Service Level ___.",
+            options: ["Agreement", "Assessment", "Authorization", "Allocation"],
+            correctIndex: 0,
+            explanation: "An SLA (Service Level Agreement) is a contract between a cloud provider and customer that defines expected service levels such as uptime, response time and support.",
+            topic: .cloud,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "The ___ cloud model charges customers only for the resources they actually consume.",
+            options: ["pay-as-you-go", "subscription", "perpetual licence", "freemium"],
+            correctIndex: 0,
+            explanation: "The pay-as-you-go (consumption) model is the defining pricing model of public cloud. Customers pay only for what they use, avoiding large upfront capital expenses.",
+            topic: .cloud,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "___ computing moves computation and data storage closer to the data source to reduce latency.",
+            options: ["Edge", "Grid", "Fog", "Cluster"],
+            correctIndex: 0,
+            explanation: "Edge computing processes data at or near the source (e.g. IoT devices, factories) rather than sending it to a centralised data centre, reducing latency and bandwidth.",
+            topic: .cloud,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "CDN stands for Content ___ Network.",
+            options: ["Delivery", "Distribution", "Domain", "Dynamic"],
+            correctIndex: 0,
+            explanation: "A CDN (Content Delivery Network) is a geographically distributed group of servers that caches content close to users, improving load times and reducing origin server load.",
+            topic: .cloud,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "In cloud environments, ___ ensures services remain operational even if individual components fail.",
+            options: ["high availability", "low latency", "horizontal scaling", "load balancing"],
+            correctIndex: 0,
+            explanation: "High availability (HA) is achieved through redundancy, failover mechanisms and geographic distribution, ensuring services meet their uptime SLA targets.",
+            topic: .cloud,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "PaaS provides developers with a ___ to build, run and manage applications without managing the underlying infrastructure.",
+            options: ["platform", "virtual machine", "container image", "bare-metal server"],
+            correctIndex: 0,
+            explanation: "PaaS (Platform as a Service) handles the OS, middleware, runtime and scaling, letting developers focus purely on writing code. Examples: Azure App Service, Google App Engine.",
+            topic: .cloud,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "AWS ___ is the service used to manage user identities and access to AWS resources.",
+            options: ["IAM (Identity and Access Management)", "EC2", "S3", "CloudFront"],
+            correctIndex: 0,
+            explanation: "AWS IAM lets you create users, groups and roles, and control who can access which AWS services and resources using fine-grained permissions.",
+            topic: .cloud,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "In a cloud disaster recovery plan, RTO refers to the maximum acceptable ___ to restore a service after a failure.",
+            options: ["downtime (time to recover)", "data loss", "cost", "bandwidth"],
+            correctIndex: 0,
+            explanation: "RTO (Recovery Time Objective) is the maximum duration a service can be unavailable. A short RTO requires more expensive solutions like hot standby or active-active replication.",
+            topic: .cloud,
+            difficulty: .hard
+        ),
+        Question(
+            questionText: "A ___ is a pre-configured template containing the OS and application stack used to launch cloud instances.",
+            options: ["machine image (AMI/snapshot)", "Dockerfile", "YAML manifest", "shell script"],
+            correctIndex: 0,
+            explanation: "Cloud machine images (e.g. AWS AMI) capture the full state of an instance. Launching from an image produces identical, pre-configured instances rapidly.",
+            topic: .cloud,
+            difficulty: .medium
+        ),
+    ]
+
     // MARK: - IT Management (ניהול IT)
-    static let itManagement: [Question] = [
+    static let itManagement: [Question] = itManagementHE + itManagementEN
+    static let itManagementHE: [Question] = [
         Question(
             questionText: "מה הוא ITIL?",
             options: [
@@ -495,8 +1076,133 @@ struct QuestionsData {
         ),
     ]
 
+    // MARK: - IT Management EN – Sentence Completion
+    static let itManagementEN: [Question] = [
+        Question(
+            questionText: "ITIL stands for Information Technology Infrastructure ___.",
+            options: ["Library", "Lifecycle", "Listing", "Logic"],
+            correctIndex: 0,
+            explanation: "ITIL (Information Technology Infrastructure Library) is a set of best-practice guidelines for IT service management (ITSM), widely adopted worldwide.",
+            topic: .itManagement,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "In ITIL, an ___ is any unplanned interruption or reduction in quality of an IT service.",
+            options: ["incident", "problem", "change", "event"],
+            correctIndex: 0,
+            explanation: "An incident is an unplanned service disruption. The goal of incident management is to restore normal service as quickly as possible with minimum business impact.",
+            topic: .itManagement,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "The ___ process in ITIL investigates the root cause of one or more incidents to prevent recurrence.",
+            options: ["Problem Management", "Incident Management", "Change Management", "Release Management"],
+            correctIndex: 0,
+            explanation: "Problem Management identifies and removes the underlying cause of incidents. Once identified, the root cause becomes a 'known error' with a documented workaround.",
+            topic: .itManagement,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "KPI stands for Key Performance ___.",
+            options: ["Indicator", "Index", "Integration", "Interface"],
+            correctIndex: 0,
+            explanation: "KPIs (Key Performance Indicators) are measurable values that demonstrate how effectively an organisation or team is achieving key business objectives.",
+            topic: .itManagement,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "An SLA defines the ___ of service expected between an IT provider and the customer.",
+            options: ["level", "speed", "cost", "architecture"],
+            correctIndex: 0,
+            explanation: "An SLA (Service Level Agreement) is a formal contract specifying service metrics such as uptime percentage, response time, and resolution time for incidents.",
+            topic: .itManagement,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "CMDB stands for Configuration Management ___ Database.",
+            options: ["- (the full name is Configuration Management Database)", "Change", "Content", "Control"],
+            correctIndex: 0,
+            explanation: "A CMDB (Configuration Management Database) stores information about IT assets (Configuration Items) and their relationships, supporting ITSM processes.",
+            topic: .itManagement,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "RTO stands for Recovery Time ___.",
+            options: ["Objective", "Operation", "Override", "Outcome"],
+            correctIndex: 0,
+            explanation: "RTO (Recovery Time Objective) is the maximum acceptable length of time after a service disruption before it must be restored to avoid unacceptable business impact.",
+            topic: .itManagement,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "RPO refers to the maximum amount of ___ a business can afford to lose in a disaster.",
+            options: ["data", "time", "money", "staff"],
+            correctIndex: 0,
+            explanation: "RPO (Recovery Point Objective) defines the age of data that must be recovered. A 4-hour RPO means backups must occur at least every 4 hours.",
+            topic: .itManagement,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "ITSM stands for IT Service ___.",
+            options: ["Management", "Monitoring", "Mapping", "Migration"],
+            correctIndex: 0,
+            explanation: "IT Service Management (ITSM) encompasses all activities, processes and policies an organisation uses to plan, design, deliver, operate and control IT services.",
+            topic: .itManagement,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "The ___ is the single point of contact between IT users and the IT department.",
+            options: ["Service Desk", "Help Centre", "NOC", "SOC"],
+            correctIndex: 0,
+            explanation: "The Service Desk (per ITIL) is a broader concept than a Help Desk. It handles incidents, service requests, changes, and communications – acting as a strategic function.",
+            topic: .itManagement,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "Change ___ in ITIL ensures all modifications to IT infrastructure are properly assessed, approved and implemented.",
+            options: ["Management", "Control", "Logging", "Deployment"],
+            correctIndex: 0,
+            explanation: "Change Management controls the lifecycle of all changes, minimising the risk of disruption. Changes are categorised as standard, normal, or emergency.",
+            topic: .itManagement,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "A ___ plan describes the steps an organisation takes to resume critical business operations after a disaster.",
+            options: ["Business Continuity", "Disaster Recovery", "Incident Response", "Service Level"],
+            correctIndex: 0,
+            explanation: "A Business Continuity Plan (BCP) ensures critical business functions continue during and after a disaster. The more focused Disaster Recovery Plan (DRP) covers IT systems restoration.",
+            topic: .itManagement,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "In ITIL, a ___ is a workaround for a known error until a permanent fix is implemented.",
+            options: ["known error record", "problem ticket", "incident report", "change request"],
+            correctIndex: 0,
+            explanation: "A known error record documents a problem with an identified root cause and a workaround. It lives in the Known Error Database (KEDB) and helps resolve future incidents faster.",
+            topic: .itManagement,
+            difficulty: .hard
+        ),
+        Question(
+            questionText: "Availability management in ITIL aims to ensure IT services meet availability targets defined in the ___.",
+            options: ["SLA", "CMDB", "RFC", "KPI dashboard"],
+            correctIndex: 0,
+            explanation: "Availability management monitors and improves the availability of IT services to ensure they meet the levels agreed with customers in the SLA.",
+            topic: .itManagement,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "A ___ (RFC) is a formal proposal submitted to the change management process requesting a modification to an IT service.",
+            options: ["Request for Change", "Request for Comment", "Release for Change", "Record for Configuration"],
+            correctIndex: 0,
+            explanation: "A Request for Change (RFC) triggers the Change Management process. It documents the nature of the change, its business justification, risk assessment and rollback plan.",
+            topic: .itManagement,
+            difficulty: .medium
+        ),
+    ]
+
     // MARK: - Protocols (פרוטוקולים)
-    static let protocols: [Question] = [
+    static let protocols: [Question] = protocolsHE + protocolsEN
+    static let protocolsHE: [Question] = [
         Question(
             questionText: "מה הפורט הסטנדרטי של DNS?",
             options: ["53", "80", "443", "25"],
@@ -595,6 +1301,130 @@ struct QuestionsData {
             explanation: "IMAP (פורט 143/993) מסנכרן מיילים ומשאיר עותק בשרת - מאפשר גישה ממספר מכשירים. POP3 (פורט 110/995) מוריד מיילים ומוחק אותם מהשרת.",
             topic: .protocols,
             difficulty: .medium
+        ),
+    ]
+
+    // MARK: - Protocols EN – Sentence Completion
+    static let protocolsEN: [Question] = [
+        Question(
+            questionText: "DNS stands for Domain Name ___.",
+            options: ["System", "Service", "Server", "Security"],
+            correctIndex: 0,
+            explanation: "DNS (Domain Name System) translates human-readable domain names (e.g. www.example.com) into IP addresses that computers use to communicate.",
+            topic: .protocols,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "HTTP uses port ___ by default.",
+            options: ["80", "443", "8080", "21"],
+            correctIndex: 0,
+            explanation: "HTTP (HyperText Transfer Protocol) uses TCP port 80. HTTPS (HTTP Secure) uses port 443. Port 8080 is a common alternative for web servers and proxies.",
+            topic: .protocols,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "SMTP is used to ___ email messages between servers.",
+            options: ["send / relay", "receive and store", "encrypt", "compress"],
+            correctIndex: 0,
+            explanation: "SMTP (Simple Mail Transfer Protocol) handles outgoing email – it sends and relays messages between mail servers on port 25, or port 587 for authenticated submission.",
+            topic: .protocols,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "In TCP, a connection is established using a ___ handshake.",
+            options: ["three-way", "two-way", "four-way", "one-way"],
+            correctIndex: 0,
+            explanation: "TCP's three-way handshake: (1) Client sends SYN, (2) Server replies SYN-ACK, (3) Client sends ACK. Only then is the connection established.",
+            topic: .protocols,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "SNMP is used by network administrators to ___ network devices.",
+            options: ["monitor and manage", "encrypt traffic on", "route packets through", "assign IPs to"],
+            correctIndex: 0,
+            explanation: "SNMP (Simple Network Management Protocol) collects and organises information about managed devices (routers, switches, servers) and allows remote configuration.",
+            topic: .protocols,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "The ___ protocol uses UDP port 123 to synchronise clocks across networked devices.",
+            options: ["NTP", "SNMP", "TFTP", "ICMP"],
+            correctIndex: 0,
+            explanation: "NTP (Network Time Protocol) keeps device clocks synchronised to within milliseconds of Coordinated Universal Time (UTC), which is essential for logs, certificates and Kerberos.",
+            topic: .protocols,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "IMAP allows email clients to access and manage messages ___ on the mail server.",
+            options: ["stored remotely", "downloaded and deleted", "encrypted locally", "cached offline only"],
+            correctIndex: 0,
+            explanation: "IMAP (Internet Message Access Protocol) keeps email on the server and synchronises state across multiple devices. POP3 downloads and typically deletes from the server.",
+            topic: .protocols,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "POP3 uses port ___ by default.",
+            options: ["110", "25", "143", "993"],
+            correctIndex: 0,
+            explanation: "POP3 uses port 110 (unencrypted) or port 995 (POP3S over TLS). IMAP uses port 143 (or 993 encrypted). SMTP uses port 25.",
+            topic: .protocols,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "The ___ protocol is used by the 'ping' command to test network connectivity.",
+            options: ["ICMP", "TCP", "UDP", "ARP"],
+            correctIndex: 0,
+            explanation: "Ping uses ICMP (Internet Control Message Protocol) Echo Request and Echo Reply messages to test reachability and measure round-trip time.",
+            topic: .protocols,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "LDAP is used to access and maintain ___ directory services.",
+            options: ["distributed", "encrypted", "local", "real-time streaming"],
+            correctIndex: 0,
+            explanation: "LDAP (Lightweight Directory Access Protocol) queries and modifies items in distributed directory services such as Active Directory, using port 389 (or 636 for LDAPS).",
+            topic: .protocols,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "BGP stands for ___ Gateway Protocol.",
+            options: ["Border", "Basic", "Bridge", "Broadcast"],
+            correctIndex: 0,
+            explanation: "BGP (Border Gateway Protocol) is the routing protocol of the internet. It exchanges routing information between autonomous systems (AS) on port 179.",
+            topic: .protocols,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "Telnet is considered insecure because it transmits all data, including passwords, in ___.",
+            options: ["plaintext", "ciphertext", "binary", "Base64"],
+            correctIndex: 0,
+            explanation: "Telnet sends all data unencrypted in plaintext. SSH (port 22) replaced Telnet as the secure alternative for remote administration.",
+            topic: .protocols,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "The ___ protocol provides connectionless, fast data transmission without guaranteed delivery.",
+            options: ["UDP", "TCP", "FTP", "HTTPS"],
+            correctIndex: 0,
+            explanation: "UDP (User Datagram Protocol) is connectionless and has no error-checking or retransmission. It is ideal for speed-critical applications: DNS, VoIP, video streaming, online gaming.",
+            topic: .protocols,
+            difficulty: .easy
+        ),
+        Question(
+            questionText: "SFTP transfers files securely by running over ___.",
+            options: ["SSH (port 22)", "FTP (port 21)", "HTTPS (port 443)", "TFTP (port 69)"],
+            correctIndex: 0,
+            explanation: "SFTP (SSH File Transfer Protocol) is not FTP over SSL. It is a completely separate protocol that runs within an SSH session, inheriting SSH's encryption and authentication.",
+            topic: .protocols,
+            difficulty: .medium
+        ),
+        Question(
+            questionText: "HTTPS secures web traffic by operating at the ___ layer of the OSI model.",
+            options: ["Application (Layer 7)", "Transport (Layer 4)", "Session (Layer 5)", "Presentation (Layer 6)"],
+            correctIndex: 0,
+            explanation: "HTTPS is an Application layer protocol. The TLS encryption it uses actually spans the Presentation and Session layers, but as a user-facing protocol it is classified at Layer 7.",
+            topic: .protocols,
+            difficulty: .hard
         ),
     ]
 
