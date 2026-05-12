@@ -41,6 +41,8 @@ struct ManagementView: View {
     var body: some View {
         NavigationStack {
             List {
+                profileCard
+
                 Section {
                     NavigationLink(destination: AdminView()) {
                         ManagementRow(
@@ -103,13 +105,6 @@ struct ManagementView: View {
                 } header: {
                     Text("מערכת")
                 }
-
-                // Quick stats summary
-                Section {
-                    quickSummary
-                } header: {
-                    Text("סיכום מהיר")
-                }
             }
             .listStyle(.insetGrouped)
             .navigationTitle("ניהול")
@@ -117,49 +112,67 @@ struct ManagementView: View {
         }
     }
 
-    private var quickSummary: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(progress.userName.isEmpty ? "AmirNet Plus" : progress.userName)
-                        .font(.headline)
-                    Text("ביצועים כלליים")
-                        .font(.caption).foregroundStyle(.secondary)
+    private var profileCard: some View {
+        Section {
+            VStack(spacing: 14) {
+                HStack(spacing: 14) {
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(progress.userName.isEmpty ? "AmirNet Plus" : progress.userName)
+                            .font(.title3.bold())
+                        Text("ביצועים כלליים")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    ZStack {
+                        Circle()
+                            .stroke(Color(.systemFill), lineWidth: 5)
+                            .frame(width: 58, height: 58)
+                        Circle()
+                            .trim(from: 0, to: min(progress.overallPercentage / 100, 1))
+                            .stroke(scoreColor, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                            .frame(width: 58, height: 58)
+                            .animation(.easeOut(duration: 0.6), value: progress.overallPercentage)
+                        VStack(spacing: 0) {
+                            Text("\(Int(progress.overallPercentage))%")
+                                .font(.caption.bold())
+                                .foregroundStyle(scoreColor)
+                        }
+                    }
                 }
-                ZStack {
-                    Circle()
-                        .trim(from: 0, to: progress.overallPercentage / 100)
-                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: 50, height: 50)
-                    Circle()
-                        .stroke(Color(.systemFill), lineWidth: 6)
-                        .frame(width: 50, height: 50)
-                    Text("\(Int(progress.overallPercentage))%")
-                        .font(.caption2.bold())
+
+                Divider()
+
+                HStack(spacing: 0) {
+                    statPill("\(progress.streakDays)", "רצף", "flame.fill", .orange)
+                    statPill("\(progress.totalAnswered)", "שאלות", "checkmark.circle.fill", .blue)
+                    statPill("\(progress.unlockedAchievements.count)", "הישגים", "star.fill", .yellow)
+                    statPill("\(progress.weakTopics.count)", "לחיזוק", "exclamationmark.circle.fill", .red)
                 }
             }
-
-            Divider()
-
-            HStack {
-                summaryItem("\(progress.streakDays)", "ימי רצף", .orange)
-                Divider().frame(height: 30)
-                summaryItem("\(progress.totalAnswered)", "שאלות", .blue)
-                Divider().frame(height: 30)
-                summaryItem("\(progress.unlockedAchievements.count)", "הישגים", .yellow)
-                Divider().frame(height: 30)
-                summaryItem("\(progress.weakTopics.count)", "לחיזוק", .red)
-            }
+            .padding(.vertical, 6)
         }
-        .padding(.vertical, 4)
     }
 
-    private func summaryItem(_ value: String, _ label: String, _ color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.callout.bold()).foregroundStyle(color)
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+    private var scoreColor: Color {
+        let p = progress.overallPercentage
+        if p >= 80 { return .green }
+        if p >= 60 { return .orange }
+        return .red
+    }
+
+    private func statPill(_ value: String, _ label: String, _ icon: String, _ color: Color) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(color)
+            Text(value)
+                .font(.callout.bold())
+                .foregroundStyle(color)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
     }

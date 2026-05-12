@@ -1,5 +1,29 @@
 import SwiftUI
 
+// MARK: - Sort Order
+
+enum AdminSortOrder: String, CaseIterable {
+    case newest, oldest, byTopic, byDifficulty
+
+    var displayName: String {
+        switch self {
+        case .newest: return "חדש לישן"
+        case .oldest: return "ישן לחדש"
+        case .byTopic: return "לפי נושא"
+        case .byDifficulty: return "לפי קושי"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .newest: return "arrow.down.circle"
+        case .oldest: return "arrow.up.circle"
+        case .byTopic: return "tag.circle"
+        case .byDifficulty: return "chart.bar.xaxis"
+        }
+    }
+}
+
 // MARK: - Admin Root
 
 struct AdminView: View {
@@ -8,6 +32,7 @@ struct AdminView: View {
     @State private var editingQuestion: CustomQuestion? = nil
     @State private var searchText = ""
     @State private var filterTopic: TopicID? = nil
+    @State private var sortOrder: AdminSortOrder = .newest
     @State private var showDeleteConfirm = false
     @State private var pendingDeleteID: UUID? = nil
 
@@ -17,14 +42,27 @@ struct AdminView: View {
         if !searchText.isEmpty {
             list = list.filter { $0.questionText.localizedCaseInsensitiveContains(searchText) }
         }
+        switch sortOrder {
+        case .newest:
+            break
+        case .oldest:
+            list = list.reversed()
+        case .byTopic:
+            list = list.sorted { $0.topic.displayName < $1.topic.displayName }
+        case .byDifficulty:
+            let order: [Difficulty] = [.easy, .medium, .hard]
+            list = list.sorted { (order.firstIndex(of: $0.difficulty) ?? 0) < (order.firstIndex(of: $1.difficulty) ?? 0) }
+        }
         return list
     }
+
+    private var isFiltered: Bool { filterTopic != nil || !searchText.isEmpty }
 
     var body: some View {
         NavigationStack {
             List {
                 builtInSection
-                if !filteredCustom.isEmpty || filterTopic != nil || !searchText.isEmpty {
+                if !filteredCustom.isEmpty || isFiltered {
                     customSection
                 } else {
                     customEmptySection
@@ -36,7 +74,12 @@ struct AdminView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    filterMenu
+                    HStack(spacing: 6) {
+                        filterMenu
+                        if !progress.customQuestions.isEmpty {
+                            sortMenu
+                        }
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -44,6 +87,7 @@ struct AdminView: View {
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .foregroundStyle(.blue)
+                            .font(.title3)
                     }
                 }
             }
@@ -66,10 +110,18 @@ struct AdminView: View {
 
     private var filterMenu: some View {
         Menu {
-            Button("כל הנושאים") { filterTopic = nil }
+            Button {
+                filterTopic = nil
+            } label: {
+                Label("כל הנושאים", systemImage: filterTopic == nil ? "checkmark" : "line.3.horizontal.decrease")
+            }
             Divider()
             ForEach(TopicID.allCases, id: \.self) { topic in
-                Button(topic.displayName) { filterTopic = topic }
+                Button {
+                    filterTopic = topic
+                } label: {
+                    Label(topic.displayName, systemImage: filterTopic == topic ? "checkmark" : topic.icon)
+                }
             }
         } label: {
             Label(filterTopic?.displayName ?? "סנן", systemImage: "line.3.horizontal.decrease.circle")
@@ -77,24 +129,50 @@ struct AdminView: View {
         }
     }
 
+    private var sortMenu: some View {
+        Menu {
+            ForEach(AdminSortOrder.allCases, id: \.self) { order in
+                Button {
+                    sortOrder = order
+                } label: {
+                    Label(order.displayName, systemImage: sortOrder == order ? "checkmark" : order.icon)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down.circle")
+                .foregroundStyle(sortOrder != .newest ? .blue : .secondary)
+        }
+    }
+
     private var builtInSection: some View {
         Section {
             NavigationLink(destination: BuiltInQuestionsView()) {
-                HStack {
+                HStack(spacing: 14) {
                     Spacer()
-                    VStack(alignment: .trailing, spacing: 3) {
+                    VStack(alignment: .trailing, spacing: 6) {
                         Text("שאלות מובנות")
-                            .font(.subheadline.weight(.medium))
-                        Text("\(QuestionsData.all.count) שאלות ב-\(TopicID.allCases.count) נושאים")
+                            .font(.subheadline.weight(.semibold))
+                        Text("\(QuestionsData.all.count) שאלות · \(TopicID.allCases.count) נושאים")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        HStack(spacing: 5) {
+                            ForEach(TopicID.allCases, id: \.self) { topic in
+                                Circle()
+                                    .fill(colorFromString(topic.color))
+                                    .frame(width: 8, height: 8)
+                            }
+                        }
                     }
                     ZStack {
-                        Circle().fill(Color.blue.opacity(0.12)).frame(width: 38, height: 38)
-                        Image(systemName: "books.vertical.fill").foregroundStyle(.blue)
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.blue.opacity(0.12))
+                            .frame(width: 46, height: 46)
+                        Image(systemName: "books.vertical.fill")
+                            .foregroundStyle(.blue)
+                            .font(.title3)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 6)
             }
         } header: {
             Text("בנק השאלות")
@@ -122,6 +200,7 @@ struct AdminView: View {
                         Button { editingQuestion = q } label: {
                             Label("ערוך שאלה", systemImage: "pencil")
                         }
+                        Divider()
                         Button(role: .destructive) {
                             pendingDeleteID = q.id
                             showDeleteConfirm = true
@@ -132,7 +211,11 @@ struct AdminView: View {
             }
         } header: {
             HStack {
-                Text("\(filteredCustom.count) שאלות")
+                if isFiltered {
+                    Text("\(filteredCustom.count) מתוך \(progress.customQuestions.count)")
+                } else {
+                    Text("\(filteredCustom.count) שאלות")
+                }
                 Spacer()
                 Text("שאלות שלי")
             }
@@ -141,32 +224,63 @@ struct AdminView: View {
 
     private var customEmptySection: some View {
         Section("שאלות שלי") {
-            VStack(spacing: 12) {
-                Image(systemName: "plus.square.dashed")
-                    .font(.largeTitle)
-                    .foregroundStyle(.tertiary)
-                Text("אין עדיין שאלות מותאמות אישית")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Button("הוסף שאלה ראשונה") {
-                    showAddQuestion = true
+            VStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.08))
+                        .frame(width: 72, height: 72)
+                    Image(systemName: "plus.square.dashed")
+                        .font(.largeTitle)
+                        .foregroundStyle(.blue.opacity(0.55))
                 }
-                .font(.subheadline.bold())
-                .foregroundStyle(.blue)
+                VStack(spacing: 4) {
+                    Text("אין עדיין שאלות מותאמות אישית")
+                        .font(.subheadline.weight(.medium))
+                    Text("צור שאלות משלך לתרגול ממוקד")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Button {
+                    showAddQuestion = true
+                } label: {
+                    Label("הוסף שאלה ראשונה", systemImage: "plus")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 10)
+                        .background(Color.blue, in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
+            .padding(.vertical, 28)
         }
     }
 }
+
+// MARK: - Custom Question Row
 
 struct CustomQuestionRow: View {
     @Environment(UserProgress.self) private var progress
     let question: CustomQuestion
 
+    private var difficultyColor: Color {
+        switch question.difficulty {
+        case .easy: return .green
+        case .medium: return .orange
+        case .hard: return .red
+        }
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 0) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(difficultyColor)
+                .frame(width: 3, height: 44)
+                .padding(.trailing, 10)
+
             Spacer()
+
             VStack(alignment: .trailing, spacing: 5) {
                 Text(question.questionText)
                     .font(.subheadline)
@@ -185,11 +299,13 @@ struct CustomQuestionRow: View {
                         .foregroundStyle(colorFromString(question.topic.color))
                 }
             }
+
             Button {
                 progress.toggleBookmark(questionID: question.id)
             } label: {
                 Image(systemName: progress.isBookmarked(question.id) ? "bookmark.fill" : "bookmark")
                     .foregroundStyle(progress.isBookmarked(question.id) ? .orange : .secondary)
+                    .padding(.leading, 10)
             }
             .buttonStyle(.plain)
         }
@@ -215,34 +331,78 @@ struct BuiltInQuestionsView: View {
     }
 
     var body: some View {
-        List(questions) { q in
-            Button {
-                selectedQuestion = q
-            } label: {
-                BuiltInQuestionRow(question: q)
+        Group {
+            if questions.isEmpty {
+                emptyState
+            } else {
+                List(questions) { q in
+                    Button {
+                        selectedQuestion = q
+                    } label: {
+                        BuiltInQuestionRow(question: q)
+                    }
+                    .foregroundStyle(.primary)
+                }
+                .listStyle(.insetGrouped)
             }
-            .foregroundStyle(.primary)
         }
-        .listStyle(.insetGrouped)
         .searchable(text: $searchText, prompt: "חפש שאלה...")
-        .navigationTitle("שאלות מובנות")
+        .navigationTitle(filterTopic?.displayName ?? "שאלות מובנות")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Menu {
-                    Button("כל הנושאים") { filterTopic = nil }
+                    Button {
+                        filterTopic = nil
+                    } label: {
+                        Label("כל הנושאים", systemImage: filterTopic == nil ? "checkmark" : "line.3.horizontal.decrease")
+                    }
                     Divider()
                     ForEach(TopicID.allCases, id: \.self) { t in
-                        Button(t.displayName) { filterTopic = t }
+                        Button {
+                            filterTopic = t
+                        } label: {
+                            Label(t.displayName, systemImage: filterTopic == t ? "checkmark" : t.icon)
+                        }
                     }
                 } label: {
                     Label(filterTopic?.displayName ?? "נושא", systemImage: "line.3.horizontal.decrease.circle")
+                        .foregroundStyle(filterTopic != nil ? .blue : .primary)
                 }
+            }
+            ToolbarItem(placement: .principal) {
+                Text("\(questions.count) שאלות")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .sheet(item: $selectedQuestion) { q in
             QuestionDetailSheet(question: q)
         }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 48))
+                .foregroundStyle(.tertiary)
+            VStack(spacing: 6) {
+                Text("לא נמצאו שאלות")
+                    .font(.headline)
+                Text("נסה לשנות את החיפוש או הסינון")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Button {
+                filterTopic = nil
+            } label: {
+                Text("נקה סינון")
+                    .font(.subheadline)
+                    .foregroundStyle(.blue)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
     }
 }
 
@@ -302,12 +462,15 @@ struct QuestionDetailSheet: View {
             .navigationTitle("פרטי שאלה")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { Button("סגור") { dismiss() } }
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("סגור") { dismiss() }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         progress.toggleBookmark(questionID: question.id)
                     } label: {
                         Image(systemName: progress.isBookmarked(question.id) ? "bookmark.fill" : "bookmark")
+                            .foregroundStyle(progress.isBookmarked(question.id) ? .orange : .blue)
                     }
                 }
             }
@@ -316,15 +479,20 @@ struct QuestionDetailSheet: View {
     }
 
     private var headerSection: some View {
-        VStack(alignment: .trailing, spacing: 10) {
+        VStack(alignment: .trailing, spacing: 12) {
             HStack {
                 DifficultyBadgeSmall(difficulty: question.difficulty)
                 Spacer()
-                Text(question.topic.displayName)
-                    .font(.caption)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(colorFromString(question.topic.color).opacity(0.12), in: Capsule())
-                    .foregroundStyle(colorFromString(question.topic.color))
+                HStack(spacing: 6) {
+                    Text(question.topic.displayName)
+                        .font(.caption)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(colorFromString(question.topic.color).opacity(0.12), in: Capsule())
+                        .foregroundStyle(colorFromString(question.topic.color))
+                    Image(systemName: question.topic.icon)
+                        .font(.caption)
+                        .foregroundStyle(colorFromString(question.topic.color))
+                }
             }
             Text(question.questionText)
                 .font(.body.weight(.semibold))
@@ -342,20 +510,37 @@ struct QuestionDetailSheet: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             ForEach(Array(question.options.enumerated()), id: \.offset) { idx, opt in
-                HStack(spacing: 8) {
-                    if idx == question.correctIndex {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
+                let isCorrect = idx == question.correctIndex
+                HStack(spacing: 10) {
+                    if isCorrect {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.subheadline)
                     }
                     Spacer()
-                    Text(opt).font(.callout).multilineTextAlignment(.trailing)
-                        .foregroundStyle(idx == question.correctIndex ? .green : .primary)
-                    Text(String(Character(UnicodeScalar(0x41 + idx)!)))
-                        .font(.caption.bold()).frame(width: 24, height: 24)
-                        .background(Color(.systemFill), in: Circle()).foregroundStyle(.secondary)
+                    Text(opt)
+                        .font(.callout)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(isCorrect ? .green : .primary)
+                    ZStack {
+                        Circle()
+                            .fill(isCorrect ? Color.green.opacity(0.15) : Color(.systemFill))
+                            .frame(width: 28, height: 28)
+                        Text(String(Character(UnicodeScalar(0x41 + idx)!)))
+                            .font(.caption.bold())
+                            .foregroundStyle(isCorrect ? .green : .secondary)
+                    }
                 }
-                .padding(10)
-                .background(idx == question.correctIndex ? Color.green.opacity(0.08) : Color(.background),
-                            in: RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(isCorrect ? Color.green.opacity(0.08) : Color(.background))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .strokeBorder(isCorrect ? Color.green.opacity(0.3) : Color.clear, lineWidth: 1)
+                        )
+                )
             }
         }
     }
@@ -363,10 +548,12 @@ struct QuestionDetailSheet: View {
     private var explanationSection: some View {
         VStack(alignment: .trailing, spacing: 6) {
             Label("הסבר", systemImage: "lightbulb.fill")
-                .font(.caption.bold()).foregroundStyle(.orange)
+                .font(.caption.bold())
+                .foregroundStyle(.orange)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             Text(question.explanation)
-                .font(.callout).multilineTextAlignment(.trailing)
+                .font(.callout)
+                .multilineTextAlignment(.trailing)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding()
@@ -376,7 +563,8 @@ struct QuestionDetailSheet: View {
     private var noteSection: some View {
         VStack(alignment: .trailing, spacing: 8) {
             Label("הערות אישיות", systemImage: "note.text")
-                .font(.caption.bold()).foregroundStyle(.purple)
+                .font(.caption.bold())
+                .foregroundStyle(.purple)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             TextEditor(text: $noteText)
                 .frame(minHeight: 80)
@@ -417,6 +605,14 @@ struct QuestionFormView: View {
         return false
     }
 
+    private var isValid: Bool {
+        !questionText.trimmingCharacters(in: .whitespaces).isEmpty &&
+        options.allSatisfy({ !$0.trimmingCharacters(in: .whitespaces).isEmpty }) &&
+        !explanation.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private let optionLetters = ["א", "ב", "ג", "ד"]
+
     var body: some View {
         NavigationStack {
             Form {
@@ -434,6 +630,7 @@ struct QuestionFormView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(isEditing ? "שמור" : "הוסף") { save() }
                         .fontWeight(.semibold)
+                        .disabled(!isValid)
                 }
             }
             .alert("שגיאה", isPresented: $showValidationAlert) {
@@ -446,32 +643,59 @@ struct QuestionFormView: View {
     }
 
     private var questionSection: some View {
-        Section("טקסט השאלה") {
+        Section {
             TextEditor(text: $questionText)
                 .frame(minHeight: 80)
                 .multilineTextAlignment(.trailing)
+        } header: {
+            Text("טקסט השאלה")
+        } footer: {
+            HStack {
+                Spacer()
+                Text("\(questionText.count) תווים")
+                    .foregroundStyle(questionText.count > 300 ? .orange : .secondary)
+            }
         }
     }
 
     private var optionsSection: some View {
         Section {
             ForEach(0..<4, id: \.self) { idx in
-                HStack(spacing: 10) {
-                    Button {
-                        correctIndex = idx
-                    } label: {
+                Button {
+                    correctIndex = idx
+                } label: {
+                    HStack(spacing: 12) {
                         Image(systemName: correctIndex == idx ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(correctIndex == idx ? .green : .secondary)
+                            .font(.title3)
+                        TextField("אפשרות \(idx + 1)", text: $options[idx])
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(.primary)
+                        Text(optionLetters[idx])
+                            .font(.caption.bold())
+                            .frame(width: 24, height: 24)
+                            .background(
+                                correctIndex == idx ? Color.green.opacity(0.15) : Color(.systemFill),
+                                in: Circle()
+                            )
+                            .foregroundStyle(correctIndex == idx ? .green : .secondary)
                     }
-                    .buttonStyle(.plain)
-                    TextField("אפשרות \(idx + 1)", text: $options[idx])
-                        .multilineTextAlignment(.trailing)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .listRowBackground(
+                    correctIndex == idx ? Color.green.opacity(0.05) : Color(.systemBackground)
+                )
             }
         } header: {
-            Text("אפשרויות תשובה (סמן את הנכונה)")
+            Text("אפשרויות תשובה")
         } footer: {
-            Text("לחץ על העיגול לצד האפשרות הנכונה")
+            HStack {
+                Spacer()
+                Label("האפשרות הנכונה: \(optionLetters[correctIndex])", systemImage: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+            }
         }
     }
 
@@ -479,7 +703,7 @@ struct QuestionFormView: View {
         Section("סיווג") {
             Picker("נושא", selection: $topic) {
                 ForEach(TopicID.allCases, id: \.self) { t in
-                    Text(t.displayName).tag(t)
+                    Label(t.displayName, systemImage: t.icon).tag(t)
                 }
             }
             Picker("רמת קושי", selection: $difficulty) {
@@ -491,10 +715,21 @@ struct QuestionFormView: View {
     }
 
     private var explanationSection: some View {
-        Section("הסבר לתשובה") {
+        Section {
             TextEditor(text: $explanation)
                 .frame(minHeight: 80)
                 .multilineTextAlignment(.trailing)
+        } header: {
+            Text("הסבר לתשובה")
+        } footer: {
+            if !isValid && !questionText.isEmpty {
+                HStack {
+                    Spacer()
+                    Text("יש למלא את כל השדות לפני השמירה")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
         }
     }
 
@@ -510,9 +745,7 @@ struct QuestionFormView: View {
     }
 
     private func save() {
-        guard !questionText.trimmingCharacters(in: .whitespaces).isEmpty,
-              options.allSatisfy({ !$0.trimmingCharacters(in: .whitespaces).isEmpty }),
-              !explanation.trimmingCharacters(in: .whitespaces).isEmpty else {
+        guard isValid else {
             showValidationAlert = true
             return
         }
@@ -541,4 +774,3 @@ struct QuestionFormView: View {
         dismiss()
     }
 }
-
