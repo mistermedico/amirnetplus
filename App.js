@@ -1,1150 +1,1111 @@
 import React, { useState, useEffect, useReducer, useCallback, useRef } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, Dimensions, Platform, Alert, Switch,
-  TextInput, StatusBar, Animated,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
+  Dimensions, Platform, Alert, Switch, TextInput, StatusBar, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width: W } = Dimensions.get('window');
-
-// ─── IN-MEMORY STORAGE ──────────────────────────────────────────────────────
 const _mem = {};
-const Storage = {
-  get: (k) => Promise.resolve(_mem[k] ?? null),
-  set: (k, v) => { _mem[k] = v; return Promise.resolve(); },
-};
+const Store = { get: k => Promise.resolve(_mem[k] ?? null), set: (k,v) => { _mem[k]=v; } };
 
-// ─── THEME ──────────────────────────────────────────────────────────────────
-const C = {
-  primary:   '#1e40af',
-  primaryLt: '#3b82f6',
-  success:   '#15803d',
-  warning:   '#d97706',
-  danger:    '#dc2626',
-  purple:    '#7c3aed',
-  cyan:      '#0891b2',
-  bg:        '#f1f5f9',
-  card:      '#ffffff',
-  text:      '#0f172a',
-  muted:     '#64748b',
-  border:    '#e2e8f0',
-  fill:      '#f8fafc',
-};
+// ─── THEME ───────────────────────────────────────────────────────────────────
+const C = { primary:'#1e40af', blue:'#3b82f6', success:'#15803d', warning:'#d97706',
+  danger:'#dc2626', purple:'#7c3aed', cyan:'#0891b2', orange:'#ea580c',
+  bg:'#f1f5f9', card:'#fff', text:'#0f172a', muted:'#64748b', border:'#e2e8f0', fill:'#f8fafc' };
 
-// ─── TOPICS ─────────────────────────────────────────────────────────────────
+// ─── DIFFICULTY → THETA MAP ──────────────────────────────────────────────────
+const DIFF_THETA = { beginner:-1, intermediate:0, advanced:1, expert:2 };
+const THETA_DIFF = t => t < -0.5 ? 'beginner' : t < 0.5 ? 'intermediate' : t < 1.5 ? 'advanced' : 'expert';
+const DIFF_COLOR = { beginner:C.success, intermediate:C.warning, advanced:C.orange, expert:C.danger };
+const DIFF_LABEL = { beginner:'קל', intermediate:'בינוני', advanced:'מתקדם', expert:'מומחה' };
+
+// ─── TOPICS / SECTIONS ───────────────────────────────────────────────────────
 const TOPICS = [
-  { id: 'networking',       name: 'רשתות תקשורת',     icon: '🌐', color: C.primary,  desc: 'מודל OSI, TCP/IP, ניתוב, Subnetting' },
-  { id: 'security',         name: 'אבטחת מידע',        icon: '🔒', color: C.danger,   desc: 'חומות אש, הצפנה, VPN, איומי סייבר' },
-  { id: 'operatingSystems', name: 'מערכות הפעלה',      icon: '💻', color: C.success,  desc: 'Windows Server, Linux, ניהול שרתים' },
-  { id: 'cloud',            name: 'ענן ווירטואליזציה', icon: '☁️', color: C.cyan,     desc: 'AWS, Azure, VMware, Docker' },
-  { id: 'itManagement',     name: 'ניהול IT',           icon: '👥', color: C.warning,  desc: 'ITIL, SLA, Change Management' },
-  { id: 'protocols',        name: 'פרוטוקולים',         icon: '🔄', color: C.purple,   desc: 'HTTP, DNS, DHCP, TCP/UDP, FTP' },
+  { id:'networking',       name:'רשתות תקשורת',     icon:'🌐', color:C.primary },
+  { id:'security',         name:'אבטחת מידע',        icon:'🔒', color:C.danger  },
+  { id:'operatingSystems', name:'מערכות הפעלה',      icon:'💻', color:C.success },
+  { id:'cloud',            name:'ענן ווירטואליזציה', icon:'☁️', color:C.cyan   },
+  { id:'itManagement',     name:'ניהול IT',           icon:'👥', color:C.warning },
+  { id:'protocols',        name:'פרוטוקולים',         icon:'🔄', color:C.purple  },
 ];
 const topicById = id => TOPICS.find(t => t.id === id);
 
-// ─── QUESTIONS ───────────────────────────────────────────────────────────────
+// ─── QUESTION BANK ───────────────────────────────────────────────────────────
+// type: 'mc' = multiple choice, 'reading' = passage + question, 'restatement' = match equivalent
 const QS = [
-  { id:'n1', q:'כמה שכבות יש במודל OSI?', opts:['5','6','7','8'], a:2, exp:'מודל OSI מורכב מ-7 שכבות: פיזית, קישור נתונים, רשת, תחבורה, סשן, מצגת ויישום.', topic:'networking', diff:'easy' },
-  { id:'n2', q:'באיזו שכבת OSI פועל פרוטוקול IP?', opts:['שכבה 2 - קישור נתונים','שכבה 3 - רשת','שכבה 4 - תחבורה','שכבה 5 - סשן'], a:1, exp:'פרוטוקול IP פועל בשכבה 3 (שכבת הרשת) ואחראי על הניתוב בין רשתות.', topic:'networking', diff:'easy' },
-  { id:'n3', q:'מה הוא ה-Subnet Mask לרשת Class C?', opts:['255.0.0.0','255.255.0.0','255.255.255.0','255.255.255.255'], a:2, exp:'רשת Class C משתמשת ב-255.255.255.0 (/24), עד 254 מארחים.', topic:'networking', diff:'easy' },
-  { id:'n4', q:'מה ההבדל בין Router ל-Switch?', opts:['Router שכבה 2, Switch שכבה 3','Router מנתב בין רשתות (שכבה 3), Switch מחבר בתוך רשת (שכבה 2)','אין הבדל','Switch מהיר יותר תמיד'], a:1, exp:'Router פועל בשכבה 3 ומנתב בין רשתות. Switch פועל בשכבה 2 ומחבר מכשירים באותה רשת.', topic:'networking', diff:'medium' },
-  { id:'n5', q:'מה המשמעות של CIDR /24?', opts:['24 מארחים ברשת','24 סיביות לרשת, 8 למארח','Subnet Mask 255.255.0.0','24 נתבים ברשת'], a:1, exp:'/24 = 24 סיביות לרשת, Subnet Mask 255.255.255.0, עד 254 מארחים.', topic:'networking', diff:'medium' },
-  { id:'n6', q:'מהו טווח כתובות IP פרטיות Class A?', opts:['172.16.0.0–172.31.255.255','192.168.0.0–192.168.255.255','10.0.0.0–10.255.255.255','169.254.0.0–169.254.255.255'], a:2, exp:'Class A פרטי: 10.0.0.0–10.255.255.255.', topic:'networking', diff:'medium' },
-  { id:'n7', q:'מה תפקיד פרוטוקול ARP?', opts:['הקצאת IP דינמית','תרגום שם דומיין ל-IP','תרגום IP לכתובת MAC','הצפנת תנועת רשת'], a:2, exp:'ARP ממפה כתובת IP לכתובת MAC ברשת מקומית.', topic:'networking', diff:'medium' },
-  { id:'n8', q:'מה הפורט הסטנדרטי של HTTPS?', opts:['80','443','8080','8443'], a:1, exp:'HTTPS פועל על פורט 443. HTTP על פורט 80.', topic:'networking', diff:'easy' },
-  { id:'n9', q:'מה ההבדל בין Half-Duplex ל-Full-Duplex?', opts:['Half-Duplex מהיר יותר','Full-Duplex שליחה וקבלה בו-זמנית; Half-Duplex כיוון אחד בכל פעם','Half-Duplex ל-Wireless בלבד','Full-Duplex זול יותר'], a:1, exp:'Full-Duplex = תקשורת דו-כיוונית. Half-Duplex = כיוון אחד בכל פעם.', topic:'networking', diff:'easy' },
-  { id:'n10', q:'רשת 192.168.1.0/26 – כמה מארחים?', opts:['30','62','126','254'], a:1, exp:'/26 = 6 סיביות למארח → 2^6-2 = 62 מארחים.', topic:'networking', diff:'hard' },
-  { id:'s1', q:'מה ההבדל בין Symmetric ל-Asymmetric Encryption?', opts:['Symmetric מהיר, מפתח אחד; Asymmetric זוג מפתחות','Asymmetric מהיר יותר','Symmetric שני מפתחות','אין הבדל'], a:0, exp:'Symmetric = מפתח אחד (AES). Asymmetric = זוג ציבורי/פרטי (RSA).', topic:'security', diff:'medium' },
-  { id:'s2', q:'מה הוא מתקפת Man-in-the-Middle?', opts:['מתקפה על DNS','תוקף מיירט תקשורת בין שני צדדים','הצפת שרת','פרצה בחומת אש'], a:1, exp:'MITM: תוקף מיירט ומסוגל לקרוא/לשנות את התקשורת בין שני צדדים.', topic:'security', diff:'easy' },
-  { id:'s3', q:'מהי מתקפת DoS לעומת DDoS?', opts:['DoS ממחשב אחד; DDoS ממחשבים רבים (Botnet)','DDoS מסוכן פחות','זהים לחלוטין','DoS לנתונים, DDoS לרשת'], a:0, exp:'DoS = מחשב אחד. DDoS = אלפי מחשבים (Botnet), קשה יותר לעצירה.', topic:'security', diff:'easy' },
-  { id:'s4', q:'מה הוא Stateful Firewall?', opts:['בוחן רק כותרות','עוקב אחר מצב חיבורים ובוחן הקשר','מסנן לפי MAC','ללא תצורה'], a:1, exp:'Stateful Firewall עוקב אחר מצב כל חיבור ומאפשר החלטות מבוססות הקשר.', topic:'security', diff:'medium' },
-  { id:'s5', q:'מה ההבדל בין IDS ל-IPS?', opts:['IDS מגיב אוטומטית; IPS רק מזהה','IDS רק מזהה ומתריע; IPS גם חוסם','זהים','IPS ב-Cloud בלבד'], a:1, exp:'IDS = מזהה ומתריע. IPS = מזהה + חוסם באופן אקטיבי.', topic:'security', diff:'medium' },
-  { id:'s6', q:'מהו SSL/TLS?', opts:['פרוטוקול ניתוב','פרוטוקול הצפנה לאבטחת תקשורת','מנגנון זיהוי משתמשים','DNS מאובטח'], a:1, exp:'TLS מאבטח תקשורת ברשת (HTTPS). TLS = גרסה מעודכנת של SSL.', topic:'security', diff:'easy' },
-  { id:'s7', q:'מה הוא Phishing?', opts:['תוכנה שמצפינה קבצים','הונאה לגניבת פרטים דרך הודעות מזויפות','Brute Force על סיסמאות','ניצול חולשה ב-TCP'], a:1, exp:'Phishing = הנדסה חברתית לגניבת פרטים רגישים דרך הודעות מזויפות.', topic:'security', diff:'easy' },
-  { id:'s8', q:'מה הוא VPN?', opts:['רשת וירטואלית פרטית המצפינה תנועה ויוצרת מנהרה מאובטחת','סוג חומת אש','פרוטוקול ניתוב','שירות אנטי-וירוס'], a:0, exp:'VPN = מנהרה מוצפנת ברשת ציבורית, גישה מאובטחת למשאבים פרטיים.', topic:'security', diff:'easy' },
-  { id:'o1', q:'מה הוא Active Directory?', opts:['אנטי-וירוס של Microsoft','שירות ספריה לניהול משתמשים, קבוצות ומשאבים ברשת','פרוטוקול ניתוב','מנגנון גיבוי'], a:1, exp:'Active Directory = ניהול מרכזי של משתמשים, מחשבים ומדיניות אבטחה.', topic:'operatingSystems', diff:'easy' },
-  { id:'o2', q:'מה ההבדל בין Domain Controller ל-Member Server?', opts:['DC מנהל AD; Member Server חבר בדומיין','Member Server חזק יותר','DC ל-Linux בלבד','אין הבדל'], a:0, exp:'DC = מריץ AD DS. Member Server = חבר בדומיין, לא מריץ AD DS.', topic:'operatingSystems', diff:'medium' },
-  { id:'o3', q:'יתרון NTFS על FAT32?', opts:['NTFS מהיר אך לא תומך בקבצים גדולים','NTFS תומך בהרשאות, הצפנה, דחיסה, קבצים מעל 4GB','FAT32 מתקדם יותר','זהים'], a:1, exp:'NTFS = הרשאות, EFS הצפנה, דחיסה, ללא הגבלת 4GB. FAT32 מוגבל ל-4GB לקובץ.', topic:'operatingSystems', diff:'medium' },
-  { id:'o4', q:'פקודת בדיקת IP ב-Windows?', opts:['ipconfig','ifconfig','netstat','ping'], a:0, exp:'Windows: ipconfig. Linux/macOS: ifconfig או ip addr.', topic:'operatingSystems', diff:'easy' },
-  { id:'o5', q:'מה הוא Group Policy (GPO)?', opts:['מדיניות קבוצתית ב-AD לניהול הגדרות מחשבים ומשתמשים','תוכנת גיבוי','פרוטוקול אבטחה','שירות DHCP'], a:0, exp:'GPO = ניהול מרכזי של הגדרות בדומיין: סיסמאות, אבטחה, מיפוי כוננים.', topic:'operatingSystems', diff:'medium' },
-  { id:'o6', q:'פקודת Linux להצגת כל הקבצים כולל מוסתרים?', opts:['ls -a','ls -l','dir /a','show all'], a:0, exp:'ls -a מציגה קבצים כולל מוסתרים (קבצים המתחילים בנקודה).', topic:'operatingSystems', diff:'easy' },
-  { id:'o7', q:'מה הוא RAID 5?', opts:['גיבוי לדיסק חיצוני','Striping עם Parity על 3+ דיסקים, עמיד לכשל דיסק אחד','שיקוף בין 2 דיסקים','ללא הגנה'], a:1, exp:'RAID 5 = Striping + Parity מפוזר על 3+ דיסקים. עמיד לכשל דיסק אחד.', topic:'operatingSystems', diff:'medium' },
-  { id:'o8', q:'מה הוא Hyper-V?', opts:['אנטי-וירוס','פלטפורמת וירטואליזציה של Microsoft ב-Windows Server','שירות ענן','פרוטוקול גיבוי'], a:1, exp:'Hyper-V = וירטואליזציה מובנית ב-Windows Server ליצירת VMs.', topic:'operatingSystems', diff:'easy' },
-  { id:'c1', q:'מה ההבדל בין IaaS, PaaS ו-SaaS?', opts:['זהים, שמות שונים','IaaS=תשתית; PaaS=פלטפורמה; SaaS=תוכנה מוכנה','SaaS מאובטח יותר','PaaS לחברות גדולות'], a:1, exp:'IaaS=EC2 (תשתית). PaaS=App Service (פיתוח). SaaS=Office365 (מוכן).', topic:'cloud', diff:'medium' },
-  { id:'c2', q:'מה הוא S3 ב-AWS?', opts:['שירות מחשוב','אחסון אובייקטים (Object Storage)','שירות רשת','מסד נתונים'], a:1, exp:'Amazon S3 = אחסון אובייקטים בענן, זמינות גבוהה, ניתן להרחבה.', topic:'cloud', diff:'easy' },
-  { id:'c3', q:'מה הוא VPC ב-AWS?', opts:['מסד נתונים','רשת וירטואלית פרטית עם שליטה מלאה','שירות Backup','DNS ב-AWS'], a:1, exp:'VPC = רשת וירטואלית מבודדת ב-AWS עם שליטה ב-IP, Subnets, Routing.', topic:'cloud', diff:'medium' },
-  { id:'c4', q:'ההבדל בין Public Cloud ל-Private Cloud?', opts:['Public מאובטח יותר','Public=תשתית משותפת; Private=תשתית ייעודית לארגון','Private תמיד זול','אין הבדל'], a:1, exp:'Public (AWS/Azure) = שירותים משותפים. Private = תשתית ייעודית, אבטחה גבוהה.', topic:'cloud', diff:'easy' },
-  { id:'c5', q:'מה הוא Docker?', opts:['מערכת הפעלה','פלטפורמת Containerization להרצת אפליקציות מבודדות','שפת תכנות','כלי גיבוי'], a:1, exp:'Docker = אריזת אפליקציה ב-Container עם יחסי תלות, ריצה אחידה בכל סביבה.', topic:'cloud', diff:'medium' },
-  { id:'c6', q:'ההבדל בין Virtualization ל-Containerization?', opts:['Container כבד יותר','VM מריץ OS מלא; Container חולק Kernel ויעיל יותר','אין הבדל','VM מהיר יותר'], a:1, exp:'VM = OS מלא לכל מכונה (כבד). Container = חולק Kernel, קל ומהיר.', topic:'cloud', diff:'medium' },
-  { id:'c7', q:'מה הוא Auto Scaling?', opts:['הגדלה ידנית','הוספה/הסרה אוטומטית של משאבים לפי עומס','גיבוי אוטומטי','עדכון תוכנה'], a:1, exp:'Auto Scaling = הוספת/הסרת משאבים אוטומטית לפי עומס, ביצועים + חיסכון.', topic:'cloud', diff:'easy' },
-  { id:'i1', q:'מה הוא ITIL?', opts:['שפת תכנות','מסגרת Best Practices לניהול שירותי IT','פרוטוקול רשת','מוצר Microsoft'], a:1, exp:'ITIL = Information Technology Infrastructure Library, מסגרת לניהול שירותי IT.', topic:'itManagement', diff:'easy' },
-  { id:'i2', q:'ההבדל בין Incident ל-Problem ב-ITIL?', opts:['זהים','Incident=שיבוש בשירות; Problem=גורם שורשי לאירועים חוזרים','Problem קל לפתרון','Incident מטופל אחרי Problem'], a:1, exp:'Incident = שיבוש לא מתוכנן. Problem = Root Cause Analysis למניעת הישנות.', topic:'itManagement', diff:'medium' },
-  { id:'i3', q:'מה הוא SLA?', opts:['חוזה חומרה','הסכם רמת שירות: זמינות, זמן תגובה','תוכנת ניהול','תקן אבטחה'], a:1, exp:'SLA = הסכם רשמי הגדרת ציפיות שירות: זמינות, זמן תגובה, זמן שיקום.', topic:'itManagement', diff:'easy' },
-  { id:'i4', q:'מה הוא Change Management ב-ITIL?', opts:['ניהול שינויים ארגוניים','ניהול מבוקר של שינויים ב-IT למניעת שיבושים','עדכונים אוטומטיים','ניהול גרסאות'], a:1, exp:'Change Management = RFC, הערכת סיכונים, אישור, ביצוע ותיעוד שינויים ב-IT.', topic:'itManagement', diff:'medium' },
-  { id:'i5', q:'מה הם RTO ו-RPO?', opts:['RTO=זמן שיקום מקסימלי; RPO=כמות נתונים מקסימלית שניתן לאבד','שניהם זמן שיקום','RPO מדד ביצועים','RTO לענן בלבד'], a:0, exp:'RTO = זמן שיקום מקסימלי. RPO = כמות נתונים מקסימלית שניתן לאבד (מהגיבוי האחרון).', topic:'itManagement', diff:'hard' },
-  { id:'i6', q:'ההבדל בין Help Desk ל-Service Desk?', opts:['זהים','Help Desk=תקלות; Service Desk=נקודת קשר רחבה + בקשות שירות','Service Desk ללקוחות חיצוניים','Help Desk יקר יותר'], a:1, exp:'Help Desk = פתרון תקלות. Service Desk (ITIL) = נקודת קשר יחידה רחבה יותר.', topic:'itManagement', diff:'medium' },
-  { id:'p1', q:'הפורט הסטנדרטי של DNS?', opts:['53','80','443','25'], a:0, exp:'DNS פועל על פורט 53 (UDP לשאילתות, TCP להעברות אזור).', topic:'protocols', diff:'easy' },
-  { id:'p2', q:'תפקיד פרוטוקול DHCP?', opts:['תרגום שמות דומיין','הקצאה אוטומטית של IP ופרמטרי רשת','הצפנת תקשורת','ניהול ניתוב'], a:1, exp:'DHCP = הקצאה אוטומטית: IP, Subnet Mask, Default Gateway, DNS Server.', topic:'protocols', diff:'easy' },
-  { id:'p3', q:'ההבדל בין TCP ל-UDP?', opts:['TCP מהיר; UDP אמין','TCP מבוסס חיבור ואמין; UDP ללא חיבור ומהיר','זהים','UDP תומך הצפנה'], a:1, exp:'TCP = מסירה מסודרת (Handshake). UDP = מהיר, ללא ערבות (DNS, VoIP, Streaming).', topic:'protocols', diff:'easy' },
-  { id:'p4', q:'תפקיד SMTP?', opts:['קבלת מיילים','שליחת מיילים בין שרתי דואר','גלישה','העברת קבצים'], a:1, exp:'SMTP = שליחת מיילים, פורט 25/587. IMAP/POP3 = קבלת מיילים.', topic:'protocols', diff:'easy' },
-  { id:'p5', q:'HTTP ה-Method הנפוץ ביותר?', opts:['ENCRYPT','GET','ROUTE','QUERY'], a:1, exp:'HTTP = פרוטוקול האינטרנט. GET לבקשת נתונים. POST/PUT/DELETE לפעולות אחרות.', topic:'protocols', diff:'easy' },
-  { id:'p6', q:'FTP ועל איזה פורט?', opts:['File Transfer Protocol, פורט 21','File Transfer Protocol, פורט 22','Fast Transfer, פורט 80','File Transfer, פורט 443'], a:0, exp:'FTP = פורט 21 (control), 20 (data). SFTP על 22 מאובטח יותר.', topic:'protocols', diff:'easy' },
-  { id:'p7', q:'מהו Three-Way Handshake?', opts:['סגירת חיבור','יצירת חיבור TCP: SYN → SYN-ACK → ACK','שליחת נתונים','בדיקת שגיאות'], a:1, exp:'Three-Way: 1) Client→SYN, 2) Server→SYN-ACK, 3) Client→ACK. חיבור נוצר.', topic:'protocols', diff:'medium' },
-  { id:'p8', q:'ההבדל בין IMAP ל-POP3?', opts:['IMAP מסנכרן ושומר בשרת; POP3 מוריד ומוחק','POP3 מודרני יותר','IMAP רק לשליחה','זהים'], a:0, exp:'IMAP (143/993) = מסנכרן, גישה ממכשירים מרובים. POP3 (110/995) = מוריד ומוחק.', topic:'protocols', diff:'medium' },
+  // ── NETWORKING mc ──
+  { id:'n1', type:'mc', topic:'networking', diff:'beginner',     vs:0.72,
+    q:'כמה שכבות יש במודל OSI?', opts:['5','6','7','8'], a:2,
+    exp:'מודל OSI = 7 שכבות: פיזית, קישור נתונים, רשת, תחבורה, סשן, מצגת, יישום.' },
+  { id:'n2', type:'mc', topic:'networking', diff:'beginner',     vs:0.68,
+    q:'באיזו שכבת OSI פועל IP?', opts:['שכבה 2','שכבה 3','שכבה 4','שכבה 5'], a:1,
+    exp:'IP פועל בשכבה 3 (רשת) ואחראי על ניתוב בין רשתות.' },
+  { id:'n3', type:'mc', topic:'networking', diff:'beginner',     vs:0.75,
+    q:'Subnet Mask של Class C?', opts:['255.0.0.0','255.255.0.0','255.255.255.0','255.255.255.255'], a:2,
+    exp:'Class C = 255.255.255.0 (/24), עד 254 מארחים.' },
+  { id:'n4', type:'mc', topic:'networking', diff:'intermediate', vs:0.58,
+    q:'ההבדל בין Router ל-Switch?', opts:['Router שכבה 2','Router ניתוב בין רשתות (שכבה 3), Switch מחבר בתוך רשת (שכבה 2)','זהים','Switch מהיר יותר'], a:1,
+    exp:'Router = שכבה 3, מנתב בין רשתות. Switch = שכבה 2, מחבר בתוך רשת.' },
+  { id:'n5', type:'mc', topic:'networking', diff:'intermediate', vs:0.55,
+    q:'CIDR /24 — מה המשמעות?', opts:['24 מארחים','24 סיביות לרשת, 8 למארח','Mask 255.255.0.0','24 נתבים'], a:1,
+    exp:'/24 = 24 סיביות לרשת → Mask 255.255.255.0 → 254 מארחים.' },
+  { id:'n6', type:'mc', topic:'networking', diff:'intermediate', vs:0.52,
+    q:'Class A פרטי?', opts:['172.16.0.0–172.31','192.168.0.0–192.168','10.0.0.0–10.255.255.255','169.254.0.0'], a:2,
+    exp:'Class A פרטי = 10.0.0.0–10.255.255.255.' },
+  { id:'n7', type:'mc', topic:'networking', diff:'intermediate', vs:0.60,
+    q:'תפקיד ARP?', opts:['הקצאת IP','תרגום שם→IP','תרגום IP→MAC','הצפנה'], a:2,
+    exp:'ARP ממפה IP לכתובת MAC ברשת מקומית.' },
+  { id:'n8', type:'mc', topic:'networking', diff:'beginner',     vs:0.80,
+    q:'פורט HTTPS?', opts:['80','443','8080','8443'], a:1,
+    exp:'HTTPS = פורט 443. HTTP = פורט 80.' },
+  { id:'n9', type:'mc', topic:'networking', diff:'beginner',     vs:0.78,
+    q:'Full-Duplex לעומת Half-Duplex?', opts:['Half מהיר','Full=שליחה+קבלה בו-זמנית; Half=כיוון אחד','Half=Wireless בלבד','Full זול יותר'], a:1,
+    exp:'Full-Duplex = תקשורת דו-כיוונית בו-זמנית. Half = כיוון אחד בכל פעם.' },
+  { id:'n10', type:'mc', topic:'networking', diff:'advanced',    vs:0.38,
+    q:'192.168.1.0/26 — כמה מארחים?', opts:['30','62','126','254'], a:1,
+    exp:'/26 = 6 סיביות למארח → 2^6−2 = 62 מארחים.' },
+  { id:'n11', type:'mc', topic:'networking', diff:'expert',      vs:0.25,
+    q:'VLSM — מה התועלת?', opts:['מאפשר שימוש חוזר ב-IP','מאפשר חלוקת רשת למשנה-רשתות בגדלים שונים','מחליף NAT','מצפין תנועה'], a:1,
+    exp:'VLSM (Variable Length Subnet Masking) = חלוקת Subnet בגדלים שונים לניצול יעיל של כתובות IP.' },
+  // ── SECURITY mc ──
+  { id:'s1', type:'mc', topic:'security', diff:'intermediate', vs:0.55,
+    q:'Symmetric לעומת Asymmetric?', opts:['Symmetric מהיר, מפתח אחד; Asymmetric זוג מפתחות','Asymmetric מהיר','Symmetric שני מפתחות','אין הבדל'], a:0,
+    exp:'Symmetric = מפתח אחד (AES). Asymmetric = ציבורי+פרטי (RSA).' },
+  { id:'s2', type:'mc', topic:'security', diff:'beginner',     vs:0.70,
+    q:'Man-in-the-Middle?', opts:['מתקפה על DNS','תוקף מיירט תקשורת בין שני צדדים','הצפת שרת','פרצה בFW'], a:1,
+    exp:'MITM = תוקף מיירט ויכול לקרוא/לשנות את התקשורת.' },
+  { id:'s3', type:'mc', topic:'security', diff:'beginner',     vs:0.72,
+    q:'DoS לעומת DDoS?', opts:['DoS=מחשב אחד; DDoS=Botnet','DDoS פחות מסוכן','זהים','DoS לנתונים'], a:0,
+    exp:'DoS = מחשב אחד. DDoS = אלפי מחשבים (Botnet).' },
+  { id:'s4', type:'mc', topic:'security', diff:'intermediate', vs:0.58,
+    q:'Stateful Firewall?', opts:['בוחן כותרות בלבד','עוקב אחר מצב חיבורים','מסנן לפי MAC','ללא תצורה'], a:1,
+    exp:'Stateful FW עוקב אחר מצב חיבור ומחליט לפי הקשר.' },
+  { id:'s5', type:'mc', topic:'security', diff:'intermediate', vs:0.56,
+    q:'IDS לעומת IPS?', opts:['IDS=מגיב; IPS=מזהה בלבד','IDS=מזהה; IPS=מזהה+חוסם','זהים','IPS בענן בלבד'], a:1,
+    exp:'IDS = זיהוי+התראה בלבד. IPS = זיהוי+חסימה אקטיבית.' },
+  { id:'s6', type:'mc', topic:'security', diff:'beginner',     vs:0.76,
+    q:'SSL/TLS?', opts:['ניתוב','הצפנה לאבטחת תקשורת','זיהוי משתמשים','DNS מאובטח'], a:1,
+    exp:'TLS מאבטח תקשורת (HTTPS). TLS = גרסה מעודכנת של SSL.' },
+  { id:'s7', type:'mc', topic:'security', diff:'beginner',     vs:0.80,
+    q:'Phishing?', opts:['מצפין קבצים','הונאה לגניבת פרטים דרך הודעות מזויפות','Brute Force','ניצול TCP'], a:1,
+    exp:'Phishing = הנדסה חברתית לגניבת פרטים רגישים.' },
+  { id:'s8', type:'mc', topic:'security', diff:'beginner',     vs:0.82,
+    q:'VPN?', opts:['מנהרה מוצפנת ברשת ציבורית','חומת אש','פרוטוקול ניתוב','אנטי-וירוס'], a:0,
+    exp:'VPN = מנהרה מוצפנת, גישה מאובטחת למשאבים פרטיים.' },
+  { id:'s9', type:'mc', topic:'security', diff:'advanced',     vs:0.40,
+    q:'Zero Trust Architecture?', opts:['מאמין לכולם בתוך הרשת','לא מאמין לאף ישות, בדיקה תמידית','ביטול סיסמאות','VPN לכולם'], a:1,
+    exp:'Zero Trust = "Never trust, always verify" — בדיקת כל גישה ללא קשר למיקום ברשת.' },
+  // ── OS mc ──
+  { id:'o1', type:'mc', topic:'operatingSystems', diff:'beginner',     vs:0.74,
+    q:'Active Directory?', opts:['אנטי-וירוס','שירות ספריה לניהול משתמשים וקבוצות','פרוטוקול','גיבוי'], a:1,
+    exp:'AD = ניהול מרכזי משתמשים, מחשבים ומדיניות אבטחה.' },
+  { id:'o2', type:'mc', topic:'operatingSystems', diff:'intermediate', vs:0.58,
+    q:'Domain Controller לעומת Member Server?', opts:['DC מנהל AD; Member חבר בדומיין','Member חזק יותר','DC=Linux','זהים'], a:0,
+    exp:'DC מריץ AD DS. Member Server חבר בדומיין, לא מריץ AD DS.' },
+  { id:'o3', type:'mc', topic:'operatingSystems', diff:'intermediate', vs:0.55,
+    q:'NTFS לעומת FAT32?', opts:['NTFS מהיר אך לא גדולים','NTFS=הרשאות, הצפנה, קבצים >4GB','FAT32 מתקדם','זהים'], a:1,
+    exp:'NTFS = הרשאות, EFS, דחיסה, ללא מגבלת 4GB. FAT32 מוגבל.' },
+  { id:'o4', type:'mc', topic:'operatingSystems', diff:'beginner',     vs:0.85,
+    q:'בדיקת IP ב-Windows?', opts:['ipconfig','ifconfig','netstat','ping'], a:0,
+    exp:'Windows = ipconfig. Linux/macOS = ifconfig / ip addr.' },
+  { id:'o5', type:'mc', topic:'operatingSystems', diff:'intermediate', vs:0.60,
+    q:'Group Policy (GPO)?', opts:['מדיניות קבוצתית ב-AD','גיבוי','אבטחת רשת','DHCP'], a:0,
+    exp:'GPO = ניהול מרכזי הגדרות בדומיין: סיסמאות, אבטחה, מיפוי כוננים.' },
+  { id:'o6', type:'mc', topic:'operatingSystems', diff:'beginner',     vs:0.88,
+    q:'Linux — קבצים כולל מוסתרים?', opts:['ls -a','ls -l','dir /a','show all'], a:0,
+    exp:'ls -a = כל הקבצים כולל מוסתרים (מתחילים בנקודה).' },
+  { id:'o7', type:'mc', topic:'operatingSystems', diff:'intermediate', vs:0.52,
+    q:'RAID 5?', opts:['גיבוי לדיסק חיצוני','Striping+Parity על 3+ דיסקים, עמיד לכשל דיסק אחד','שיקוף 2 דיסקים','ללא הגנה'], a:1,
+    exp:'RAID 5 = Striping+Parity מפוזר, עמיד לכשל דיסק אחד.' },
+  { id:'o8', type:'mc', topic:'operatingSystems', diff:'beginner',     vs:0.75,
+    q:'Hyper-V?', opts:['אנטי-וירוס','וירטואליזציה של Microsoft ב-Windows Server','ענן','גיבוי'], a:1,
+    exp:'Hyper-V = וירטואליזציה מובנית ב-Windows Server.' },
+  // ── CLOUD mc ──
+  { id:'c1', type:'mc', topic:'cloud', diff:'intermediate', vs:0.58,
+    q:'IaaS / PaaS / SaaS?', opts:['זהים','IaaS=תשתית; PaaS=פלטפורמה; SaaS=תוכנה מוכנה','SaaS מאובטח יותר','PaaS לחברות גדולות'], a:1,
+    exp:'IaaS=EC2, PaaS=App Service, SaaS=Office365.' },
+  { id:'c2', type:'mc', topic:'cloud', diff:'beginner',     vs:0.72,
+    q:'S3 ב-AWS?', opts:['מחשוב','אחסון אובייקטים','רשת','DB'], a:1,
+    exp:'Amazon S3 = Object Storage, זמינות גבוהה.' },
+  { id:'c3', type:'mc', topic:'cloud', diff:'intermediate', vs:0.55,
+    q:'VPC ב-AWS?', opts:['DB','רשת וירטואלית פרטית עם שליטה מלאה','Backup','DNS'], a:1,
+    exp:'VPC = רשת מבודדת ב-AWS, שליטה ב-Subnet, Routing, SG.' },
+  { id:'c4', type:'mc', topic:'cloud', diff:'beginner',     vs:0.70,
+    q:'Public Cloud לעומת Private?', opts:['Public מאובטח יותר','Public=משותף; Private=ייעודי לארגון','Private תמיד זול','זהים'], a:1,
+    exp:'Public = משאבים משותפים. Private = ייעודי, אבטחה גבוהה.' },
+  { id:'c5', type:'mc', topic:'cloud', diff:'intermediate', vs:0.60,
+    q:'Docker?', opts:['OS','Containerization לאפליקציות מבודדות','שפה','גיבוי'], a:1,
+    exp:'Docker = Container עם יחסי תלות, ריצה אחידה בכל סביבה.' },
+  { id:'c6', type:'mc', topic:'cloud', diff:'intermediate', vs:0.55,
+    q:'VM לעומת Container?', opts:['Container כבד יותר','VM=OS מלא; Container=חולק Kernel, יעיל יותר','זהים','VM מהיר יותר'], a:1,
+    exp:'VM = OS מלא (כבד). Container = חולק Kernel (קל+מהיר).' },
+  { id:'c7', type:'mc', topic:'cloud', diff:'beginner',     vs:0.78,
+    q:'Auto Scaling?', opts:['הגדלה ידנית','הוספה/הסרה אוטומטית לפי עומס','גיבוי','עדכונים'], a:1,
+    exp:'Auto Scaling = מוסיף/מסיר משאבים אוטומטית לפי עומס.' },
+  { id:'c8', type:'mc', topic:'cloud', diff:'advanced',    vs:0.38,
+    q:'Kubernetes?', opts:['DB','תזמור Containers בקנה מידה','מערכת הפעלה','שירות DNS'], a:1,
+    exp:'Kubernetes = תזמור ואוטומציה של פריסת Containers בקנה מידה.' },
+  // ── IT MANAGEMENT mc ──
+  { id:'i1', type:'mc', topic:'itManagement', diff:'beginner',     vs:0.72,
+    q:'ITIL?', opts:['שפת תכנות','מסגרת Best Practices לניהול שירותי IT','פרוטוקול','מוצר Microsoft'], a:1,
+    exp:'ITIL = Information Technology Infrastructure Library, ניהול שירותי IT.' },
+  { id:'i2', type:'mc', topic:'itManagement', diff:'intermediate', vs:0.55,
+    q:'Incident לעומת Problem?', opts:['זהים','Incident=שיבוש; Problem=גורם שורשי','Problem קל','Incident אחרי Problem'], a:1,
+    exp:'Incident = שיבוש לא מתוכנן. Problem = Root Cause Analysis.' },
+  { id:'i3', type:'mc', topic:'itManagement', diff:'beginner',     vs:0.70,
+    q:'SLA?', opts:['חוזה חומרה','הסכם רמת שירות: זמינות, זמן תגובה','תוכנה','תקן אבטחה'], a:1,
+    exp:'SLA = הסכם המגדיר ציפיות שירות (זמינות, זמן תגובה, שיקום).' },
+  { id:'i4', type:'mc', topic:'itManagement', diff:'intermediate', vs:0.58,
+    q:'Change Management ב-ITIL?', opts:['שינויים ארגוניים','ניהול מבוקר שינויים ב-IT','עדכונים אוטומטיים','גרסאות קוד'], a:1,
+    exp:'Change Management = RFC, הערכת סיכונים, אישור, ביצוע, תיעוד.' },
+  { id:'i5', type:'mc', topic:'itManagement', diff:'advanced',    vs:0.40,
+    q:'RTO ו-RPO?', opts:['RTO=זמן שיקום מקסימלי; RPO=כמות נתונים שניתן לאבד','שניהם זמן שיקום','RPO=ביצועים','RTO לענן'], a:0,
+    exp:'RTO = זמן שיקום מקסימלי. RPO = כמות נתונים מקסימלית שניתן לאבד.' },
+  { id:'i6', type:'mc', topic:'itManagement', diff:'intermediate', vs:0.56,
+    q:'Help Desk לעומת Service Desk?', opts:['זהים','Help=תקלות; Service=נקודת קשר רחבה + בקשות שירות','Service לחיצוניים','Help יקר'], a:1,
+    exp:'Help Desk = פתרון תקלות. Service Desk = נקודת קשר יחידה רחבה.' },
+  { id:'i7', type:'mc', topic:'itManagement', diff:'advanced',    vs:0.42,
+    q:'CMDB?', opts:['תוכנת אנטי-וירוס','מאגר מידע של רכיבי תשתית ויחסיהם','שירות גיבוי','DB למשתמשים'], a:1,
+    exp:'CMDB (Configuration Management Database) = מאגר כל Configuration Items ויחסיהם ב-IT.' },
+  // ── PROTOCOLS mc ──
+  { id:'p1', type:'mc', topic:'protocols', diff:'beginner',     vs:0.80,
+    q:'פורט DNS?', opts:['53','80','443','25'], a:0,
+    exp:'DNS = פורט 53 (UDP לשאילתות, TCP להעברות אזור).' },
+  { id:'p2', type:'mc', topic:'protocols', diff:'beginner',     vs:0.76,
+    q:'DHCP?', opts:['תרגום שם→IP','הקצאה אוטומטית IP+פרמטרים','הצפנה','ניתוב'], a:1,
+    exp:'DHCP = הקצאה אוטומטית: IP, Mask, Gateway, DNS.' },
+  { id:'p3', type:'mc', topic:'protocols', diff:'beginner',     vs:0.78,
+    q:'TCP לעומת UDP?', opts:['TCP מהיר; UDP אמין','TCP=חיבור+אמין; UDP=ללא חיבור+מהיר','זהים','UDP=הצפנה'], a:1,
+    exp:'TCP = Handshake, מסירה מובטחת. UDP = מהיר, ללא ערבות (DNS, VoIP).' },
+  { id:'p4', type:'mc', topic:'protocols', diff:'beginner',     vs:0.82,
+    q:'SMTP?', opts:['קבלת מיילים','שליחת מיילים בין שרתים','גלישה','קבצים'], a:1,
+    exp:'SMTP = שליחת מיילים, פורט 25/587. IMAP/POP3 לקבלה.' },
+  { id:'p5', type:'mc', topic:'protocols', diff:'beginner',     vs:0.84,
+    q:'HTTP Method נפוץ?', opts:['ENCRYPT','GET','ROUTE','QUERY'], a:1,
+    exp:'HTTP = פרוטוקול האינטרנט. GET לקבלת נתונים.' },
+  { id:'p6', type:'mc', topic:'protocols', diff:'beginner',     vs:0.80,
+    q:'FTP על פורט?', opts:['פורט 21','פורט 22','פורט 80','פורט 443'], a:0,
+    exp:'FTP = פורט 21 (control), 20 (data). SFTP = פורט 22, מאובטח.' },
+  { id:'p7', type:'mc', topic:'protocols', diff:'intermediate', vs:0.60,
+    q:'Three-Way Handshake?', opts:['סגירת חיבור','SYN→SYN-ACK→ACK','שליחת נתונים','בדיקת שגיאות'], a:1,
+    exp:'TCP Handshake: Client→SYN, Server→SYN-ACK, Client→ACK.' },
+  { id:'p8', type:'mc', topic:'protocols', diff:'intermediate', vs:0.55,
+    q:'IMAP לעומת POP3?', opts:['IMAP=מסנכרן+שומר בשרת; POP3=מוריד+מוחק','POP3 מודרני','IMAP=שליחה','זהים'], a:0,
+    exp:'IMAP (143/993) = מסנכרן ממכשירים מרובים. POP3 (110/995) = מוריד ומוחק.' },
+  { id:'p9', type:'mc', topic:'protocols', diff:'advanced',    vs:0.38,
+    q:'BGP?', opts:['פרוטוקול ניתוב פנימי','פרוטוקול ניתוב בין-מערכות אוטונומיות (AS)','פרוטוקול הצפנה','שירות DNS מורחב'], a:1,
+    exp:'BGP (Border Gateway Protocol) = ניתוב בין Autonomous Systems, עמוד השדרה של האינטרנט.' },
+  // ── READING TYPE (passage + question) ──
+  { id:'r1', type:'reading', topic:'networking', diff:'intermediate', vs:0.52,
+    passage:'רשת ה-LAN של חברת XYZ כוללת 3 VLAN: VLAN 10 לניהול, VLAN 20 לעובדים, VLAN 30 לאורחים. הראוטר מחובר ל-Switch בחיבור Trunk המעביר את כל ה-VLANs. כל VLAN מקבל כתובות IP מ-DHCP נפרד, ו-Firewall חוסם תנועה בין VLAN 30 לשאר הרשת.',
+    q:'מדוע הAorG-VLAN מבודד ב-Firewall?', opts:['לחסוך IP','למנוע גישה של אורחים לרשת הפנימית','VLAN 30 איטי יותר','הגדרת ברירת מחדל'], a:1,
+    exp:'VLAN לאורחים מבודד כדי למנוע גישה לנתונים פנימיים — עיקרון Zero Trust ל-Guest Networks.' },
+  { id:'r2', type:'reading', topic:'security', diff:'advanced', vs:0.38,
+    passage:'ארגון גדול גילה שמישהו ניגש לשרת ה-DB הפנימי מכתובת IP חיצונית. בדיקת הלוגים מראה שהגישה הייתה דרך פורט 3389 שנותר פתוח בטעות בFW. הגישה נעשתה בשעות הלילה עם פרטי כניסה של עובד שהתפטר לפני 3 חודשים.',
+    q:'אילו כשלי אבטחה מוצגים בתרחיש? (בחר הכי מקיף)', opts:['רק פורט פתוח','רק חשבון לא נמחק','פורט פתוח שלא לצורך + ניהול גישה לקוי (חשבון לא בוטל) + חוסר ניטור','רק חוסר ניטור'], a:2,
+    exp:'3 כשלים: 1) פורט 3389 (RDP) פתוח לאינטרנט 2) חשבון עובד שעזב לא בוטל 3) אין ניטור בזמן אמת.' },
+  { id:'r3', type:'reading', topic:'cloud', diff:'intermediate', vs:0.50,
+    passage:'צוות DevOps פורס אפליקציה ב-AWS. הם משתמשים ב-ECS (Elastic Container Service) עם Fargate להרצת Containers, S3 לאחסון קבצים סטטיים, RDS (PostgreSQL) ל-Database, ו-CloudFront כ-CDN. ה-Load Balancer מחלק תנועה בין 3 AZs.',
+    q:'מה התועלת של 3 Availability Zones?', opts:['חיסכון בעלויות','זמינות גבוהה — אם AZ אחד נכשל, שניים אחרים ממשיכים','מהירות גבוהה יותר','הדרישה של RDS'], a:1,
+    exp:'Multi-AZ = High Availability. כשל באחד מ-3 AZs לא משבית את השירות — עיקרון ה-Fault Tolerance.' },
+  { id:'r4', type:'reading', topic:'operatingSystems', diff:'beginner', vs:0.65,
+    passage:'מנהל רשת מגדיר GPO חדש בActive Directory. ה-GPO מחייב: סיסמה מינימום 12 תווים, נעילת חשבון אחרי 5 נסיונות, שינוי סיסמה כל 90 יום, ומניעת שימוש ב-10 הסיסמאות האחרונות. ה-GPO מוחל על כל ה-Domain Users OU.',
+    q:'מה מטרת הגדרת "מניעת שימוש ב-10 הסיסמאות האחרונות"?', opts:['לחסוך מקום DB','למנוע שימוש חוזר בסיסמאות ישנות שעלולות להיות חשופות','לחסוך זמן','הדרישה של NTFS'], a:1,
+    exp:'Password History = מניעת שימוש חוזר בסיסמאות ישנות שייתכן שנחשפו או ידועות.' },
+  // ── RESTATEMENT TYPE (match equivalent statement) ──
+  { id:'rs1', type:'restatement', topic:'networking', diff:'intermediate', vs:0.52,
+    q:'באיזו הצהרה מכוונת הכי נכון את המשמעות של "חוק ה-Subnet Mask הוא 255.255.255.0"?',
+    opts:['הרשת תומכת עד 254 מארחים ומסומנת /24','הרשת תומכת 255 מארחים','ה-Subnet Mask מורכב מ-8 סיביות','זו רשת Class B'], a:0,
+    exp:'255.255.255.0 = /24 = 24 סיביות לרשת, 8 למארח → 2^8−2 = 254 מארחים.' },
+  { id:'rs2', type:'restatement', topic:'security', diff:'advanced', vs:0.38,
+    q:'מהי ההצהרה השקולה ל: "IPS פועל inline ברשת"?',
+    opts:['IPS מנטר תנועה ממרחק','IPS ממוקם בנתיב התנועה ויכול לחסום בזמן אמת','IPS פועל רק כשיש התקפה','IPS הוא סוג של FW'], a:1,
+    exp:'Inline = בנתיב התנועה. זה מה שמאפשר ל-IPS לחסום (לא רק להתריע) בזמן אמת.' },
+  { id:'rs3', type:'restatement', topic:'itManagement', diff:'intermediate', vs:0.55,
+    q:'מהי ההצהרה הנכונה ביותר ל: "RTO = 4 שעות"?',
+    opts:['מותר לאבד 4 שעות של נתונים','השירות חייב לחזור לפעולה תוך 4 שעות מרגע הכשל','הגיבוי נעשה כל 4 שעות','4 שעות זמן עבודה יומי'], a:1,
+    exp:'RTO (Recovery Time Objective) = הזמן המקסימלי המוסכם לשיקום השירות לאחר כשל.' },
 ];
 
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-function getQuestions(topicId, count) {
-  const pool = topicId ? QS.filter(q => q.topic === topicId) : QS;
-  return shuffle(pool).slice(0, Math.min(count, pool.length));
-}
-function countByTopic(id) { return QS.filter(q => q.topic === id).length; }
+// ─── ADAPTIVE ENGINE ─────────────────────────────────────────────────────────
+const AdaptiveEngine = {
+  startTheta: () => 0,
+  updateTheta(theta, isCorrect, diffLevel) {
+    const b = DIFF_THETA[diffLevel] ?? 0;
+    const delta = isCorrect ? Math.abs(b - theta + 1) * 0.35 : -Math.abs(theta - b + 1) * 0.35;
+    return Math.max(-2.5, Math.min(2.5, theta + delta));
+  },
+  selectNext(theta, usedIds, allQuestions, topicFilter) {
+    const target = THETA_DIFF(theta);
+    const pool = allQuestions.filter(q =>
+      !usedIds.includes(q.id) &&
+      (!topicFilter || q.topic === topicFilter)
+    );
+    if (!pool.length) return null;
+    const exact = pool.filter(q => q.diff === target);
+    const fallback = pool.sort((a,b) =>
+      Math.abs(DIFF_THETA[a.diff]-theta) - Math.abs(DIFF_THETA[b.diff]-theta)
+    );
+    const candidates = exact.length ? exact : fallback;
+    return candidates[Math.floor(Math.random() * Math.min(candidates.length, 3))];
+  },
+  thetaToLevel(theta) {
+    if (theta < -0.5) return 'beginner';
+    if (theta < 0.5)  return 'intermediate';
+    if (theta < 1.5)  return 'advanced';
+    return 'expert';
+  },
+};
 
-// ─── STATE ───────────────────────────────────────────────────────────────────
-const INIT = {
-  totalAnswered: 0, totalCorrect: 0, topicProgress: {},
-  streakDays: 0, lastStudyDate: null, quizHistory: [],
-  bookmarkedIds: [], dailyGoal: 20, userName: '', onboarded: false,
+// ─── SCORING ENGINE ───────────────────────────────────────────────────────────
+const Scoring = {
+  compute(questions, answers, startTime) {
+    let correct = 0, diffScore = 0;
+    const topicMap = {};
+    questions.forEach((q, i) => {
+      const ok = answers[i] === q.a;
+      if (ok) { correct++; diffScore += DIFF_THETA[q.diff] + 2; }
+      if (!topicMap[q.topic]) topicMap[q.topic] = { total:0, correct:0 };
+      topicMap[q.topic].total++;
+      if (ok) topicMap[q.topic].correct++;
+    });
+    const total = questions.length;
+    const base = total > 0 ? Math.round(correct / total * 100) : 0;
+    const weighted = total > 0 ? Math.round(diffScore / (total * 3) * 100) : 0;
+    const pass = base >= 70;
+    const secs = (Date.now() - startTime) / 1000;
+    return { correct, total, base, weighted, pass, secs, topicMap };
+  },
+};
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const INIT_PROG = {
+  userName:'', onboarded:false, dailyGoal:20,
+  totalAnswered:0, totalCorrect:0, topicProgress:{},
+  streakDays:0, lastStudyDate:null,
+  quizHistory:[], bookmarkedIds:[],
+  adaptiveLog:[],  // [{date, theta_start, theta_end, questions_count}]
 };
 
 function reducer(state, action) {
-  switch (action.type) {
-    case 'LOAD': return { ...INIT, ...action.payload };
+  switch(action.type) {
+    case 'LOAD': return {...INIT_PROG,...action.payload};
+    case 'SETTINGS': return {...state,...action.payload};
     case 'RECORD': {
-      const { questions, answers, startTime } = action.payload;
-      let correct = 0;
-      const tp = { ...state.topicProgress };
-      questions.forEach((q, i) => {
-        const ok = answers[i] === q.a;
-        if (ok) correct++;
-        const p = tp[q.topic] || { answered: 0, correct: 0 };
-        tp[q.topic] = { answered: p.answered + 1, correct: p.correct + (ok ? 1 : 0) };
+      const {questions, answers, startTime} = action.payload;
+      const result = Scoring.compute(questions, answers, startTime);
+      const tp = {...state.topicProgress};
+      Object.entries(result.topicMap).forEach(([tid,tm]) => {
+        const p = tp[tid]||{answered:0,correct:0};
+        tp[tid] = {answered:p.answered+tm.total, correct:p.correct+tm.correct};
       });
-      const secs = (Date.now() - startTime) / 1000;
-      const entry = { date: Date.now(), score: correct, total: questions.length, topic: questions[0]?.topic, secs };
       const today = new Date().toDateString();
       const last = state.lastStudyDate ? new Date(state.lastStudyDate).toDateString() : null;
-      const diff = last ? Math.floor((new Date(today) - new Date(last)) / 86400000) : -1;
-      const streak = diff === 0 ? state.streakDays : diff === 1 ? state.streakDays + 1 : 1;
-      return { ...state, totalAnswered: state.totalAnswered + questions.length, totalCorrect: state.totalCorrect + correct, topicProgress: tp, quizHistory: [entry, ...state.quizHistory].slice(0, 100), streakDays: streak, lastStudyDate: Date.now() };
+      const diff = last ? Math.floor((new Date(today)-new Date(last))/86400000) : -1;
+      const streak = diff===0?state.streakDays:diff===1?state.streakDays+1:1;
+      const entry = {date:Date.now(), score:result.correct, total:result.total,
+        base:result.base, weighted:result.weighted, pass:result.pass,
+        topic:questions[0]?.topic||null, secs:result.secs};
+      return {...state, totalAnswered:state.totalAnswered+result.total,
+        totalCorrect:state.totalCorrect+result.correct, topicProgress:tp,
+        quizHistory:[entry,...state.quizHistory].slice(0,150),
+        streakDays:streak, lastStudyDate:Date.now()};
+    }
+    case 'RECORD_ADAPTIVE': {
+      const log = [{date:Date.now(),...action.payload},...(state.adaptiveLog||[])].slice(0,50);
+      return {...state, adaptiveLog:log};
     }
     case 'BOOKMARK': {
-      const ids = state.bookmarkedIds.includes(action.id) ? state.bookmarkedIds.filter(x => x !== action.id) : [...state.bookmarkedIds, action.id];
-      return { ...state, bookmarkedIds: ids };
+      const ids = state.bookmarkedIds.includes(action.id)
+        ? state.bookmarkedIds.filter(x=>x!==action.id)
+        : [...state.bookmarkedIds, action.id];
+      return {...state, bookmarkedIds:ids};
     }
-    case 'SETTINGS': return { ...state, ...action.payload };
-    case 'RESET': return { ...INIT, dailyGoal: state.dailyGoal, userName: state.userName, onboarded: state.onboarded };
+    case 'RESET': return {...INIT_PROG, userName:state.userName, onboarded:state.onboarded, dailyGoal:state.dailyGoal};
     default: return state;
   }
 }
 
-// ─── HELPERS ────────────────────────────────────────────────────────────────
-function fmtTime(secs) {
-  const m = Math.floor(secs / 60), s = Math.floor(secs % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-function pct(c, t) { return t > 0 ? Math.round(c / t * 100) : 0; }
-function gradeLabel(p) {
-  if (p >= 90) return { text: 'מצוין!', color: C.success };
-  if (p >= 75) return { text: 'טוב מאוד', color: C.success };
-  if (p >= 70) return { text: 'עבר ✓', color: C.success };
-  if (p >= 60) return { text: 'כמעט...', color: C.warning };
-  return { text: 'נכשל', color: C.danger };
-}
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function shuffle(a) { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; }
+function pct(c,t) { return t>0?Math.round(c/t*100):0; }
+function fmtTime(s) { const m=Math.floor(s/60); return `${m}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
+function getQsByTopic(tid) { return QS.filter(q=>q.topic===tid); }
+function getPool(tid,count) { return shuffle(tid?QS.filter(q=>q.topic===tid):QS).slice(0,count); }
 
-// ─── COMPONENTS ─────────────────────────────────────────────────────────────
-function Card({ children, style, onPress }) {
-  if (onPress) return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={[S.card, style]}>{children}</TouchableOpacity>
-  );
-  return <View style={[S.card, style]}>{children}</View>;
+// ─── SHARED COMPONENTS ───────────────────────────────────────────────────────
+function Row({children,style}) { return <View style={[{flexDirection:'row-reverse',alignItems:'center'},style]}>{children}</View>; }
+function Col({children,style}) { return <View style={[{alignItems:'flex-end'},style]}>{children}</View>; }
+function Card({children,style,onPress}) {
+  if(onPress) return <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={[S.card,style]}>{children}</TouchableOpacity>;
+  return <View style={[S.card,style]}>{children}</View>;
 }
-
-function Row({ children, style }) {
-  return <View style={[S.row, style]}>{children}</View>;
+function Pill({label,color,small}) {
+  return <View style={{backgroundColor:color+'22',paddingHorizontal:8,paddingVertical:3,borderRadius:20}}>
+    <Text style={{color,fontWeight:'700',fontSize:small?10:12}}>{label}</Text>
+  </View>;
 }
-
-function Pill({ label, color, small }) {
-  return (
-    <View style={[S.pill, { backgroundColor: color + '20' }]}>
-      <Text style={[S.pillTxt, { color, fontSize: small ? 10 : 12 }]}>{label}</Text>
-    </View>
-  );
+function Bar({value,total=100,color=C.primary,h=7}) {
+  const w = total>0?Math.min(value/total,1)*100:0;
+  return <View style={{height:h,backgroundColor:C.fill,borderRadius:10,overflow:'hidden',width:'100%'}}>
+    <View style={{width:`${w}%`,height:h,backgroundColor:color,borderRadius:10}}/>
+  </View>;
 }
-
-function Bar({ value, total = 100, color = C.primary, h = 7 }) {
-  const w = total > 0 ? Math.min(value / total, 1) * 100 : 0;
-  return (
-    <View style={[S.barTrack, { height: h }]}>
-      <View style={[S.barFill, { width: `${w}%`, backgroundColor: color, height: h }]} />
-    </View>
-  );
-}
-
-function Section({ title }) {
-  return <Text style={S.section}>{title}</Text>;
-}
-
-function Icon({ name, size = 20, color = C.text }) {
-  return <Ionicons name={name} size={size} color={color} />;
-}
-
-function CircleScore({ value, color, size = 130 }) {
-  const r = (size - 16) / 2;
-  const circ = 2 * Math.PI * r;
-  const dash = circ * value / 100;
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 10, borderColor: C.border, position: 'absolute' }} />
-      <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 10, borderColor: color, position: 'absolute', borderTopColor: 'transparent', borderRightColor: value > 25 ? color : 'transparent', borderBottomColor: value > 50 ? color : 'transparent', borderLeftColor: value > 75 ? color : 'transparent', transform: [{ rotate: '-45deg' }] }} />
-      <Text style={{ fontSize: 28, fontWeight: '900', color }}>{value}%</Text>
-    </View>
-  );
-}
-
-// Timer component — keeps its own interval
-function ExamTimer({ totalSeconds, onTimeUp }) {
-  const [remaining, setRemaining] = useState(totalSeconds);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    ref.current = setInterval(() => {
-      setRemaining(r => {
-        if (r <= 1) { clearInterval(ref.current); onTimeUp(); return 0; }
-        return r - 1;
-      });
-    }, 1000);
-    return () => clearInterval(ref.current);
-  }, []);
-
-  const warn = remaining < 120;
-  const mins = Math.floor(remaining / 60), secs = remaining % 60;
-  return (
-    <View style={[S.timerBox, { backgroundColor: warn ? C.danger + '15' : C.primary + '10', borderColor: warn ? C.danger : C.primary + '40' }]}>
-      <Icon name={warn ? 'warning' : 'time-outline'} size={14} color={warn ? C.danger : C.primary} />
-      <Text style={[S.timerTxt, { color: warn ? C.danger : C.primary }]}>
-        {mins}:{String(secs).padStart(2, '0')}
-      </Text>
-    </View>
-  );
-}
+function Icon({name,size=20,color=C.text}) { return <Ionicons name={name} size={size} color={color}/>; }
+function Sec({title}) { return <Text style={S.sec}>{title}</Text>; }
 
 // Animated answer option
-function AnswerOption({ text, index, selected, correctIdx, studyMode, onPress }) {
+function AnswerOpt({text,index,selected,correctIdx,studyMode,onPress}) {
   const scale = useRef(new Animated.Value(1)).current;
-  const letters = ['א', 'ב', 'ג', 'ד'];
-  const isSelected = selected === index;
-  const answered = selected !== null;
-  const isCorrect = correctIdx === index;
-  const isWrong = isSelected && !isCorrect;
+  const letters = ['א','ב','ג','ד'];
+  const isSelected = selected===index;
+  const answered = selected!==null;
+  const isCorrect = correctIdx===index;
+  const isWrong = isSelected&&!isCorrect;
 
-  function handlePress() {
-    if (answered) return;
+  function tap() {
+    if(answered)return;
     Animated.sequence([
-      Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 50 }),
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50 }),
+      Animated.spring(scale,{toValue:.96,useNativeDriver:true,speed:50}),
+      Animated.spring(scale,{toValue:1,useNativeDriver:true,speed:50}),
     ]).start();
     onPress(index);
   }
+  let bg=C.card, border=C.border;
+  if(answered&&studyMode) { if(isCorrect){bg=C.success+'18';border=C.success;} else if(isWrong){bg=C.danger+'18';border=C.danger;} }
+  else if(isSelected&&!studyMode){bg=C.primary+'12';border=C.primary;}
 
-  let bg = C.card, border = C.border, txtColor = C.text;
-  if (answered && studyMode) {
-    if (isCorrect) { bg = C.success + '15'; border = C.success; }
-    else if (isWrong) { bg = C.danger + '15'; border = C.danger; }
-  } else if (isSelected && !studyMode) { bg = C.primary + '12'; border = C.primary; }
-
-  return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <TouchableOpacity onPress={handlePress} disabled={answered}
-        style={[S.option, { backgroundColor: bg, borderColor: border }]} activeOpacity={0.8}>
-        <Row>
-          {answered && studyMode && isCorrect && <Icon name="checkmark-circle" size={18} color={C.success} />}
-          {answered && studyMode && isWrong && <Icon name="close-circle" size={18} color={C.danger} />}
-          <Text style={[S.optionTxt, { color: txtColor, flex: 1, textAlign: 'right', marginHorizontal: 8 }]}>{text}</Text>
-          <View style={[S.optLetter, { backgroundColor: isSelected ? (isWrong ? C.danger : C.primary) : C.fill }]}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: isSelected ? '#fff' : C.muted }}>{letters[index]}</Text>
-          </View>
-        </Row>
-      </TouchableOpacity>
-    </Animated.View>
-  );
+  return <Animated.View style={{transform:[{scale}]}}>
+    <TouchableOpacity onPress={tap} disabled={answered}
+      style={[S.opt,{backgroundColor:bg,borderColor:border}]} activeOpacity={0.85}>
+      <Row>
+        {answered&&studyMode&&isCorrect&&<Icon name="checkmark-circle" size={18} color={C.success}/>}
+        {answered&&studyMode&&isWrong&&<Icon name="close-circle" size={18} color={C.danger}/>}
+        <Text style={{flex:1,textAlign:'right',fontSize:15,color:C.text,marginHorizontal:8,lineHeight:22}}>{text}</Text>
+        <View style={[S.optLetter,{backgroundColor:isSelected?(isWrong?C.danger:C.primary):C.fill}]}>
+          <Text style={{fontSize:12,fontWeight:'700',color:isSelected?'#fff':C.muted}}>{letters[index]}</Text>
+        </View>
+      </Row>
+    </TouchableOpacity>
+  </Animated.View>;
 }
 
-// Answer review row in results
-function ReviewRow({ q, idx, sel }) {
-  const [open, setOpen] = useState(false);
-  const ok = sel === q.a;
-  return (
-    <Card style={{ marginBottom: 8 }}>
-      <TouchableOpacity onPress={() => setOpen(o => !o)}>
-        <Row>
-          <Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} color={C.muted} />
-          <Row style={{ flex: 0 }}>
-            <Icon name={ok ? 'checkmark-circle' : 'close-circle'} size={16} color={ok ? C.success : C.danger} />
-            <View style={[S.numBadge, { marginRight: 6 }]}><Text style={S.numBadgeTxt}>{idx + 1}</Text></View>
-          </Row>
-          <Text style={{ flex: 1, textAlign: 'right', fontSize: 13, color: C.text, marginHorizontal: 8 }} numberOfLines={open ? undefined : 2}>{q.q}</Text>
-        </Row>
+// Reading passage renderer
+function PassageCard({passage}) {
+  const [expanded,setExpanded] = useState(false);
+  return <Card style={{backgroundColor:'#eff6ff',borderWidth:1,borderColor:C.primary+'40',marginBottom:10}}>
+    <Row style={{justifyContent:'space-between',marginBottom:6}}>
+      <TouchableOpacity onPress={()=>setExpanded(e=>!e)} style={{flexDirection:'row-reverse',alignItems:'center'}}>
+        <Icon name={expanded?'chevron-up':'chevron-down'} size={14} color={C.primary}/>
+        <Text style={{color:C.primary,fontWeight:'700',fontSize:12,marginRight:4}}>{expanded?'כווץ':'הרחב'}</Text>
       </TouchableOpacity>
-      {open && (
-        <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border }}>
-          {sel !== undefined && sel !== q.a && (
-            <Text style={{ textAlign: 'right', fontSize: 12, color: C.danger, marginBottom: 3 }}>תשובתך: {q.opts[sel]}</Text>
-          )}
-          <Text style={{ textAlign: 'right', fontSize: 12, fontWeight: '700', color: C.success, marginBottom: 3 }}>✓ תשובה נכונה: {q.opts[q.a]}</Text>
-          <Text style={{ textAlign: 'right', fontSize: 12, color: C.muted }}>{q.exp}</Text>
-        </View>
-      )}
-    </Card>
-  );
+      <Text style={{fontWeight:'700',color:C.primary,fontSize:13}}>📄 קטע קריאה</Text>
+    </Row>
+    <Text style={{textAlign:'right',fontSize:13,color:C.text,lineHeight:21}} numberOfLines={expanded?undefined:3}>{passage}</Text>
+  </Card>;
+}
+
+// Timer
+function ExamTimer({totalSeconds,onTimeUp}) {
+  const [rem,setRem] = useState(totalSeconds);
+  useEffect(()=>{
+    const iv = setInterval(()=>setRem(r=>{ if(r<=1){clearInterval(iv);onTimeUp();return 0;} return r-1; }),1000);
+    return ()=>clearInterval(iv);
+  },[]);
+  const warn=rem<120;
+  return <View style={[S.timerBox,{backgroundColor:warn?C.danger+'15':C.primary+'10',borderColor:warn?C.danger:C.primary+'40'}]}>
+    <Icon name={warn?'warning':'time-outline'} size={14} color={warn?C.danger:C.primary}/>
+    <Text style={{fontSize:14,fontWeight:'900',color:warn?C.danger:C.primary,marginRight:4}}>{fmtTime(rem)}</Text>
+  </View>;
+}
+
+// Review row in results
+function ReviewRow({q,idx,sel}) {
+  const [open,setOpen] = useState(false);
+  const ok = sel===q.a;
+  return <Card style={{marginBottom:8}}>
+    <TouchableOpacity onPress={()=>setOpen(o=>!o)}>
+      <Row>
+        <Icon name={open?'chevron-up':'chevron-down'} size={14} color={C.muted}/>
+        <Row style={{flex:0,gap:4}}>
+          <Icon name={ok?'checkmark-circle':'close-circle'} size={16} color={ok?C.success:C.danger}/>
+          <View style={{width:22,height:22,borderRadius:11,backgroundColor:C.fill,alignItems:'center',justifyContent:'center'}}>
+            <Text style={{fontSize:11,fontWeight:'700',color:C.muted}}>{idx+1}</Text>
+          </View>
+        </Row>
+        <Text style={{flex:1,textAlign:'right',fontSize:13,marginHorizontal:8}} numberOfLines={open?undefined:2}>{q.q}</Text>
+      </Row>
+    </TouchableOpacity>
+    {open&&<View style={{marginTop:10,paddingTop:10,borderTopWidth:1,borderTopColor:C.border}}>
+      {q.type==='reading'&&<Text style={{textAlign:'right',fontSize:11,color:C.muted,marginBottom:6,fontStyle:'italic'}}>{q.passage}</Text>}
+      {sel!==undefined&&sel!==q.a&&<Text style={{textAlign:'right',fontSize:12,color:C.danger,marginBottom:3}}>תשובתך: {q.opts[sel]}</Text>}
+      <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.success,marginBottom:3}}>✓ {q.opts[q.a]}</Text>
+      <Text style={{textAlign:'right',fontSize:12,color:C.muted}}>{q.exp}</Text>
+    </View>}
+  </Card>;
 }
 
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
-function OnboardingScreen({ onDone }) {
-  const [name, setName] = useState('');
-  const [goal, setGoal] = useState('20');
-  const [step, setStep] = useState(0);
-
-  function finish() {
-    onDone({ userName: name.trim() || 'לומד', dailyGoal: parseInt(goal) || 20 });
-  }
-
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.primary }}>
-      <StatusBar barStyle="light-content" />
-      <View style={{ flex: 1, justifyContent: 'center', padding: 32 }}>
-        {step === 0 ? (
-          <>
-            <View style={{ alignItems: 'center', marginBottom: 40 }}>
-              <Text style={{ fontSize: 64, marginBottom: 16 }}>🌐</Text>
-              <Text style={{ fontSize: 30, fontWeight: '900', color: '#fff', textAlign: 'center' }}>AmirNet Plus</Text>
-              <Text style={{ fontSize: 16, color: '#bfdbfe', textAlign: 'center', marginTop: 8 }}>הכנה מקצועית לבחינת אמירנט</Text>
-            </View>
-            <View style={{ gap: 12 }}>
-              {['49 שאלות ב-6 נושאים', 'בחינות מדומות עם טיימר', 'מעקב התקדמות מפורט', 'מצב לימוד עם הסברים'].map(f => (
-                <Row key={f} style={{ alignSelf: 'flex-end' }}>
-                  <Text style={{ color: '#bfdbfe', textAlign: 'right', fontSize: 15, marginRight: 8 }}>{f}</Text>
-                  <Icon name="checkmark-circle" size={20} color="#4ade80" />
-                </Row>
-              ))}
-            </View>
-            <TouchableOpacity style={[S.startBtn, { backgroundColor: '#fff', marginTop: 48 }]} onPress={() => setStep(1)}>
-              <Text style={[S.startBtnTxt, { color: C.primary }]}>בוא נתחיל ←</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <Text style={{ fontSize: 24, fontWeight: '800', color: '#fff', textAlign: 'right', marginBottom: 8 }}>ספר לנו קצת</Text>
-            <Text style={{ fontSize: 14, color: '#bfdbfe', textAlign: 'right', marginBottom: 32 }}>המידע יעזור לנו להתאים את הלמידה שלך</Text>
-            <Text style={{ color: '#bfdbfe', textAlign: 'right', marginBottom: 6, fontSize: 14 }}>מה שמך?</Text>
-            <TextInput style={S.onboardInput} value={name} onChangeText={setName} placeholder="הכנס שם..." placeholderTextColor="#93c5fd" textAlign="right" />
-            <Text style={{ color: '#bfdbfe', textAlign: 'right', marginTop: 20, marginBottom: 6, fontSize: 14 }}>יעד יומי (שאלות)</Text>
-            <Row style={{ gap: 10, alignSelf: 'flex-end' }}>
-              {['10','20','30','50'].map(n => (
-                <TouchableOpacity key={n} onPress={() => setGoal(n)}
-                  style={{ backgroundColor: goal === n ? '#fff' : 'transparent', borderWidth: 1.5, borderColor: '#fff', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 }}>
-                  <Text style={{ color: goal === n ? C.primary : '#fff', fontWeight: '700' }}>{n}</Text>
-                </TouchableOpacity>
-              ))}
-            </Row>
-            <TouchableOpacity style={[S.startBtn, { backgroundColor: '#fff', marginTop: 48 }]} onPress={finish}>
-              <Text style={[S.startBtnTxt, { color: C.primary }]}>כניסה לאפליקציה ←</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </SafeAreaView>
-  );
-}
-
-// ─── HOME ────────────────────────────────────────────────────────────────────
-function HomeScreen({ prog, dispatch, onQuiz }) {
-  const tp = prog.topicProgress || {};
-  const overall = pct(prog.totalCorrect, prog.totalAnswered);
-  const todayAns = (prog.quizHistory || []).filter(h => new Date(h.date).toDateString() === new Date().toDateString()).reduce((s, h) => s + h.total, 0);
-  const goalDone = todayAns >= prog.dailyGoal;
-  const weakTopics = TOPICS.filter(t => { const p = tp[t.id]; return p && p.answered >= 3 && pct(p.correct, p.answered) < 70; });
-  const lastTopic = prog.quizHistory?.[0]?.topic ? topicById(prog.quizHistory[0].topic) : null;
-
-  return (
-    <ScrollView style={S.screen} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={{ paddingTop: 8, paddingBottom: 16 }}>
-        <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View style={[S.streakBadge]}>
-            <Text style={{ fontSize: 13 }}>🔥</Text>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: C.warning, marginRight: 3 }}>{prog.streakDays || 0} ימים</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: C.text }}>שלום, {prog.userName || 'לומד'} 👋</Text>
-            <Text style={{ fontSize: 13, color: C.muted }}>הכנה לבחינת אמירנט</Text>
-          </View>
-        </Row>
-      </View>
-
-      {/* Daily Goal Card */}
-      <Card style={goalDone ? { borderWidth: 1.5, borderColor: C.success + '66', backgroundColor: '#f0fdf4' } : {}}>
-        <Row style={{ justifyContent: 'space-between', marginBottom: 10 }}>
-          <Row style={{ flex: 0 }}>
-            <Icon name={goalDone ? 'checkmark-circle' : 'today-outline'} size={15} color={goalDone ? C.success : C.primary} />
-            <Text style={{ fontSize: 13, color: goalDone ? C.success : C.primary, fontWeight: '700', marginRight: 4 }}>
-              {goalDone ? 'יעד הושג! 🎯' : 'יעד יומי'}
-            </Text>
+function OnboardingScreen({onDone}) {
+  const [step,setStep]=useState(0);
+  const [name,setName]=useState('');
+  const [goal,setGoal]=useState('20');
+  return <SafeAreaView style={{flex:1,backgroundColor:C.primary}}>
+    <StatusBar barStyle="light-content"/>
+    <View style={{flex:1,justifyContent:'center',padding:32}}>
+      {step===0?<>
+        <View style={{alignItems:'center',marginBottom:40}}>
+          <Text style={{fontSize:72,marginBottom:12}}>🌐</Text>
+          <Text style={{fontSize:30,fontWeight:'900',color:'#fff',textAlign:'center'}}>AmirNet Plus</Text>
+          <Text style={{fontSize:15,color:'#bfdbfe',textAlign:'center',marginTop:6}}>הכנה מקצועית לבחינת אמירנט</Text>
+        </View>
+        {['57 שאלות ב-6 נושאים + קריאה','מנוע אדפטיבי המתאים לרמתך','ניתוח מיומנויות מפורט','מצב לימוד ומבחן מלא'].map(f=>(
+          <Row key={f} style={{alignSelf:'flex-end',marginBottom:12}}>
+            <Text style={{color:'#bfdbfe',fontSize:14,marginRight:8}}>{f}</Text>
+            <Icon name="checkmark-circle" size={18} color="#4ade80"/>
           </Row>
-          <Text style={{ fontSize: 20, fontWeight: '900', color: goalDone ? C.success : C.primary }}>{todayAns}/{prog.dailyGoal}</Text>
-        </Row>
-        <Bar value={todayAns} total={prog.dailyGoal} color={goalDone ? C.success : C.primary} h={9} />
-        <Text style={{ textAlign: 'right', fontSize: 11, color: C.muted, marginTop: 6 }}>שאלות שנענו היום</Text>
-      </Card>
-
-      {/* Stats Row */}
-      <Row style={{ gap: 10, marginBottom: 4 }}>
-        {[
-          { icon: 'help-circle', val: prog.totalAnswered || 0, lbl: 'שאלות', c: C.primary },
-          { icon: 'trophy',      val: overall > 0 ? `${overall}%` : '–', lbl: 'הצלחה', c: overall >= 70 ? C.success : C.warning },
-          { icon: 'flame',       val: prog.streakDays || 0, lbl: 'ימי רצף', c: C.warning },
-          { icon: 'bookmark',    val: prog.bookmarkedIds?.length || 0, lbl: 'שמורות', c: C.purple },
-        ].map(s => (
-          <Card key={s.lbl} style={{ flex: 1, alignItems: 'center', padding: 12, marginBottom: 0 }}>
-            <Icon name={s.icon} size={20} color={s.c} />
-            <Text style={{ fontSize: 18, fontWeight: '900', color: s.c, marginTop: 4 }}>{s.val}</Text>
-            <Text style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{s.lbl}</Text>
-          </Card>
         ))}
-      </Row>
-
-      {/* Quick Actions */}
-      <Section title="פעולות מהירות" />
-      <Row style={{ gap: 10 }}>
-        <Card style={{ flex: 1, alignItems: 'center', padding: 16 }} onPress={() => onQuiz({ count: 10, topic: null, mode: 'exam', timer: 0 })}>
-          <Icon name="play-circle" size={32} color={C.primary} />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: C.primary, marginTop: 6 }}>בחינה מהירה</Text>
-          <Text style={{ fontSize: 11, color: C.muted }}>10 שאלות</Text>
-        </Card>
-        <Card style={{ flex: 1, alignItems: 'center', padding: 16 }} onPress={() => onQuiz({ count: 40, topic: null, mode: 'exam', timer: 45 * 60 })}>
-          <Icon name="school" size={32} color={C.danger} />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: C.danger, marginTop: 6 }}>בחינה מלאה</Text>
-          <Text style={{ fontSize: 11, color: C.muted }}>40 שאלות • 45 דק׳</Text>
-        </Card>
-        {weakTopics.length > 0 && (
-          <Card style={{ flex: 1, alignItems: 'center', padding: 16 }} onPress={() => onQuiz({ count: 10, topic: weakTopics[0].id, mode: 'study', timer: 0 })}>
-            <Icon name="fitness" size={32} color={C.warning} />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: C.warning, marginTop: 6 }}>חזק חולשות</Text>
-            <Text style={{ fontSize: 11, color: C.muted }}>{weakTopics[0].name}</Text>
-          </Card>
-        )}
-      </Row>
-
-      {/* Last topic resume */}
-      {lastTopic && (
-        <>
-          <Section title="המשך מאיפה שהפסקת" />
-          <Card onPress={() => onQuiz({ count: 10, topic: lastTopic.id, mode: 'study', timer: 0 })}>
-            <Row style={{ justifyContent: 'space-between' }}>
-              <Row style={{ flex: 0 }}>
-                <Icon name="arrow-forward-circle" size={18} color={C.primary} />
-                <Text style={{ color: C.primary, fontWeight: '700', fontSize: 13, marginRight: 4 }}>המשך</Text>
-              </Row>
-              <Row style={{ flex: 0 }}>
-                <Text style={{ fontWeight: '700', fontSize: 15, marginRight: 6 }}>{lastTopic.name}</Text>
-                <Text style={{ fontSize: 22 }}>{lastTopic.icon}</Text>
-              </Row>
-            </Row>
-          </Card>
-        </>
-      )}
-
-      {/* Weak topics warning */}
-      {weakTopics.length > 0 && (
-        <>
-          <Section title="⚠️ נושאים שדורשים חיזוק" />
-          {weakTopics.slice(0, 2).map(t => {
-            const p = tp[t.id];
-            const p2 = pct(p.correct, p.answered);
-            return (
-              <Card key={t.id} style={{ marginBottom: 8, borderWidth: 1, borderColor: C.warning + '40' }} onPress={() => onQuiz({ count: 10, topic: t.id, mode: 'study', timer: 0 })}>
-                <Row style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-                  <Pill label={`${p2}%`} color={C.warning} />
-                  <Row style={{ flex: 0 }}>
-                    <Text style={{ fontWeight: '700', fontSize: 14 }}>{t.name}</Text>
-                    <Text style={{ fontSize: 20, marginRight: 6 }}>{t.icon}</Text>
-                  </Row>
-                </Row>
-                <Bar value={p2} total={100} color={C.warning} h={5} />
-              </Card>
-            );
-          })}
-        </>
-      )}
-
-      {/* Topics overview */}
-      <Section title="סקירת נושאים" />
-      {TOPICS.map(t => {
-        const p = tp[t.id];
-        const p2 = p ? pct(p.correct, p.answered) : 0;
-        return (
-          <Card key={t.id} style={{ marginBottom: 8 }} onPress={() => onQuiz({ count: countByTopic(t.id), topic: t.id, mode: 'exam', timer: 0 })}>
-            <Row style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-              <Text style={{ fontSize: 12, color: C.muted }}>{p?.answered || 0} שאלות</Text>
-              <Row style={{ flex: 0 }}>
-                {p2 > 0 && <Pill label={`${p2}%`} color={p2 >= 70 ? C.success : C.warning} small />}
-                <Text style={{ fontWeight: '700', fontSize: 14, marginRight: 6 }}>{t.name}</Text>
-                <Text style={{ fontSize: 20 }}>{t.icon}</Text>
-              </Row>
-            </Row>
-            <Bar value={p2} total={100} color={t.color} h={5} />
-          </Card>
-        );
-      })}
-    </ScrollView>
-  );
+        <TouchableOpacity style={[S.btn,{backgroundColor:'#fff',marginTop:40}]} onPress={()=>setStep(1)}>
+          <Text style={[S.btnTxt,{color:C.primary}]}>בוא נתחיל ←</Text>
+        </TouchableOpacity>
+      </>:<>
+        <Text style={{fontSize:24,fontWeight:'800',color:'#fff',textAlign:'right',marginBottom:24}}>קצת עליך</Text>
+        <Text style={{color:'#bfdbfe',textAlign:'right',marginBottom:6}}>שמך</Text>
+        <TextInput style={S.onbInput} value={name} onChangeText={setName} placeholder="הכנס שם..." placeholderTextColor="#93c5fd" textAlign="right"/>
+        <Text style={{color:'#bfdbfe',textAlign:'right',marginTop:20,marginBottom:10}}>יעד יומי (שאלות)</Text>
+        <Row style={{gap:8,alignSelf:'flex-end'}}>
+          {['10','20','30','50'].map(n=>(
+            <TouchableOpacity key={n} onPress={()=>setGoal(n)}
+              style={{backgroundColor:goal===n?'#fff':'transparent',borderWidth:1.5,borderColor:'#fff',borderRadius:10,paddingHorizontal:14,paddingVertical:9}}>
+              <Text style={{color:goal===n?C.primary:'#fff',fontWeight:'700'}}>{n}</Text>
+            </TouchableOpacity>
+          ))}
+        </Row>
+        <TouchableOpacity style={[S.btn,{backgroundColor:'#fff',marginTop:40}]}
+          onPress={()=>onDone({userName:name.trim()||'לומד',dailyGoal:parseInt(goal)||20})}>
+          <Text style={[S.btnTxt,{color:C.primary}]}>כניסה ←</Text>
+        </TouchableOpacity>
+      </>}
+    </View>
+  </SafeAreaView>;
 }
 
-// ─── TOPICS SCREEN ───────────────────────────────────────────────────────────
-function TopicsScreen({ prog, onQuiz }) {
-  const tp = prog.topicProgress || {};
-  return (
-    <ScrollView style={S.screen} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
-      <Text style={S.pageTitle}>נושאים</Text>
-      {TOPICS.map(t => {
-        const p = tp[t.id];
-        const p2 = p ? pct(p.correct, p.answered) : 0;
-        const total = countByTopic(t.id);
-        const easy = QS.filter(q => q.topic === t.id && q.diff === 'easy').length;
-        const med = QS.filter(q => q.topic === t.id && q.diff === 'medium').length;
-        const hard = QS.filter(q => q.topic === t.id && q.diff === 'hard').length;
-        return (
-          <Card key={t.id} style={{ marginBottom: 14, borderTopWidth: 3, borderTopColor: t.color }} onPress={() => onQuiz({ count: total, topic: t.id, mode: 'exam', timer: 0 })}>
-            <Row style={{ justifyContent: 'space-between', marginBottom: 10 }}>
-              <View>
-                <Text style={{ fontSize: 12, color: C.muted }}>{p?.answered || 0}/{total} שאלות</Text>
-                {p2 > 0 && <Text style={{ fontSize: 12, fontWeight: '700', color: p2 >= 70 ? C.success : C.warning, marginTop: 2 }}>{p2}% הצלחה</Text>}
-              </View>
-              <Row style={{ flex: 0 }}>
-                <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
-                  <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>{t.name}</Text>
-                  <Text style={{ fontSize: 12, color: C.muted, textAlign: 'right', maxWidth: W * 0.5 }}>{t.desc}</Text>
-                </View>
-                <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: t.color + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 26 }}>{t.icon}</Text>
-                </View>
-              </Row>
-            </Row>
-            <Bar value={p2} total={100} color={t.color} h={7} />
-            <Row style={{ justifyContent: 'space-between', marginTop: 10 }}>
-              <Row style={{ flex: 0, gap: 6 }}>
-                {[['קל', C.success, easy], ['בינוני', C.warning, med], ['קשה', C.danger, hard]].map(([l, c, n]) => (
-                  <Pill key={l} label={`${n} ${l}`} color={c} small />
-                ))}
-              </Row>
-              <Row style={{ flex: 0 }}>
-                <Text style={{ fontSize: 12, color: C.primary, fontWeight: '700' }}>התחל </Text>
-                <Icon name="arrow-back" size={14} color={C.primary} />
-              </Row>
-            </Row>
-          </Card>
-        );
+// ─── HOME SCREEN ─────────────────────────────────────────────────────────────
+function HomeScreen({prog,onQuiz}) {
+  const tp = prog.topicProgress||{};
+  const overall = pct(prog.totalCorrect,prog.totalAnswered);
+  const todayAns = (prog.quizHistory||[]).filter(h=>new Date(h.date).toDateString()===new Date().toDateString()).reduce((s,h)=>s+h.total,0);
+  const goalDone = todayAns>=prog.dailyGoal;
+  const weak = TOPICS.filter(t=>{ const p=tp[t.id]; return p&&p.answered>=3&&pct(p.correct,p.answered)<70; });
+  const lastH = prog.quizHistory?.[0];
+  const lastTopic = lastH?.topic?topicById(lastH.topic):null;
+
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:24}} showsVerticalScrollIndicator={false}>
+    {/* Header */}
+    <Row style={{justifyContent:'space-between',paddingVertical:10}}>
+      <View style={{flexDirection:'row-reverse',alignItems:'center',backgroundColor:'#fff7ed',paddingHorizontal:10,paddingVertical:5,borderRadius:20,borderWidth:1,borderColor:C.warning+'40'}}>
+        <Text style={{fontSize:13}}>🔥</Text>
+        <Text style={{fontSize:12,fontWeight:'700',color:C.warning,marginRight:3}}>{prog.streakDays||0} ימים</Text>
+      </View>
+      <Col>
+        <Text style={{fontSize:21,fontWeight:'900',color:C.text}}>שלום, {prog.userName} 👋</Text>
+        <Text style={{fontSize:13,color:C.muted}}>הכנה לבחינת אמירנט</Text>
+      </Col>
+    </Row>
+
+    {/* Daily Goal */}
+    <Card style={goalDone?{borderWidth:1.5,borderColor:C.success+'55',backgroundColor:'#f0fdf4'}:{}}>
+      <Row style={{justifyContent:'space-between',marginBottom:8}}>
+        <Row style={{flex:0,gap:4}}>
+          <Icon name={goalDone?'checkmark-circle':'today-outline'} size={15} color={goalDone?C.success:C.primary}/>
+          <Text style={{fontSize:13,color:goalDone?C.success:C.primary,fontWeight:'700'}}>{goalDone?'יעד הושג 🎯':'יעד יומי'}</Text>
+        </Row>
+        <Text style={{fontSize:20,fontWeight:'900',color:goalDone?C.success:C.primary}}>{todayAns}/{prog.dailyGoal}</Text>
+      </Row>
+      <Bar value={todayAns} total={prog.dailyGoal} color={goalDone?C.success:C.primary} h={9}/>
+    </Card>
+
+    {/* Stats */}
+    <Row style={{gap:8,marginBottom:4}}>
+      {[
+        {i:'help-circle',v:prog.totalAnswered||0,l:'שאלות',c:C.primary},
+        {i:'trophy',v:overall>0?`${overall}%`:'–',l:'הצלחה',c:overall>=70?C.success:C.warning},
+        {i:'flame',v:prog.streakDays||0,l:'רצף',c:C.warning},
+        {i:'bookmark',v:prog.bookmarkedIds?.length||0,l:'שמורות',c:C.purple},
+      ].map(s=><Card key={s.l} style={{flex:1,alignItems:'center',padding:10,marginBottom:0}}>
+        <Icon name={s.i} size={18} color={s.c}/>
+        <Text style={{fontSize:17,fontWeight:'900',color:s.c,marginTop:3}}>{s.v}</Text>
+        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>{s.l}</Text>
+      </Card>)}
+    </Row>
+
+    {/* Quick Actions */}
+    <Sec title="בחינות"/>
+    <Row style={{gap:10}}>
+      <Card style={{flex:1,alignItems:'center',padding:14}} onPress={()=>onQuiz({count:10,topic:null,mode:'exam',timer:0,adaptive:false})}>
+        <Icon name="play-circle" size:={30} color={C.primary}/>
+        <Text style={{fontWeight:'700',color:C.primary,marginTop:4,fontSize:13}}>בחינה מהירה</Text>
+        <Text style={{fontSize:11,color:C.muted}}>10 שאלות</Text>
+      </Card>
+      <Card style={{flex:1,alignItems:'center',padding:14}} onPress={()=>onQuiz({count:40,topic:null,mode:'exam',timer:45*60,adaptive:false})}>
+        <Icon name="school" size={30} color={C.danger}/>
+        <Text style={{fontWeight:'700',color:C.danger,marginTop:4,fontSize:13}}>בחינה מלאה</Text>
+        <Text style={{fontSize:11,color:C.muted}}>40 שאלות • 45′</Text>
+      </Card>
+      <Card style={{flex:1,alignItems:'center',padding:14}} onPress={()=>onQuiz({count:20,topic:null,mode:'exam',timer:0,adaptive:true})}>
+        <Icon name="analytics" size={30} color={C.purple}/>
+        <Text style={{fontWeight:'700',color:C.purple,marginTop:4,fontSize:13}}>אדפטיבי</Text>
+        <Text style={{fontSize:11,color:C.muted}}>מתאים לרמתך</Text>
+      </Card>
+    </Row>
+
+    {weak.length>0&&<>
+      <Sec title="⚠️ חולשות"/>
+      {weak.slice(0,2).map(t=>{
+        const p=tp[t.id], p2=pct(p.correct,p.answered);
+        return <Card key={t.id} style={{marginBottom:8,borderWidth:1,borderColor:C.warning+'44'}}
+          onPress={()=>onQuiz({count:10,topic:t.id,mode:'study',timer:0,adaptive:false})}>
+          <Row style={{justifyContent:'space-between',marginBottom:6}}>
+            <Pill label={`${p2}%`} color={C.warning}/>
+            <Row style={{flex:0,gap:6}}><Text style={{fontWeight:'700',fontSize:14}}>{t.name}</Text><Text style={{fontSize:20}}>{t.icon}</Text></Row>
+          </Row>
+          <Bar value={p2} total={100} color={C.warning} h={5}/>
+        </Card>;
       })}
-    </ScrollView>
-  );
-}
+    </>}
 
-// ─── QUIZ SETUP ──────────────────────────────────────────────────────────────
-function QuizSetupScreen({ onStart }) {
-  const [count, setCount] = useState(10);
-  const [topic, setTopic] = useState(null);
-  const [mode, setMode] = useState('exam');
-  const [timerMin, setTimerMin] = useState(0);
-
-  return (
-    <ScrollView style={S.screen} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-      <Text style={S.pageTitle}>הגדרות בחינה</Text>
-
-      {/* Header banner */}
-      <Card style={{ backgroundColor: C.primary, marginBottom: 20 }}>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <Icon name="school" size={42} color="#bfdbfe" />
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ fontSize: 19, fontWeight: '800', color: '#fff' }}>בחינת אמירנט</Text>
-            <Text style={{ fontSize: 13, color: '#bfdbfe', textAlign: 'right' }}>הגדר והתחל להתכונן</Text>
-          </View>
+    {lastTopic&&<>
+      <Sec title="המשך מאיפה שהפסקת"/>
+      <Card onPress={()=>onQuiz({count:10,topic:lastTopic.id,mode:'study',timer:0,adaptive:false})}>
+        <Row style={{justifyContent:'space-between'}}>
+          <Row style={{flex:0,gap:4}}><Icon name="arrow-forward-circle" size={18} color={C.primary}/><Text style={{color:C.primary,fontWeight:'700',fontSize:13}}>המשך</Text></Row>
+          <Row style={{flex:0,gap:6}}><Text style={{fontWeight:'700',fontSize:15}}>{lastTopic.name}</Text><Text style={{fontSize:22}}>{lastTopic.icon}</Text></Row>
         </Row>
       </Card>
+    </>}
 
-      {/* Question Count */}
-      <Section title="מספר שאלות" />
-      <Row style={{ gap: 8, marginBottom: 20 }}>
-        {[10, 20, 30, 50].map(n => (
-          <TouchableOpacity key={n} style={[S.countBtn, count === n && S.countBtnOn]} onPress={() => setCount(n)}>
-            <Text style={[S.countBtnTxt, count === n && { color: '#fff' }]}>{n}</Text>
-          </TouchableOpacity>
-        ))}
-      </Row>
-
-      {/* Mode */}
-      <Section title="מצב בחינה" />
-      <Row style={{ gap: 10, marginBottom: 20 }}>
-        {[
-          { v: 'exam', icon: 'timer-outline', title: 'מצב בחינה', sub: 'תוצאות בסוף' },
-          { v: 'study', icon: 'bulb-outline', title: 'מצב לימוד', sub: 'הסבר אחרי כל שאלה' },
-        ].map(m => (
-          <TouchableOpacity key={m.v} style={[S.modeBtn, mode === m.v && S.modeBtnOn]} onPress={() => setMode(m.v)}>
-            <Icon name={m.icon} size={28} color={mode === m.v ? C.primary : C.muted} />
-            <Text style={[S.modeBtnTitle, mode === m.v && { color: C.primary }]}>{m.title}</Text>
-            <Text style={S.modeBtnSub}>{m.sub}</Text>
-          </TouchableOpacity>
-        ))}
-      </Row>
-
-      {/* Timer (only exam mode) */}
-      {mode === 'exam' && (
-        <>
-          <Section title="טיימר (אופציונלי)" />
-          <Row style={{ gap: 8, marginBottom: 20 }}>
-            {[0, 10, 20, 30, 45].map(n => (
-              <TouchableOpacity key={n} style={[S.countBtn, timerMin === n && S.countBtnOn]} onPress={() => setTimerMin(n)}>
-                <Text style={[S.countBtnTxt, timerMin === n && { color: '#fff' }]}>{n === 0 ? 'ללא' : `${n}′`}</Text>
-              </TouchableOpacity>
-            ))}
-          </Row>
-        </>
-      )}
-
-      {/* Topic */}
-      <Section title="נושא" />
-      {[null, ...TOPICS].map((t, i) => {
-        const isAll = t === null;
-        const selected = topic === (isAll ? null : t.id);
-        return (
-          <TouchableOpacity key={i} style={[S.topicOpt, selected && S.topicOptOn]} onPress={() => setTopic(isAll ? null : t.id)}>
-            <Row style={{ justifyContent: 'space-between' }}>
-              <Row style={{ flex: 0 }}>
-                {selected && <Icon name="checkmark-circle" size={18} color={C.primary} />}
-              </Row>
-              <Row style={{ flex: 0 }}>
-                <View style={{ alignItems: 'flex-end', marginLeft: 10 }}>
-                  <Text style={{ fontWeight: '700', fontSize: 14 }}>{isAll ? 'כל הנושאים' : t.name}</Text>
-                  <Text style={{ fontSize: 12, color: C.muted }}>{isAll ? 'שאלות מעורבות' : `${countByTopic(t.id)} שאלות`}</Text>
-                </View>
-                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: isAll ? C.primary + '20' : t.color + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: isAll ? 18 : 22 }}>{isAll ? '🔲' : t.icon}</Text>
-                </View>
-              </Row>
-            </Row>
-          </TouchableOpacity>
-        );
-      })}
-
-      <TouchableOpacity style={S.startBtn} onPress={() => onStart({ count, topic, mode, timer: mode === 'exam' ? timerMin * 60 : 0 })}>
-        <Icon name="play" size={18} color="#fff" />
-        <Text style={[S.startBtnTxt, { marginRight: 8 }]}>התחל בחינה</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
+    <Sec title="נושאים"/>
+    {TOPICS.map(t=>{
+      const p=tp[t.id], p2=p?pct(p.correct,p.answered):0;
+      return <Card key={t.id} style={{marginBottom:8}} onPress={()=>onQuiz({count:getQsByTopic(t.id).length,topic:t.id,mode:'exam',timer:0,adaptive:false})}>
+        <Row style={{justifyContent:'space-between',marginBottom:6}}>
+          <Text style={{fontSize:12,color:C.muted}}>{p?.answered||0} שאלות</Text>
+          <Row style={{flex:0,gap:6}}>{p2>0&&<Pill label={`${p2}%`} color={p2>=70?C.success:C.warning} small/>}
+            <Text style={{fontWeight:'700',fontSize:14}}>{t.name}</Text><Text style={{fontSize:20}}>{t.icon}</Text></Row>
+        </Row>
+        <Bar value={p2} total={100} color={t.color} h={5}/>
+      </Card>;
+    })}
+  </ScrollView>;
 }
 
-// ─── QUIZ SCREEN ─────────────────────────────────────────────────────────────
-function QuizScreen({ config, dispatch, onFinish }) {
-  const [questions] = useState(() => getQuestions(config.topic, config.count));
-  const [idx, setIdx] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [selected, setSelected] = useState(null);
-  const [showExp, setShowExp] = useState(false);
-  const [done, setDone] = useState(false);
+// ─── QUIZ SETUP ───────────────────────────────────────────────────────────────
+function QuizSetupScreen({onStart}) {
+  const [count,setCount]=useState(10);
+  const [topic,setTopic]=useState(null);
+  const [mode,setMode]=useState('exam');
+  const [timerMin,setTimerMin]=useState(0);
+  const [adaptive,setAdaptive]=useState(false);
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:40}} showsVerticalScrollIndicator={false}>
+    <Text style={S.pgTitle}>הגדרות בחינה</Text>
+    <Card style={{backgroundColor:C.primary,marginBottom:16}}>
+      <Row style={{justifyContent:'space-between'}}>
+        <Icon name="school" size={42} color="#bfdbfe"/>
+        <Col style={{alignItems:'flex-end'}}><Text style={{fontSize:19,fontWeight:'800',color:'#fff'}}>בחינת אמירנט</Text>
+          <Text style={{fontSize:13,color:'#bfdbfe'}}>הגדר והתחל</Text></Col>
+      </Row>
+    </Card>
+
+    <Sec title="מספר שאלות"/>
+    <Row style={{gap:8,marginBottom:16}}>
+      {[10,20,30,50].map(n=><TouchableOpacity key={n} style={[S.cntBtn,count===n&&S.cntBtnOn]} onPress={()=>setCount(n)}>
+        <Text style={[S.cntTxt,count===n&&{color:'#fff'}]}>{n}</Text>
+      </TouchableOpacity>)}
+    </Row>
+
+    <Sec title="מצב"/>
+    <Row style={{gap:10,marginBottom:16}}>
+      {[{v:'exam',icon:'timer-outline',t:'בחינה',s:'תוצאות בסוף'},
+        {v:'study',icon:'bulb-outline',t:'לימוד',s:'הסבר אחרי כל שאלה'}].map(m=>
+        <TouchableOpacity key={m.v} style={[S.modeBtn,mode===m.v&&S.modeBtnOn]} onPress={()=>setMode(m.v)}>
+          <Icon name={m.icon} size={26} color={mode===m.v?C.primary:C.muted}/>
+          <Text style={{fontWeight:'800',fontSize:13,color:mode===m.v?C.primary:C.text,marginTop:5}}>{m.t}</Text>
+          <Text style={{fontSize:11,color:C.muted,textAlign:'center',marginTop:2}}>{m.s}</Text>
+        </TouchableOpacity>
+      )}
+    </Row>
+
+    {/* Adaptive toggle */}
+    <Card style={{marginBottom:12}}>
+      <Row style={{justifyContent:'space-between'}}>
+        <Switch value={adaptive} onValueChange={setAdaptive} trackColor={{false:C.border,true:C.purple}} thumbColor="#fff"/>
+        <Col style={{alignItems:'flex-end'}}>
+          <Row style={{flex:0,gap:4}}><Icon name="analytics" size={16} color={C.purple}/><Text style={{fontWeight:'700',color:C.purple,fontSize:14}}>מצב אדפטיבי</Text></Row>
+          <Text style={{fontSize:11,color:C.muted}}>קושי מתאים אוטומטית לרמתך</Text>
+        </Col>
+      </Row>
+    </Card>
+
+    {mode==='exam'&&<>
+      <Sec title="טיימר"/>
+      <Row style={{gap:8,marginBottom:16}}>
+        {[0,10,20,30,45].map(n=><TouchableOpacity key={n} style={[S.cntBtn,timerMin===n&&S.cntBtnOn]} onPress={()=>setTimerMin(n)}>
+          <Text style={[S.cntTxt,timerMin===n&&{color:'#fff'}]}>{n===0?'ללא':`${n}′`}</Text>
+        </TouchableOpacity>)}
+      </Row>
+    </>}
+
+    <Sec title="נושא"/>
+    {[null,...TOPICS].map((t,i)=>{
+      const isAll=t===null; const sel=topic===(isAll?null:t?.id);
+      return <TouchableOpacity key={i} style={[S.topicOpt,sel&&S.topicOptOn]} onPress={()=>setTopic(isAll?null:t.id)}>
+        <Row style={{justifyContent:'space-between'}}>
+          <Row style={{flex:0}}>{sel&&<Icon name="checkmark-circle" size={18} color={C.primary}/>}</Row>
+          <Row style={{flex:0,gap:10}}>
+            <Col style={{alignItems:'flex-end'}}>
+              <Text style={{fontWeight:'700',fontSize:14}}>{isAll?'כל הנושאים':t.name}</Text>
+              <Text style={{fontSize:11,color:C.muted}}>{isAll?'שאלות מעורבות':`${getQsByTopic(t.id).length} שאלות`}</Text>
+            </Col>
+            <View style={{width:38,height:38,borderRadius:19,backgroundColor:(isAll?C.primary:t.color)+'22',alignItems:'center',justifyContent:'center'}}>
+              <Text style={{fontSize:isAll?18:22}}>{isAll?'🔲':t.icon}</Text>
+            </View>
+          </Row>
+        </Row>
+      </TouchableOpacity>;
+    })}
+    <TouchableOpacity style={[S.btn,{marginTop:8}]} onPress={()=>onStart({count,topic,mode,timer:mode==='exam'?timerMin*60:0,adaptive})}>
+      <Icon name="play" size={17} color="#fff"/>
+      <Text style={[S.btnTxt,{marginRight:8}]}>התחל בחינה</Text>
+    </TouchableOpacity>
+  </ScrollView>;
+}
+
+// ─── QUIZ ENGINE SCREEN ───────────────────────────────────────────────────────
+function QuizScreen({config,dispatch,onFinish}) {
+  const [questions,setQuestions] = useState(()=>config.adaptive?[AdaptiveEngine.selectNext(0,[],QS,config.topic)].filter(Boolean):getPool(config.topic,config.count));
+  const [idx,setIdx] = useState(0);
+  const [answers,setAnswers] = useState({});
+  const [selected,setSelected] = useState(null);
+  const [showExp,setShowExp] = useState(false);
+  const [done,setDone] = useState(false);
+  const [theta,setTheta] = useState(0);
+  const [flagged,setFlagged] = useState(new Set());
   const [startTime] = useState(Date.now());
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  if (questions.length === 0) return (
-    <SafeAreaView style={S.center}>
-      <Text style={S.pageTitle}>אין שאלות</Text>
-      <TouchableOpacity style={S.startBtn} onPress={onFinish}><Text style={S.startBtnTxt}>חזור</Text></TouchableOpacity>
-    </SafeAreaView>
-  );
+  if(!questions.length) return <SafeAreaView style={S.center}><Text style={S.pgTitle}>אין שאלות</Text><TouchableOpacity style={S.btn} onPress={onFinish}><Text style={S.btnTxt}>חזור</Text></TouchableOpacity></SafeAreaView>;
 
-  function animateNext(fn) {
-    Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
-      fn();
-      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-    });
+  function animNext(fn) {
+    Animated.timing(fadeAnim,{toValue:0,duration:140,useNativeDriver:true}).start(()=>{fn();Animated.timing(fadeAnim,{toValue:1,duration:180,useNativeDriver:true}).start();});
   }
 
   function handleSelect(i) {
-    if (selected !== null) return;
-    const newAnswers = { ...answers, [idx]: i };
-    setSelected(i);
-    setAnswers(newAnswers);
-    if (config.mode === 'study') setShowExp(true);
+    if(selected!==null)return;
+    const newAns = {...answers,[idx]:i};
+    setSelected(i); setAnswers(newAns);
+    if(config.mode==='study') setShowExp(true);
+    if(config.adaptive) {
+      const isOk = i===questions[idx].a;
+      const newTheta = AdaptiveEngine.updateTheta(theta,isOk,questions[idx].diff);
+      setTheta(newTheta);
+    }
   }
 
   function handleNext() {
-    if (idx === questions.length - 1) {
-      dispatch({ type: 'RECORD', payload: { questions, answers: { ...answers, [idx]: selected }, startTime } });
-      setDone(true);
+    const finalAns = {...answers,[idx]:selected};
+    const isLast = config.adaptive ? questions.length>=config.count : idx===questions.length-1;
+    if(isLast) {
+      dispatch({type:'RECORD',payload:{questions,answers:finalAns,startTime}});
+      if(config.adaptive) dispatch({type:'RECORD_ADAPTIVE',payload:{theta_start:0,theta_end:theta,questions_count:questions.length}});
+      setAnswers(finalAns); setDone(true);
+    } else if(config.adaptive) {
+      const usedIds = questions.map(q=>q.id);
+      const next = AdaptiveEngine.selectNext(theta,usedIds,QS,config.topic);
+      if(next) { animNext(()=>{ setQuestions(qs=>[...qs,next]); setIdx(i=>i+1); setSelected(null); setShowExp(false); }); }
+      else { dispatch({type:'RECORD',payload:{questions,answers:finalAns,startTime}}); setAnswers(finalAns); setDone(true); }
     } else {
-      animateNext(() => { setIdx(i => i + 1); setSelected(null); setShowExp(false); });
+      animNext(()=>{ setIdx(i=>i+1); setSelected(null); setShowExp(false); });
     }
   }
 
   function handleTimeUp() {
-    Alert.alert('הזמן נגמר!', 'הבחינה הסתיימה אוטומטית.', [{ text: 'ראה תוצאות', onPress: () => {
-      dispatch({ type: 'RECORD', payload: { questions, answers, startTime } });
+    Alert.alert('הזמן נגמר!','הבחינה הסתיימה.',[{text:'תוצאות',onPress:()=>{
+      dispatch({type:'RECORD',payload:{questions,answers,startTime}});
       setDone(true);
     }}]);
   }
 
-  if (done) {
-    const finalAnswers = { ...answers, [idx]: selected };
-    const score = questions.filter((q, i) => finalAnswers[i] === q.a).length;
-    return <ResultsScreen questions={questions} answers={finalAnswers} score={score} secs={(Date.now() - startTime) / 1000} onDismiss={onFinish} onRetry={() => onFinish()} />;
+  if(done) {
+    const result = Scoring.compute(questions,answers,startTime);
+    return <ResultsScreen questions={questions} answers={answers} result={result} theta={config.adaptive?theta:null} onDismiss={onFinish}/>;
   }
 
   const q = questions[idx];
-  const topic = topicById(q.topic);
-  const diffColor = { easy: C.success, medium: C.warning, hard: C.danger };
-  const diffName = { easy: 'קל', medium: 'בינוני', hard: 'קשה' };
+  const t = topicById(q.topic);
+  const maxIdx = config.adaptive?config.count-1:questions.length-1;
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      <StatusBar barStyle="dark-content" />
-      {/* Top bar */}
-      <View style={S.quizBar}>
-        <TouchableOpacity onPress={onFinish} style={{ padding: 4 }}>
-          <Icon name="close-circle" size={24} color={C.danger} />
+  return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
+    <StatusBar barStyle="dark-content"/>
+    <View style={S.qBar}>
+      <Row style={{flex:0,gap:8}}>
+        {config.timer>0&&<ExamTimer totalSeconds={config.timer} onTimeUp={handleTimeUp}/>}
+        <TouchableOpacity onPress={()=>setFlagged(f=>{const n=new Set(f);n.has(q.id)?n.delete(q.id):n.add(q.id);return n;})}>
+          <Icon name={flagged.has(q.id)?'flag':'flag-outline'} size={20} color={flagged.has(q.id)?C.warning:C.muted}/>
         </TouchableOpacity>
-        <Row style={{ flex: 0, gap: 8 }}>
-          {config.timer > 0 && <ExamTimer totalSeconds={config.timer} onTimeUp={handleTimeUp} />}
-          <Text style={{ fontWeight: '700', fontSize: 15 }}>{idx + 1} / {questions.length}</Text>
-        </Row>
-      </View>
-      {/* Progress bar */}
-      <View style={S.quizProgressTrack}>
-        <View style={[S.quizProgressFill, { width: `${(idx / questions.length) * 100}%` }]} />
-      </View>
+        <Text style={{fontWeight:'700',fontSize:14}}>{idx+1}/{config.adaptive?config.count:questions.length}</Text>
+      </Row>
+      <TouchableOpacity onPress={onFinish}><Icon name="close-circle" size={24} color={C.danger}/></TouchableOpacity>
+    </View>
+    <View style={{height:4,backgroundColor:C.fill}}>
+      <View style={{width:`${(idx/Math.max(maxIdx,1))*100}%`,height:4,backgroundColor:config.adaptive?C.purple:C.primary}}/>
+    </View>
+    {config.adaptive&&<View style={{backgroundColor:C.purple+'10',paddingHorizontal:16,paddingVertical:4}}>
+      <Row style={{justifyContent:'space-between'}}>
+        <Pill label={`θ = ${theta.toFixed(2)}`} color={C.purple} small/>
+        <Text style={{fontSize:11,color:C.purple,fontWeight:'700'}}>רמה: {DIFF_LABEL[AdaptiveEngine.thetaToLevel(theta)]}</Text>
+      </Row>
+    </View>}
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-        <Animated.View style={{ opacity: fadeAnim }}>
-          {/* Question card */}
-          <Card style={{ marginBottom: 14, borderTopWidth: 3, borderTopColor: topic?.color || C.primary }}>
-            <Row style={{ justifyContent: 'space-between', marginBottom: 10 }}>
-              <Pill label={diffName[q.diff]} color={diffColor[q.diff]} />
-              <Text style={{ fontSize: 12, color: C.muted }}>{topic?.icon} {topic?.name}</Text>
-            </Row>
-            <Text style={{ fontSize: 17, fontWeight: '700', textAlign: 'right', color: C.text, lineHeight: 27 }}>{q.q}</Text>
-          </Card>
-          {/* Options */}
-          {q.opts.map((opt, i) => (
-            <AnswerOption key={i} text={opt} index={i} selected={selected} correctIdx={q.a} studyMode={config.mode === 'study'} onPress={handleSelect} />
-          ))}
-          {/* Explanation */}
-          {config.mode === 'study' && showExp && (
-            <Card style={{ backgroundColor: '#fffbeb', borderWidth: 1, borderColor: C.warning + '50', marginTop: 8 }}>
-              <Row style={{ justifyContent: 'flex-end', marginBottom: 6 }}>
-                <Text style={{ fontWeight: '700', color: C.warning, fontSize: 13 }}>הסבר 💡</Text>
-              </Row>
-              <Text style={{ textAlign: 'right', color: C.text, fontSize: 14, lineHeight: 22 }}>{q.exp}</Text>
-            </Card>
-          )}
-        </Animated.View>
-      </ScrollView>
-
-      {/* Next button */}
-      {selected !== null && (
-        <View style={S.quizBottom}>
-          <TouchableOpacity style={S.startBtn} onPress={handleNext}>
-            <Icon name={idx === questions.length - 1 ? 'checkmark' : 'arrow-back'} size={18} color="#fff" />
-            <Text style={[S.startBtnTxt, { marginRight: 8 }]}>{idx === questions.length - 1 ? 'סיים וראה תוצאות' : 'הבא'}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </SafeAreaView>
-  );
+    <ScrollView contentContainerStyle={{padding:16,paddingBottom:110}} showsVerticalScrollIndicator={false}>
+      <Animated.View style={{opacity:fadeAnim}}>
+        {q.type==='reading'&&<PassageCard passage={q.passage}/>}
+        <Card style={{marginBottom:14,borderTopWidth:3,borderTopColor:t?.color||C.primary}}>
+          <Row style={{justifyContent:'space-between',marginBottom:8}}>
+            <Pill label={DIFF_LABEL[q.diff]} color={DIFF_COLOR[q.diff]}/>
+            <Row style={{flex:0,gap:4}}><Text style={{fontSize:12,color:C.muted}}>{t?.name}</Text><Text style={{fontSize:16}}>{t?.icon}</Text></Row>
+          </Row>
+          {q.type==='restatement'&&<Text style={{fontSize:12,color:C.purple,fontWeight:'700',textAlign:'right',marginBottom:6}}>🔁 בחר את ההצהרה השקולה</Text>}
+          <Text style={{fontSize:17,fontWeight:'700',textAlign:'right',color:C.text,lineHeight:27}}>{q.q}</Text>
+        </Card>
+        {q.opts.map((opt,i)=><AnswerOpt key={i} text={opt} index={i} selected={selected} correctIdx={q.a} studyMode={config.mode==='study'} onPress={handleSelect}/>)}
+        {config.mode==='study'&&showExp&&<Card style={{backgroundColor:'#fffbeb',borderWidth:1,borderColor:C.warning+'50',marginTop:8}}>
+          <Row style={{justifyContent:'flex-end',marginBottom:6}}><Text style={{fontWeight:'700',color:C.warning,fontSize:13}}>💡 הסבר</Text></Row>
+          <Text style={{textAlign:'right',fontSize:14,color:C.text,lineHeight:22}}>{q.exp}</Text>
+        </Card>}
+      </Animated.View>
+    </ScrollView>
+    {selected!==null&&<View style={S.qBottom}>
+      <TouchableOpacity style={S.btn} onPress={handleNext}>
+        <Icon name={idx===maxIdx?'checkmark':'arrow-back'} size={17} color="#fff"/>
+        <Text style={[S.btnTxt,{marginRight:8}]}>{idx===maxIdx?'סיים':'הבא'}</Text>
+      </TouchableOpacity>
+    </View>}
+  </SafeAreaView>;
 }
 
-// ─── RESULTS ─────────────────────────────────────────────────────────────────
-function ResultsScreen({ questions, answers, score, secs, onDismiss, onRetry }) {
-  const [detail, setDetail] = useState(false);
-  const total = questions.length;
-  const p = pct(score, total);
-  const grade = gradeLabel(p);
-  const pass = p >= 70;
-
-  const byTopic = {};
-  questions.forEach((q, i) => {
-    if (!byTopic[q.topic]) byTopic[q.topic] = { total: 0, correct: 0 };
-    byTopic[q.topic].total++;
-    if (answers[i] === q.a) byTopic[q.topic].correct++;
-  });
-
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      <StatusBar barStyle="dark-content" />
-      <View style={S.quizBar}>
-        <TouchableOpacity onPress={onDismiss}><Icon name="close" size={22} color={C.muted} /></TouchableOpacity>
-        <Text style={{ fontWeight: '800', fontSize: 16 }}>תוצאות הבחינה</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 130 }} showsVerticalScrollIndicator={false}>
-        {/* Score circle + pass/fail */}
-        <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-          <CircleScore value={p} color={grade.color} />
-          <View style={[S.passFailBadge, { backgroundColor: pass ? C.success + '15' : C.danger + '15', borderColor: pass ? C.success : C.danger, marginTop: 16 }]}>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: grade.color }}>{grade.text}</Text>
-          </View>
-          <Text style={{ color: C.muted, fontSize: 14, marginTop: 8 }}>{score} מתוך {total} תשובות נכונות</Text>
-          {p >= 70
-            ? <Text style={{ color: C.success, fontSize: 13, marginTop: 4, fontWeight: '700' }}>✓ עברת את הסף (70%)</Text>
-            : <Text style={{ color: C.danger, fontSize: 13, marginTop: 4 }}>נדרש {70 - p}% נוסף לעבור</Text>
-          }
+// ─── RESULTS SCREEN ───────────────────────────────────────────────────────────
+function ResultsScreen({questions,answers,result,theta,onDismiss}) {
+  const [detail,setDetail] = useState(false);
+  const {base,weighted,correct,total,pass,secs,topicMap} = result;
+  const gradeColor = pass?C.success:base>=60?C.warning:C.danger;
+  const gradeLabel2 = base>=90?'מצוין! 🌟':base>=75?'טוב מאוד':base>=70?'עבר ✓':base>=60?'כמעט...':'נכשל';
+  return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
+    <StatusBar barStyle="dark-content"/>
+    <View style={S.qBar}>
+      <TouchableOpacity onPress={onDismiss}><Icon name="close" size={22} color={C.muted}/></TouchableOpacity>
+      <Text style={{fontWeight:'800',fontSize:16}}>תוצאות</Text>
+    </View>
+    <ScrollView contentContainerStyle={{padding:16,paddingBottom:100}} showsVerticalScrollIndicator={false}>
+      {/* Score */}
+      <View style={{alignItems:'center',paddingVertical:20}}>
+        <View style={{width:140,height:140,borderRadius:70,borderWidth:12,borderColor:gradeColor,alignItems:'center',justifyContent:'center'}}>
+          <Text style={{fontSize:36,fontWeight:'900',color:gradeColor}}>{base}%</Text>
         </View>
-
-        {/* Stats row */}
-        <Card style={{ flexDirection: 'row-reverse', marginBottom: 14 }}>
-          {[
-            { v: score, l: 'נכון', c: C.success, i: 'checkmark-circle' },
-            { v: total - score, l: 'שגוי', c: C.danger, i: 'close-circle' },
-            { v: fmtTime(secs), l: 'זמן', c: C.primary, i: 'time' },
-          ].map((s, i, arr) => (
-            <View key={s.l} style={[{ flex: 1, alignItems: 'center', paddingVertical: 10 }, i < arr.length - 1 && { borderRightWidth: 1, borderRightColor: C.border }]}>
-              <Icon name={s.i} size={20} color={s.c} />
-              <Text style={{ fontSize: 22, fontWeight: '900', color: s.c, marginTop: 4 }}>{s.v}</Text>
-              <Text style={{ fontSize: 12, color: C.muted }}>{s.l}</Text>
-            </View>
-          ))}
-        </Card>
-
-        {/* Topic breakdown */}
-        {Object.keys(byTopic).length > 1 && (
-          <>
-            <Section title="ביצועים לפי נושא" />
-            {Object.entries(byTopic).map(([tid, tp]) => {
-              const t = topicById(tid);
-              const p2 = pct(tp.correct, tp.total);
-              return (
-                <Card key={tid} style={{ marginBottom: 8 }}>
-                  <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Pill label={`${p2}%`} color={p2 >= 70 ? C.success : C.warning} small />
-                    <Row style={{ flex: 0 }}>
-                      <Text style={{ fontWeight: '700', fontSize: 13 }}>{t?.name}</Text>
-                      <Text style={{ fontSize: 18, marginRight: 6 }}>{t?.icon}</Text>
-                    </Row>
-                  </Row>
-                  <Bar value={p2} total={100} color={t?.color || C.primary} h={5} />
-                  <Text style={{ textAlign: 'right', fontSize: 11, color: C.muted, marginTop: 4 }}>{tp.correct}/{tp.total} נכון</Text>
-                </Card>
-              );
-            })}
-          </>
-        )}
-
-        {/* Answer detail toggle */}
-        <Card>
-          <Row style={{ justifyContent: 'space-between' }}>
-            <Switch value={detail} onValueChange={setDetail} trackColor={{ false: C.border, true: C.primary }} thumbColor="#fff" />
-            <Row style={{ flex: 0 }}>
-              <Icon name="list" size={16} color={C.text} />
-              <Text style={{ fontWeight: '700', fontSize: 14, marginRight: 6 }}>פירוט תשובות</Text>
+        <View style={{backgroundColor:gradeColor+'18',borderWidth:2,borderColor:gradeColor,borderRadius:30,paddingHorizontal:24,paddingVertical:8,marginTop:14}}>
+          <Text style={{fontSize:18,fontWeight:'900',color:gradeColor}}>{gradeLabel2}</Text>
+        </View>
+        <Text style={{color:C.muted,fontSize:14,marginTop:8}}>{correct} מתוך {total} נכונות</Text>
+        {theta!==null&&<Pill label={`רמה: ${DIFF_LABEL[AdaptiveEngine.thetaToLevel(theta)]} (θ=${theta.toFixed(2)})`} color={C.purple}/>}
+      </View>
+      {/* Stats */}
+      <Card style={{flexDirection:'row-reverse',marginBottom:12}}>
+        {[{v:correct,l:'נכון',c:C.success,i:'checkmark-circle'},{v:total-correct,l:'שגוי',c:C.danger,i:'close-circle'},{v:fmtTime(secs),l:'זמן',c:C.primary,i:'time'}].map((s,i,arr)=>(
+          <View key={s.l} style={[{flex:1,alignItems:'center',paddingVertical:10},i<arr.length-1&&{borderRightWidth:1,borderRightColor:C.border}]}>
+            <Icon name={s.i} size={18} color={s.c}/>
+            <Text style={{fontSize:20,fontWeight:'900',color:s.c,marginTop:3}}>{s.v}</Text>
+            <Text style={{fontSize:12,color:C.muted}}>{s.l}</Text>
+          </View>
+        ))}
+      </Card>
+      {/* Weighted score */}
+      {weighted!==base&&<Card style={{marginBottom:12}}>
+        <Row style={{justifyContent:'space-between'}}>
+          <Pill label={`${weighted}%`} color={C.purple}/>
+          <Col>
+            <Text style={{fontWeight:'700',fontSize:14}}>ציון משוקלל לפי קושי</Text>
+            <Text style={{fontSize:12,color:C.muted}}>שאלות קשות שוות יותר</Text>
+          </Col>
+        </Row>
+      </Card>}
+      {/* Topic breakdown */}
+      {Object.keys(topicMap).length>1&&<>
+        <Sec title="לפי נושא"/>
+        {Object.entries(topicMap).map(([tid,tm])=>{
+          const t=topicById(tid), p2=pct(tm.correct,tm.total);
+          return <Card key={tid} style={{marginBottom:8}}>
+            <Row style={{justifyContent:'space-between',marginBottom:6}}>
+              <Pill label={`${p2}%`} color={p2>=70?C.success:C.warning} small/>
+              <Row style={{flex:0,gap:4}}><Text style={{fontWeight:'700',fontSize:13}}>{t?.name}</Text><Text style={{fontSize:18}}>{t?.icon}</Text></Row>
             </Row>
+            <Bar value={p2} total={100} color={t?.color||C.primary} h={5}/>
+            <Text style={{textAlign:'right',fontSize:11,color:C.muted,marginTop:3}}>{tm.correct}/{tm.total}</Text>
+          </Card>;
+        })}
+      </>}
+      {/* Detail */}
+      <Card>
+        <Row style={{justifyContent:'space-between'}}>
+          <Switch value={detail} onValueChange={setDetail} trackColor={{false:C.border,true:C.primary}} thumbColor="#fff"/>
+          <Row style={{flex:0,gap:4}}><Icon name="list" size={16} color={C.text}/><Text style={{fontWeight:'700',fontSize:14}}>פירוט תשובות</Text></Row>
+        </Row>
+      </Card>
+      {detail&&questions.map((q,i)=><ReviewRow key={q.id} q={q} idx={i} sel={answers[i]}/>)}
+    </ScrollView>
+    <View style={S.qBottom}>
+      <TouchableOpacity style={S.btn} onPress={onDismiss}>
+        <Icon name="home" size={17} color="#fff"/>
+        <Text style={[S.btnTxt,{marginRight:8}]}>חזור לבית</Text>
+      </TouchableOpacity>
+    </View>
+  </SafeAreaView>;
+}
+
+// ─── TOPICS SCREEN ────────────────────────────────────────────────────────────
+function TopicsScreen({prog,onQuiz}) {
+  const tp = prog.topicProgress||{};
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:24}} showsVerticalScrollIndicator={false}>
+    <Text style={S.pgTitle}>נושאים</Text>
+    {TOPICS.map(t=>{
+      const p=tp[t.id], p2=p?pct(p.correct,p.answered):0;
+      const total=getQsByTopic(t.id).length;
+      const easy=QS.filter(q=>q.topic===t.id&&q.diff==='beginner').length;
+      const med=QS.filter(q=>q.topic===t.id&&q.diff==='intermediate').length;
+      const adv=QS.filter(q=>q.topic===t.id&&q.diff==='advanced').length;
+      const exp=QS.filter(q=>q.topic===t.id&&q.diff==='expert').length;
+      return <Card key={t.id} style={{marginBottom:14,borderTopWidth:3,borderTopColor:t.color}} onPress={()=>onQuiz({count:total,topic:t.id,mode:'exam',timer:0,adaptive:false})}>
+        <Row style={{justifyContent:'space-between',marginBottom:8}}>
+          <Col><Text style={{fontSize:12,color:C.muted}}>{p?.answered||0}/{total}</Text>
+            {p2>0&&<Text style={{fontSize:12,fontWeight:'700',color:p2>=70?C.success:C.warning}}>{p2}%</Text>}</Col>
+          <Row style={{flex:0,gap:10}}>
+            <Col style={{alignItems:'flex-end'}}>
+              <Text style={{fontSize:17,fontWeight:'800'}}>{t.name}</Text>
+            </Col>
+            <View style={{width:50,height:50,borderRadius:25,backgroundColor:t.color+'20',alignItems:'center',justifyContent:'center'}}>
+              <Text style={{fontSize:26}}>{t.icon}</Text>
+            </View>
+          </Row>
+        </Row>
+        <Bar value={p2} total={100} color={t.color} h={6}/>
+        <Row style={{justifyContent:'space-between',marginTop:8}}>
+          <Row style={{flex:0,gap:5}}>
+            {[['קל',C.success,easy],['בינוני',C.warning,med],['מתקדם',C.orange,adv],['מומחה',C.danger,exp]].filter(([,, n])=>n>0).map(([l,c,n])=>(
+              <Pill key={l} label={`${n} ${l}`} color={c} small/>
+            ))}
+          </Row>
+          <Row style={{flex:0,gap:2}}><Text style={{fontSize:12,color:C.primary,fontWeight:'700'}}>התחל</Text><Icon name="arrow-back" size={13} color={C.primary}/></Row>
+        </Row>
+      </Card>;
+    })}
+  </ScrollView>;
+}
+
+// ─── PROGRESS SCREEN ──────────────────────────────────────────────────────────
+function ProgressScreen({prog,dispatch}) {
+  const [userName,setUserName]=useState(prog.userName||'');
+  const [goal,setGoal]=useState(String(prog.dailyGoal||20));
+  const tp=prog.topicProgress||{};
+  const history=(prog.quizHistory||[]).slice(0,15);
+  const overall=pct(prog.totalCorrect,prog.totalAnswered);
+  const adaptiveLog=(prog.adaptiveLog||[]).slice(0,5);
+
+  const achievements=[
+    {icon:'🥉',label:'10 שאלות',done:prog.totalAnswered>=10},
+    {icon:'🥈',label:'50 שאלות',done:prog.totalAnswered>=50},
+    {icon:'🥇',label:'100 שאלות',done:prog.totalAnswered>=100},
+    {icon:'🏆',label:'ציון 80%+',done:prog.totalAnswered>=20&&overall>=80},
+    {icon:'🔥',label:'3 ימי רצף',done:prog.streakDays>=3},
+    {icon:'⚡',label:'7 ימי רצף',done:prog.streakDays>=7},
+    {icon:'🎯',label:'עבר בחינה',done:(prog.quizHistory||[]).some(h=>h.pass&&h.total>=15)},
+    {icon:'🧠',label:'כל הנושאים',done:TOPICS.every(t=>(tp[t.id]?.answered||0)>0)},
+  ];
+
+  const last7=Array.from({length:7},(_,i)=>{
+    const d=new Date(); d.setDate(d.getDate()-(6-i));
+    const ds=d.toDateString();
+    const qs=(prog.quizHistory||[]).filter(h=>new Date(h.date).toDateString()===ds).reduce((s,h)=>s+h.total,0);
+    return {label:['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'][d.getDay()],qs};
+  });
+  const maxQs=Math.max(...last7.map(d=>d.qs),1);
+
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:32}} showsVerticalScrollIndicator={false}>
+    <Text style={S.pgTitle}>התקדמות</Text>
+    {/* Summary card */}
+    <Card style={{backgroundColor:C.primary,marginBottom:14}}>
+      <Row style={{justifyContent:'space-between',alignItems:'center'}}>
+        <View style={{width:100,height:100,borderRadius:50,borderWidth:10,borderColor:'#fff3',alignItems:'center',justifyContent:'center'}}>
+          <Text style={{fontSize:28,fontWeight:'900',color:'#fff'}}>{overall}%</Text>
+        </View>
+        <Col style={{flex:1,alignItems:'flex-end',paddingRight:14}}>
+          <Text style={{color:'#bfdbfe',fontSize:12,marginBottom:3}}>ציון כללי</Text>
+          <Text style={{color:'#fff',fontSize:20,fontWeight:'900'}}>{prog.totalAnswered||0} שאלות</Text>
+          <Text style={{color:'#bfdbfe',fontSize:13}}>{prog.totalCorrect||0} נכונות</Text>
+          <Text style={{color:'#fde68a',fontWeight:'700',marginTop:6}}>🔥 {prog.streakDays||0} ימי רצף</Text>
+        </Col>
+      </Row>
+    </Card>
+    {/* Activity chart */}
+    <Card>
+      <Text style={{textAlign:'right',fontWeight:'700',fontSize:14,marginBottom:12}}>פעילות 7 ימים</Text>
+      <Row style={{alignItems:'flex-end',justifyContent:'space-between',height:80}}>
+        {last7.map((d,i)=>(
+          <View key={i} style={{alignItems:'center',flex:1}}>
+            <View style={{flex:1,justifyContent:'flex-end',width:'70%'}}>
+              <View style={{height:`${Math.max(d.qs/maxQs*100,d.qs>0?12:4)}%`,backgroundColor:d.qs>0?C.primary:C.fill,borderRadius:4}}/>
+            </View>
+            <Text style={{fontSize:10,color:C.muted,marginTop:4}}>{d.label}</Text>
+            {d.qs>0&&<Text style={{fontSize:9,color:C.primary,fontWeight:'700'}}>{d.qs}</Text>}
+          </View>
+        ))}
+      </Row>
+    </Card>
+    {/* Adaptive log */}
+    {adaptiveLog.length>0&&<>
+      <Sec title=" היסטוריית אדפטיבי 🧠"/>
+      {adaptiveLog.map((log,i)=>(
+        <Card key={i} style={{marginBottom:8}}>
+          <Row style={{justifyContent:'space-between'}}>
+            <Row style={{flex:0,gap:6}}>
+              <Pill label={DIFF_LABEL[AdaptiveEngine.thetaToLevel(log.theta_end)]} color={C.purple} small/>
+              <Text style={{fontSize:11,color:C.muted}}>{log.questions_count} שאלות</Text>
+            </Row>
+            <Text style={{fontWeight:'700',fontSize:13,color:C.purple}}>θ {log.theta_start?.toFixed(1)}→{log.theta_end?.toFixed(1)}</Text>
           </Row>
         </Card>
-
-        {detail && questions.map((q, i) => (
-          <ReviewRow key={q.id} q={q} idx={i} sel={answers[i]} />
-        ))}
-      </ScrollView>
-
-      <View style={S.quizBottom}>
-        <Row style={{ gap: 10 }}>
-          <TouchableOpacity style={[S.outlineBtn, { flex: 1 }]} onPress={onRetry}>
-            <Icon name="refresh" size={16} color={C.primary} />
-            <Text style={[S.startBtnTxt, { color: C.primary, marginRight: 6 }]}>נסה שוב</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[S.startBtn, { flex: 1 }]} onPress={onDismiss}>
-            <Icon name="home" size={16} color="#fff" />
-            <Text style={[S.startBtnTxt, { marginRight: 6 }]}>בית</Text>
-          </TouchableOpacity>
+      ))}
+    </>}
+    {/* Topics */}
+    <Sec title="לפי נושא"/>
+    {TOPICS.map(t=>{const p=tp[t.id],p2=p?pct(p.correct,p.answered):0;return(
+      <Card key={t.id} style={{marginBottom:8}}>
+        <Row style={{justifyContent:'space-between',marginBottom:6}}>
+          <Text style={{fontSize:12,color:p2>=70?C.success:p2>0?C.warning:C.muted,fontWeight:'700'}}>{p?`${p2}%`:'טרם התחיל'}</Text>
+          <Row style={{flex:0,gap:4}}><Text style={{fontWeight:'700',fontSize:13}}>{t.name}</Text><Text style={{fontSize:18}}>{t.icon}</Text></Row>
         </Row>
-      </View>
-    </SafeAreaView>
-  );
-}
-
-// ─── PROGRESS ────────────────────────────────────────────────────────────────
-function ProgressScreen({ prog, dispatch }) {
-  const [userName, setUserName] = useState(prog.userName || '');
-  const [goal, setGoal] = useState(String(prog.dailyGoal || 20));
-  const tp = prog.topicProgress || {};
-  const history = (prog.quizHistory || []).slice(0, 15);
-  const overall = pct(prog.totalCorrect, prog.totalAnswered);
-
-  const achievements = [
-    { id: 'a1', icon: '🥉', label: '10 שאלות',   done: prog.totalAnswered >= 10 },
-    { id: 'a2', icon: '🥈', label: '50 שאלות',   done: prog.totalAnswered >= 50 },
-    { id: 'a3', icon: '🥇', label: '100 שאלות',  done: prog.totalAnswered >= 100 },
-    { id: 'a4', icon: '🏆', label: 'ציון 80%+',  done: prog.totalAnswered >= 20 && overall >= 80 },
-    { id: 'a5', icon: '🔥', label: 'רצף 3 ימים', done: prog.streakDays >= 3 },
-    { id: 'a6', icon: '⚡', label: 'רצף שבוע',   done: prog.streakDays >= 7 },
-    { id: 'a7', icon: '🎯', label: 'עבר בחינה',  done: (prog.quizHistory || []).some(h => pct(h.score, h.total) >= 70 && h.total >= 20) },
-    { id: 'a8', icon: '📚', label: 'כל הנושאים', done: TOPICS.every(t => (tp[t.id]?.answered || 0) > 0) },
-  ];
-
-  function save() {
-    dispatch({ type: 'SETTINGS', payload: { userName: userName.trim(), dailyGoal: parseInt(goal) || 20 } });
-    Alert.alert('✓', 'הגדרות נשמרו');
-  }
-
-  function reset() {
-    Alert.alert('איפוס', 'כל ההתקדמות תימחק. בטוח?', [
-      { text: 'ביטול', style: 'cancel' },
-      { text: 'איפוס', style: 'destructive', onPress: () => dispatch({ type: 'RESET' }) },
-    ]);
-  }
-
-  // 7-day activity bars
-  const last7 = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i));
-    const ds = d.toDateString();
-    const qs = (prog.quizHistory || []).filter(h => new Date(h.date).toDateString() === ds).reduce((s, h) => s + h.total, 0);
-    return { label: ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'][d.getDay()], qs };
-  });
-  const maxQs = Math.max(...last7.map(d => d.qs), 1);
-
-  return (
-    <ScrollView style={S.screen} contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
-      <Text style={S.pageTitle}>התקדמות</Text>
-
-      {/* Overall summary */}
-      <Card style={{ backgroundColor: C.primary, marginBottom: 16 }}>
-        <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <CircleScore value={overall} color="#fff" size={100} />
-          <View style={{ flex: 1, alignItems: 'flex-end', paddingRight: 16 }}>
-            <Text style={{ color: '#bfdbfe', fontSize: 12, marginBottom: 4 }}>ציון כללי</Text>
-            <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900' }}>{prog.totalAnswered || 0} שאלות</Text>
-            <Text style={{ color: '#bfdbfe', fontSize: 13 }}>{prog.totalCorrect || 0} נכונות</Text>
-            <Row style={{ marginTop: 8 }}>
-              <Text style={{ color: '#fde68a', fontSize: 13, fontWeight: '700', marginRight: 4 }}>🔥 {prog.streakDays || 0} ימי רצף</Text>
-            </Row>
-          </View>
-        </Row>
+        <Bar value={p2} total={100} color={t.color} h={5}/>
+        {p&&<Text style={{textAlign:'right',fontSize:11,color:C.muted,marginTop:3}}>{p.correct}/{p.answered}</Text>}
       </Card>
-
-      {/* 7-day chart */}
-      <Card>
-        <Text style={{ textAlign: 'right', fontWeight: '700', fontSize: 14, marginBottom: 14 }}>פעילות שבועית</Text>
-        <Row style={{ alignItems: 'flex-end', justifyContent: 'space-between', height: 80 }}>
-          {last7.map((d, i) => (
-            <View key={i} style={{ alignItems: 'center', flex: 1 }}>
-              <View style={{ flex: 1, justifyContent: 'flex-end', width: '70%' }}>
-                <View style={{ height: `${Math.max(d.qs / maxQs * 100, d.qs > 0 ? 10 : 4)}%`, backgroundColor: d.qs > 0 ? C.primary : C.fill, borderRadius: 4, minHeight: d.qs > 0 ? 6 : 3 }} />
-              </View>
-              <Text style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>{d.label}</Text>
-              {d.qs > 0 && <Text style={{ fontSize: 9, color: C.primary, fontWeight: '700' }}>{d.qs}</Text>}
-            </View>
-          ))}
-        </Row>
-      </Card>
-
-      {/* Topic breakdown */}
-      <Section title="ביצועים לפי נושא" />
-      {TOPICS.map(t => {
-        const p = tp[t.id];
-        const p2 = p ? pct(p.correct, p.answered) : 0;
-        return (
-          <Card key={t.id} style={{ marginBottom: 8 }}>
-            <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text style={{ fontSize: 12, color: p2 >= 70 ? C.success : p2 > 0 ? C.warning : C.muted, fontWeight: '700' }}>
-                {p ? `${p2}%` : 'לא התחיל'}
-              </Text>
-              <Row style={{ flex: 0 }}>
-                <Text style={{ fontWeight: '700', fontSize: 13 }}>{t.name}</Text>
-                <Text style={{ fontSize: 18, marginRight: 6 }}>{t.icon}</Text>
-              </Row>
-            </Row>
-            <Bar value={p2} total={100} color={t.color} h={6} />
-            {p && <Text style={{ textAlign: 'right', fontSize: 11, color: C.muted, marginTop: 4 }}>{p.correct}/{p.answered} נכון</Text>}
-          </Card>
-        );
-      })}
-
-      {/* Achievements */}
-      <Section title="הישגים" />
-      <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
-        {achievements.map(a => (
-          <View key={a.id} style={[S.achievement, !a.done && { opacity: 0.3 }]}>
-            <Text style={{ fontSize: 28 }}>{a.icon}</Text>
-            <Text style={{ fontSize: 11, color: C.text, marginTop: 4, textAlign: 'center' }}>{a.label}</Text>
-            {a.done && <Icon name="checkmark-circle" size={14} color={C.success} />}
-          </View>
-        ))}
-      </View>
-
-      {/* History */}
-      {history.length > 0 && (
-        <>
-          <Section title="היסטוריית בחינות" />
-          {history.map((h, i) => {
-            const p2 = pct(h.score, h.total);
-            const t = h.topic ? topicById(h.topic) : null;
-            return (
-              <Card key={i} style={{ marginBottom: 8 }}>
-                <Row style={{ justifyContent: 'space-between' }}>
-                  <Row style={{ flex: 0, gap: 6 }}>
-                    <Text style={{ fontSize: 11, color: C.muted }}>{new Date(h.date).toLocaleDateString('he-IL')}</Text>
-                    <Pill label={`${p2}%`} color={p2 >= 70 ? C.success : C.warning} small />
-                  </Row>
-                  <Text style={{ fontWeight: '700', fontSize: 13 }}>{t ? `${t.icon} ${t.name}` : '🔲 כל הנושאים'}</Text>
-                </Row>
-                <Text style={{ textAlign: 'right', fontSize: 11, color: C.muted, marginTop: 4 }}>{h.score}/{h.total} נכון • {fmtTime(h.secs)}</Text>
-              </Card>
-            );
-          })}
-        </>
-      )}
-
-      {/* Settings */}
-      <Section title="הגדרות" />
-      <Card>
-        <Text style={{ textAlign: 'right', fontSize: 13, color: C.muted, marginBottom: 6 }}>שם</Text>
-        <TextInput style={S.input} value={userName} onChangeText={setUserName} placeholder="שמך..." textAlign="right" placeholderTextColor={C.muted} />
-        <Text style={{ textAlign: 'right', fontSize: 13, color: C.muted, marginTop: 14, marginBottom: 6 }}>יעד יומי (שאלות)</Text>
-        <Row style={{ gap: 8 }}>
-          {['10','20','30','50'].map(n => (
-            <TouchableOpacity key={n} style={[S.countBtn, goal === n && S.countBtnOn]} onPress={() => setGoal(n)}>
-              <Text style={[S.countBtnTxt, goal === n && { color: '#fff' }]}>{n}</Text>
-            </TouchableOpacity>
-          ))}
-        </Row>
-        <TouchableOpacity style={[S.startBtn, { marginTop: 16 }]} onPress={save}>
-          <Icon name="save-outline" size={16} color="#fff" />
-          <Text style={[S.startBtnTxt, { marginRight: 6 }]}>שמור</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[S.outlineBtn, { borderColor: C.danger + '60', marginTop: 10 }]} onPress={reset}>
-          <Icon name="trash-outline" size={16} color={C.danger} />
-          <Text style={{ color: C.danger, fontWeight: '700', marginRight: 6 }}>איפוס כל ההתקדמות</Text>
-        </TouchableOpacity>
-      </Card>
-    </ScrollView>
-  );
-}
-
-// ─── TAB BAR ─────────────────────────────────────────────────────────────────
-function TabBar({ tab, setTab }) {
-  const tabs = [
-    { id: 'home', label: 'בית', icon: 'home', iconActive: 'home' },
-    { id: 'topics', label: 'נושאים', icon: 'book-outline', iconActive: 'book' },
-    { id: 'quiz', label: 'בחינה', icon: 'pencil-outline', iconActive: 'pencil' },
-    { id: 'progress', label: 'התקדמות', icon: 'bar-chart-outline', iconActive: 'bar-chart' },
-  ];
-  return (
-    <View style={S.tabBar}>
-      {tabs.map(t => {
-        const active = tab === t.id;
-        return (
-          <TouchableOpacity key={t.id} style={S.tabItem} onPress={() => setTab(t.id)}>
-            {active && <View style={S.tabIndicator} />}
-            <Icon name={active ? t.iconActive : t.icon} size={22} color={active ? C.primary : C.muted} />
-            <Text style={[S.tabLabel, active && { color: C.primary, fontWeight: '700' }]}>{t.label}</Text>
-          </TouchableOpacity>
-        );
-      })}
+    );})}
+    {/* Achievements */}
+    <Sec title="הישגים"/>
+    <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:10,marginBottom:14}}>
+      {achievements.map((a,i)=>(
+        <View key={i} style={[{width:(W-56)/4,backgroundColor:C.card,borderRadius:14,padding:10,alignItems:'center',shadowColor:'#000',shadowOpacity:0.05,shadowRadius:4,elevation:1},!a.done&&{opacity:0.3}]}>
+          <Text style={{fontSize:26}}>{a.icon}</Text>
+          <Text style={{fontSize:10,color:C.text,marginTop:3,textAlign:'center'}}>{a.label}</Text>
+          {a.done&&<Icon name="checkmark-circle" size={12} color={C.success}/>}
+        </View>
+      ))}
     </View>
-  );
+    {/* History */}
+    {history.length>0&&<><Sec title="היסטוריה"/>
+      {history.map((h,i)=>{
+        const t=h.topic?topicById(h.topic):null;
+        return <Card key={i} style={{marginBottom:7}}>
+          <Row style={{justifyContent:'space-between'}}>
+            <Row style={{flex:0,gap:6}}>
+              <Text style={{fontSize:11,color:C.muted}}>{new Date(h.date).toLocaleDateString('he-IL')}</Text>
+              <Pill label={`${h.base}%`} color={h.pass?C.success:C.warning} small/>
+            </Row>
+            <Text style={{fontWeight:'700',fontSize:13}}>{t?`${t.icon} ${t.name}`:'🔲 כל הנושאים'}</Text>
+          </Row>
+          <Text style={{textAlign:'right',fontSize:11,color:C.muted,marginTop:3}}>{h.score}/{h.total} • {fmtTime(h.secs)}</Text>
+        </Card>;
+      })}
+    </>}
+    {/* Settings */}
+    <Sec title="הגדרות"/>
+    <Card>
+      <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>שם</Text>
+      <TextInput style={S.inp} value={userName} onChangeText={setUserName} placeholder="שמך..." textAlign="right" placeholderTextColor={C.muted}/>
+      <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginTop:12,marginBottom:8}}>יעד יומי</Text>
+      <Row style={{gap:8}}>
+        {['10','20','30','50'].map(n=><TouchableOpacity key={n} style={[S.cntBtn,goal===n&&S.cntBtnOn]} onPress={()=>setGoal(n)}>
+          <Text style={[S.cntTxt,goal===n&&{color:'#fff'}]}>{n}</Text>
+        </TouchableOpacity>)}
+      </Row>
+      <TouchableOpacity style={[S.btn,{marginTop:14}]} onPress={()=>{dispatch({type:'SETTINGS',payload:{userName:userName.trim(),dailyGoal:parseInt(goal)||20}});Alert.alert('✓','נשמר');}}>
+        <Icon name="save-outline" size={16} color="#fff"/><Text style={[S.btnTxt,{marginRight:6}]}>שמור</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[S.outBtn,{borderColor:C.danger+'60',marginTop:8}]} onPress={()=>Alert.alert('איפוס','מחיקת כל ההתקדמות?',[{text:'ביטול',style:'cancel'},{text:'איפוס',style:'destructive',onPress:()=>dispatch({type:'RESET'})}])}>
+        <Icon name="trash-outline" size={16} color={C.danger}/><Text style={{color:C.danger,fontWeight:'700',marginRight:6}}>איפוס התקדמות</Text>
+      </TouchableOpacity>
+    </Card>
+  </ScrollView>;
 }
 
-// ─── APP ─────────────────────────────────────────────────────────────────────
+// ─── TAB BAR ──────────────────────────────────────────────────────────────────
+function TabBar({tab,setTab}) {
+  const tabs=[{id:'home',label:'בית',icon:'home-outline',active:'home'},{id:'topics',label:'נושאים',icon:'book-outline',active:'book'},{id:'quiz',label:'בחינה',icon:'pencil-outline',active:'pencil'},{id:'progress',label:'התקדמות',icon:'bar-chart-outline',active:'bar-chart'}];
+  return <View style={S.tabBar}>
+    {tabs.map(t=>{const on=tab===t.id;return(
+      <TouchableOpacity key={t.id} style={S.tabItem} onPress={()=>setTab(t.id)}>
+        {on&&<View style={S.tabInd}/>}
+        <Icon name={on?t.active:t.icon} size={22} color={on?C.primary:C.muted}/>
+        <Text style={{fontSize:11,color:on?C.primary:C.muted,fontWeight:on?'700':'400',marginTop:3}}>{t.label}</Text>
+      </TouchableOpacity>
+    );})}
+  </View>;
+}
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [prog, dispatch] = useReducer(reducer, INIT);
-  const [tab, setTab] = useState('home');
-  const [quiz, setQuiz] = useState(null);
-  const [loaded, setLoaded] = useState(false);
+  const [prog,dispatch] = useReducer(reducer,INIT_PROG);
+  const [tab,setTab] = useState('home');
+  const [quiz,setQuiz] = useState(null);
+  const [loaded,setLoaded] = useState(false);
+  const go = useCallback(a=>dispatch(a),[]);
 
-  useEffect(() => {
-    Storage.get('amirnet_v2').then(raw => {
-      if (raw) { try { dispatch({ type: 'LOAD', payload: JSON.parse(raw) }); } catch (_e) { /* ignore */ } }
-      setLoaded(true);
-    });
-  }, []);
+  useEffect(()=>{Store.get('amirnet_v3').then(raw=>{if(raw){try{dispatch({type:'LOAD',payload:JSON.parse(raw)});}catch(_e){}}setLoaded(true);});},[]);
+  useEffect(()=>{if(loaded)Store.set('amirnet_v3',JSON.stringify(prog));},[prog,loaded]);
 
-  useEffect(() => {
-    if (loaded) Storage.set('amirnet_v2', JSON.stringify(prog));
-  }, [prog, loaded]);
+  if(!loaded) return <SafeAreaView style={S.center}><Text style={{fontSize:48,marginBottom:8}}>🌐</Text><Text style={{fontSize:20,fontWeight:'800',color:C.primary}}>AmirNet Plus</Text></SafeAreaView>;
+  if(!prog.onboarded) return <OnboardingScreen onDone={p=>dispatch({type:'SETTINGS',payload:{...p,onboarded:true}})}/>;
+  if(quiz) return <QuizScreen config={quiz} dispatch={go} onFinish={()=>setQuiz(null)}/>;
 
-  const go = useCallback((action) => dispatch(action), []);
-
-  if (!loaded) return (
-    <SafeAreaView style={S.center}>
-      <Text style={{ fontSize: 40, marginBottom: 12 }}>🌐</Text>
-      <Text style={{ fontSize: 20, fontWeight: '800', color: C.primary }}>AmirNet Plus</Text>
-    </SafeAreaView>
-  );
-
-  if (!prog.onboarded) return (
-    <OnboardingScreen onDone={({ userName, dailyGoal }) => dispatch({ type: 'SETTINGS', payload: { userName, dailyGoal, onboarded: true } })} />
-  );
-
-  if (quiz) return <QuizScreen config={quiz} dispatch={go} onFinish={() => setQuiz(null)} />;
-
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      <StatusBar barStyle="dark-content" />
-      {tab === 'home'     && <HomeScreen    prog={prog} dispatch={go} onQuiz={setQuiz} />}
-      {tab === 'topics'   && <TopicsScreen  prog={prog} onQuiz={setQuiz} />}
-      {tab === 'quiz'     && <QuizSetupScreen onStart={setQuiz} />}
-      {tab === 'progress' && <ProgressScreen prog={prog} dispatch={go} />}
-      <TabBar tab={tab} setTab={setTab} />
-    </SafeAreaView>
-  );
+  return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
+    <StatusBar barStyle="dark-content"/>
+    {tab==='home'&&<HomeScreen prog={prog} onQuiz={setQuiz}/>}
+    {tab==='topics'&&<TopicsScreen prog={prog} onQuiz={setQuiz}/>}
+    {tab==='quiz'&&<QuizSetupScreen onStart={setQuiz}/>}
+    {tab==='progress'&&<ProgressScreen prog={prog} dispatch={go}/>}
+    <TabBar tab={tab} setTab={setTab}/>
+  </SafeAreaView>;
 }
 
-// ─── STYLES ──────────────────────────────────────────────────────────────────
+// ─── STYLES ───────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16, paddingTop: 12 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg },
-  pageTitle: { fontSize: 26, fontWeight: '900', textAlign: 'right', color: C.text, marginBottom: 16 },
-  card: { backgroundColor: C.card, borderRadius: 16, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  row: { flexDirection: 'row-reverse', alignItems: 'center' },
-  section: { fontSize: 14, fontWeight: '800', textAlign: 'right', color: C.text, marginTop: 8, marginBottom: 8 },
-  pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  pillTxt: { fontWeight: '700' },
-  barTrack: { backgroundColor: C.fill, borderRadius: 10, overflow: 'hidden', width: '100%' },
-  barFill: { borderRadius: 10 },
-  streakBadge: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff7ed', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: C.warning + '40' },
-  timerBox: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, gap: 4 },
-  timerTxt: { fontSize: 14, fontWeight: '900' },
-  option: { borderRadius: 14, borderWidth: 1.5, padding: 14, marginBottom: 10 },
-  optionTxt: { fontSize: 15, lineHeight: 22 },
-  optLetter: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  numBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.fill, alignItems: 'center', justifyContent: 'center' },
-  numBadgeTxt: { fontSize: 11, fontWeight: '700', color: C.muted },
-  quizBar: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
-  quizProgressTrack: { height: 4, backgroundColor: C.fill },
-  quizProgressFill: { height: 4, backgroundColor: C.primary },
-  quizBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.border },
-  startBtn: { flexDirection: 'row-reverse', backgroundColor: C.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
-  startBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  outlineBtn: { flexDirection: 'row-reverse', borderWidth: 1.5, borderColor: C.primary + '60', borderRadius: 14, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
-  countBtn: { flex: 1, backgroundColor: C.fill, borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: C.border },
-  countBtnOn: { backgroundColor: C.primary, borderColor: C.primary },
-  countBtnTxt: { fontSize: 15, fontWeight: '700', color: C.text },
-  modeBtn: { flex: 1, backgroundColor: C.card, borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1.5, borderColor: C.border },
-  modeBtnOn: { borderColor: C.primary, backgroundColor: C.primary + '0a' },
-  modeBtnTitle: { fontSize: 14, fontWeight: '800', color: C.text, marginTop: 6 },
-  modeBtnSub: { fontSize: 11, color: C.muted, textAlign: 'center', marginTop: 3 },
-  topicOpt: { backgroundColor: C.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8, borderWidth: 1.5, borderColor: C.border },
-  topicOptOn: { borderColor: C.primary, backgroundColor: C.primary + '08' },
-  passFailBadge: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 30, borderWidth: 2 },
-  achievement: { width: (W - 56) / 4, backgroundColor: C.card, borderRadius: 14, padding: 12, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  input: { backgroundColor: C.fill, borderRadius: 10, padding: 12, fontSize: 15, borderWidth: 1, borderColor: C.border, color: C.text },
-  onboardInput: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: 14, fontSize: 16, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)', color: '#fff', marginBottom: 4 },
-  tabBar: { flexDirection: 'row-reverse', backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.border, paddingBottom: Platform.OS === 'ios' ? 20 : 6, paddingTop: 6 },
-  tabItem: { flex: 1, alignItems: 'center', paddingTop: 4, position: 'relative' },
-  tabLabel: { fontSize: 11, color: C.muted, marginTop: 3 },
-  tabIndicator: { position: 'absolute', top: 0, left: '20%', right: '20%', height: 2.5, backgroundColor: C.primary, borderBottomLeftRadius: 2, borderBottomRightRadius: 2 },
+  scr:{flex:1,backgroundColor:C.bg,paddingHorizontal:16,paddingTop:12},
+  center:{flex:1,justifyContent:'center',alignItems:'center',backgroundColor:C.bg},
+  pgTitle:{fontSize:26,fontWeight:'900',textAlign:'right',color:C.text,marginBottom:14},
+  sec:{fontSize:14,fontWeight:'800',textAlign:'right',color:C.text,marginTop:10,marginBottom:8},
+  card:{backgroundColor:C.card,borderRadius:16,padding:14,marginBottom:10,shadowColor:'#000',shadowOpacity:0.06,shadowRadius:8,shadowOffset:{width:0,height:2},elevation:3},
+  opt:{borderRadius:14,borderWidth:1.5,padding:14,marginBottom:10},
+  optLetter:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center'},
+  btn:{flexDirection:'row-reverse',backgroundColor:C.primary,borderRadius:14,paddingVertical:15,alignItems:'center',justifyContent:'center',marginBottom:4},
+  btnTxt:{color:'#fff',fontSize:16,fontWeight:'800'},
+  outBtn:{flexDirection:'row-reverse',borderWidth:1.5,borderColor:C.primary+'60',borderRadius:14,paddingVertical:14,alignItems:'center',justifyContent:'center'},
+  cntBtn:{flex:1,backgroundColor:C.fill,borderRadius:10,paddingVertical:11,alignItems:'center',borderWidth:1,borderColor:C.border},
+  cntBtnOn:{backgroundColor:C.primary,borderColor:C.primary},
+  cntTxt:{fontSize:14,fontWeight:'700',color:C.text},
+  modeBtn:{flex:1,backgroundColor:C.card,borderRadius:14,padding:15,alignItems:'center',borderWidth:1.5,borderColor:C.border},
+  modeBtnOn:{borderColor:C.primary,backgroundColor:C.primary+'0a'},
+  topicOpt:{backgroundColor:C.card,borderRadius:12,paddingHorizontal:14,paddingVertical:12,marginBottom:8,borderWidth:1.5,borderColor:C.border},
+  topicOptOn:{borderColor:C.primary,backgroundColor:C.primary+'08'},
+  inp:{backgroundColor:C.fill,borderRadius:10,padding:12,fontSize:15,borderWidth:1,borderColor:C.border,color:C.text},
+  onbInput:{backgroundColor:'rgba(255,255,255,0.15)',borderRadius:12,padding:14,fontSize:16,borderWidth:1.5,borderColor:'rgba(255,255,255,0.4)',color:'#fff'},
+  timerBox:{flexDirection:'row-reverse',alignItems:'center',paddingHorizontal:10,paddingVertical:5,borderRadius:20,borderWidth:1,gap:4},
+  qBar:{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',paddingHorizontal:16,paddingVertical:10},
+  qBottom:{position:'absolute',bottom:0,left:0,right:0,padding:16,backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border},
+  tabBar:{flexDirection:'row-reverse',backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,paddingBottom:Platform.OS==='ios'?20:6,paddingTop:6},
+  tabItem:{flex:1,alignItems:'center',paddingTop:4,position:'relative'},
+  tabInd:{position:'absolute',top:0,left:'20%',right:'20%',height:2.5,backgroundColor:C.primary,borderBottomLeftRadius:2,borderBottomRightRadius:2},
 });
