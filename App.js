@@ -2,9 +2,15 @@ import React, { useState, useEffect, useReducer, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, Dimensions, Platform, Alert, Switch,
-  TextInput, I18nManager,
+  TextInput, StatusBar,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Simple in-memory storage — no external dependency needed in Snack
+const _mem = {};
+const AsyncStorage = {
+  getItem: (k) => Promise.resolve(_mem[k] ?? null),
+  setItem: (k, v) => { _mem[k] = v; return Promise.resolve(); },
+};
 
 const { width: W } = Dimensions.get('window');
 
@@ -677,36 +683,9 @@ function QuizResultsScreen({ questions, answers, score, secs, onDismiss, onRetry
           </View>
         </Card>
         {/* Answers Detail */}
-        {showDetail && questions.map((q, i) => {
-          const sel = answers[i];
-          const correct = sel === q.a;
-          const [expanded, setExpanded] = useState(false);
-          return (
-            <Card key={q.id} style={{ marginTop: 8 }}>
-              <TouchableOpacity onPress={() => setExpanded(e => !e)}>
-                <View style={styles.row}>
-                  <Text style={styles.caption}>{expanded ? '▲' : '▼'}</Text>
-                  <View style={styles.row}>
-                    <Text style={[styles.caption, { color: correct ? C.green : C.red, marginLeft: 8 }]}>{correct ? '✓' : '✗'}</Text>
-                    <View style={[styles.numCircle, { backgroundColor: C.fill }]}>
-                      <Text style={styles.caption}>{i + 1}</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.caption, { flex: 1, textAlign: 'right', marginHorizontal: 8 }]} numberOfLines={expanded ? undefined : 2}>{q.q}</Text>
-                </View>
-              </TouchableOpacity>
-              {expanded && (
-                <View style={{ paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border, marginTop: 8 }}>
-                  {sel !== undefined && sel !== q.a && (
-                    <Text style={[styles.caption, { color: C.red, textAlign: 'right', marginBottom: 4 }]}>תשובתך: {q.opts[sel]}</Text>
-                  )}
-                  <Text style={[styles.caption, { color: C.green, textAlign: 'right', marginBottom: 4, fontWeight: '700' }]}>תשובה נכונה: {q.opts[q.a]}</Text>
-                  <Text style={[styles.caption, { color: C.secondary, textAlign: 'right' }]}>{q.exp}</Text>
-                </View>
-              )}
-            </Card>
-          );
-        })}
+        {showDetail && questions.map((q, i) => (
+          <AnswerReviewRow key={q.id} q={q} i={i} sel={answers[i]} />
+        ))}
       </ScrollView>
       {/* Action Buttons */}
       <View style={styles.resultsButtons}>
@@ -718,6 +697,36 @@ function QuizResultsScreen({ questions, answers, score, secs, onDismiss, onRetry
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+  );
+}
+
+function AnswerReviewRow({ q, i, sel }) {
+  const [expanded, setExpanded] = useState(false);
+  const correct = sel === q.a;
+  return (
+    <Card style={{ marginTop: 8 }}>
+      <TouchableOpacity onPress={() => setExpanded(e => !e)}>
+        <View style={styles.row}>
+          <Text style={styles.caption}>{expanded ? '▲' : '▼'}</Text>
+          <View style={styles.row}>
+            <Text style={[styles.caption, { color: correct ? C.green : C.red, marginLeft: 8 }]}>{correct ? '✓' : '✗'}</Text>
+            <View style={[styles.numCircle, { backgroundColor: C.fill }]}>
+              <Text style={styles.caption}>{i + 1}</Text>
+            </View>
+          </View>
+          <Text style={[styles.caption, { flex: 1, textAlign: 'right', marginHorizontal: 8 }]} numberOfLines={expanded ? undefined : 2}>{q.q}</Text>
+        </View>
+      </TouchableOpacity>
+      {expanded && (
+        <View style={{ paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border, marginTop: 8 }}>
+          {sel !== undefined && sel !== q.a && (
+            <Text style={[styles.caption, { color: C.red, textAlign: 'right', marginBottom: 4 }]}>תשובתך: {q.opts[sel]}</Text>
+          )}
+          <Text style={[styles.caption, { color: C.green, textAlign: 'right', marginBottom: 4, fontWeight: '700' }]}>תשובה נכונה: {q.opts[q.a]}</Text>
+          <Text style={[styles.caption, { color: C.secondary, textAlign: 'right' }]}>{q.exp}</Text>
+        </View>
+      )}
+    </Card>
   );
 }
 
@@ -865,7 +874,7 @@ export default function App() {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then(raw => {
       if (raw) {
-        try { dispatch({ type: 'LOAD', payload: JSON.parse(raw) }); } catch {}
+        try { dispatch({ type: 'LOAD', payload: JSON.parse(raw) }); } catch (_e) { /* ignore */ }
       }
       setLoaded(true);
     });
