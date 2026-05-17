@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useReducer, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
-  Dimensions, Platform, Alert, Switch, TextInput, StatusBar, Animated } from 'react-native';
+  Dimensions, Platform, Alert, Switch, TextInput, StatusBar, Animated,
+  KeyboardAvoidingView, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width: W } = Dimensions.get('window');
+const isIOS = Platform.OS === 'ios';
 const _mem = {};
 const Store = { get: k => Promise.resolve(_mem[k] ?? null), set: (k,v) => { _mem[k]=v; } };
 
@@ -330,9 +332,12 @@ function shuffle(a) { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math
 function pct(c,t) { return t>0?Math.round(c/t*100):0; }
 function fmtTime(s) { const m=Math.floor(s/60); return `${m}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
 function getQsByTopic(tid) { return QS.filter(q=>q.topic===tid); }
-function getPool(tid,count) { return shuffle(tid?QS.filter(q=>q.topic===tid):QS).slice(0,count); }
+function getPool(tid,count,allQs=QS) { return shuffle(tid?allQs.filter(q=>q.topic===tid):allQs).slice(0,count); }
 
 // ─── SHARED COMPONENTS ───────────────────────────────────────────────────────
+function KAV({children,style}) {
+  return <KeyboardAvoidingView behavior={isIOS?'padding':'height'} style={[{flex:1},style]} keyboardVerticalOffset={isIOS?0:0}>{children}</KeyboardAvoidingView>;
+}
 function Row({children,style}) { return <View style={[{flexDirection:'row-reverse',alignItems:'center'},style]}>{children}</View>; }
 function Col({children,style}) { return <View style={[{alignItems:'flex-end'},style]}>{children}</View>; }
 function Card({children,style,onPress}) {
@@ -414,7 +419,7 @@ function ExamTimer({totalSeconds,onTimeUp}) {
   const warn=rem<120;
   return <View style={[S.timerBox,{backgroundColor:warn?C.danger+'15':C.primary+'10',borderColor:warn?C.danger:C.primary+'40'}]}>
     <Icon name={warn?'warning':'time-outline'} size={14} color={warn?C.danger:C.primary}/>
-    <Text style={{fontSize:14,fontWeight:'900',color:warn?C.danger:C.primary,marginRight:4}}>{fmtTime(rem)}</Text>
+    <Text style={{fontSize:14,fontWeight:'900',color:warn?C.danger:C.primary,marginRight:4,fontVariant:['tabular-nums']}}>{fmtTime(rem)}</Text>
   </View>;
 }
 
@@ -449,43 +454,72 @@ function OnboardingScreen({onDone}) {
   const [step,setStep]=useState(0);
   const [name,setName]=useState('');
   const [goal,setGoal]=useState('20');
+  const slideAnim=useRef(new Animated.Value(0)).current;
+  function goStep(s){
+    Animated.timing(slideAnim,{toValue:-W*(s),duration:260,useNativeDriver:true}).start();
+    setStep(s);
+  }
+  const features=[
+    {icon:'📚',text:'57 שאלות ב-6 נושאים + קריאה'},
+    {icon:'🧠',text:'מנוע אדפטיבי המתאים לרמתך'},
+    {icon:'📊',text:'ניתוח מיומנויות מפורט'},
+    {icon:'🎯',text:'מצב לימוד ומבחן מלא'},
+  ];
   return <SafeAreaView style={{flex:1,backgroundColor:C.primary}}>
     <StatusBar barStyle="light-content"/>
-    <View style={{flex:1,justifyContent:'center',padding:32}}>
-      {step===0?<>
-        <View style={{alignItems:'center',marginBottom:40}}>
-          <Text style={{fontSize:72,marginBottom:12}}>🌐</Text>
-          <Text style={{fontSize:30,fontWeight:'900',color:'#fff',textAlign:'center'}}>AmirNet Plus</Text>
-          <Text style={{fontSize:15,color:'#bfdbfe',textAlign:'center',marginTop:6}}>הכנה מקצועית לבחינת אמירנט</Text>
-        </View>
-        {['57 שאלות ב-6 נושאים + קריאה','מנוע אדפטיבי המתאים לרמתך','ניתוח מיומנויות מפורט','מצב לימוד ומבחן מלא'].map(f=>(
-          <Row key={f} style={{alignSelf:'flex-end',marginBottom:12}}>
-            <Text style={{color:'#bfdbfe',fontSize:14,marginRight:8}}>{f}</Text>
-            <Icon name="checkmark-circle" size={18} color="#4ade80"/>
+    <KAV>
+      <ScrollView contentContainerStyle={{flexGrow:1}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={{flex:1,padding:28,paddingTop:20}}>
+          {/* Step dots */}
+          <Row style={{justifyContent:'center',gap:8,marginBottom:24}}>
+            {[0,1].map(i=><View key={i} style={{width:i===step?24:8,height:8,borderRadius:4,backgroundColor:i===step?'#fff':'rgba(255,255,255,0.35)'}}/>)}
           </Row>
-        ))}
-        <TouchableOpacity style={[S.btn,{backgroundColor:'#fff',marginTop:40}]} onPress={()=>setStep(1)}>
-          <Text style={[S.btnTxt,{color:C.primary}]}>בוא נתחיל ←</Text>
-        </TouchableOpacity>
-      </>:<>
-        <Text style={{fontSize:24,fontWeight:'800',color:'#fff',textAlign:'right',marginBottom:24}}>קצת עליך</Text>
-        <Text style={{color:'#bfdbfe',textAlign:'right',marginBottom:6}}>שמך</Text>
-        <TextInput style={S.onbInput} value={name} onChangeText={setName} placeholder="הכנס שם..." placeholderTextColor="#93c5fd" textAlign="right"/>
-        <Text style={{color:'#bfdbfe',textAlign:'right',marginTop:20,marginBottom:10}}>יעד יומי (שאלות)</Text>
-        <Row style={{gap:8,alignSelf:'flex-end'}}>
-          {['10','20','30','50'].map(n=>(
-            <TouchableOpacity key={n} onPress={()=>setGoal(n)}
-              style={{backgroundColor:goal===n?'#fff':'transparent',borderWidth:1.5,borderColor:'#fff',borderRadius:10,paddingHorizontal:14,paddingVertical:9}}>
-              <Text style={{color:goal===n?C.primary:'#fff',fontWeight:'700'}}>{n}</Text>
+          {step===0?<>
+            <View style={{alignItems:'center',marginBottom:32}}>
+              <View style={{width:100,height:100,borderRadius:50,backgroundColor:'rgba(255,255,255,0.15)',alignItems:'center',justifyContent:'center',marginBottom:16}}>
+                <Text style={{fontSize:52}}>🌐</Text>
+              </View>
+              <Text style={{fontSize:28,fontWeight:'900',color:'#fff',textAlign:'center'}}>AmirNet Plus</Text>
+              <Text style={{fontSize:14,color:'#bfdbfe',textAlign:'center',marginTop:6,lineHeight:20}}>הכנה מקצועית לבחינת אמירנט IT</Text>
+            </View>
+            <View style={{gap:10,marginBottom:32}}>
+              {features.map(f=>(
+                <View key={f.text} style={{flexDirection:'row-reverse',alignItems:'center',backgroundColor:'rgba(255,255,255,0.1)',borderRadius:12,paddingHorizontal:14,paddingVertical:12,gap:12}}>
+                  <Text style={{fontSize:22}}>{f.icon}</Text>
+                  <Text style={{color:'#e0f2fe',fontSize:14,flex:1,textAlign:'right'}}>{f.text}</Text>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity style={[S.btn,{backgroundColor:'#fff'}]} onPress={()=>goStep(1)}>
+              <Text style={[S.btnTxt,{color:C.primary}]}>בוא נתחיל ←</Text>
             </TouchableOpacity>
-          ))}
-        </Row>
-        <TouchableOpacity style={[S.btn,{backgroundColor:'#fff',marginTop:40}]}
-          onPress={()=>onDone({userName:name.trim()||'לומד',dailyGoal:parseInt(goal)||20})}>
-          <Text style={[S.btnTxt,{color:C.primary}]}>כניסה ←</Text>
-        </TouchableOpacity>
-      </>}
-    </View>
+          </>:<>
+            <Text style={{fontSize:22,fontWeight:'900',color:'#fff',textAlign:'right',marginBottom:6}}>קצת עליך 👤</Text>
+            <Text style={{color:'#bfdbfe',textAlign:'right',fontSize:13,marginBottom:24}}>נתאים את החוויה לך</Text>
+            <Text style={{color:'#bfdbfe',textAlign:'right',marginBottom:6,fontSize:13}}>שמך</Text>
+            <TextInput style={[S.onbInput,{marginBottom:20}]} value={name} onChangeText={setName}
+              placeholder="הכנס שם..." placeholderTextColor="#93c5fd" textAlign="right" autoFocus={isIOS}/>
+            <Text style={{color:'#bfdbfe',textAlign:'right',marginBottom:10,fontSize:13}}>יעד יומי (שאלות)</Text>
+            <Row style={{gap:8,marginBottom:32}}>
+              {['10','20','30','50'].map(n=>(
+                <TouchableOpacity key={n} onPress={()=>setGoal(n)}
+                  style={{flex:1,backgroundColor:goal===n?'#fff':'transparent',borderWidth:1.5,borderColor:'#fff',borderRadius:12,paddingVertical:12,alignItems:'center'}}>
+                  <Text style={{color:goal===n?C.primary:'#fff',fontWeight:'800',fontSize:15}}>{n}</Text>
+                </TouchableOpacity>
+              ))}
+            </Row>
+            <TouchableOpacity style={[S.btn,{backgroundColor:'#fff'}]}
+              onPress={()=>onDone({userName:name.trim()||'לומד',dailyGoal:parseInt(goal)||20})}>
+              <Icon name="checkmark" size={18} color={C.primary}/>
+              <Text style={[S.btnTxt,{color:C.primary,marginRight:8}]}>כניסה</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={()=>goStep(0)} style={{alignItems:'center',marginTop:14}}>
+              <Text style={{color:'#bfdbfe',fontSize:13}}>← חזור</Text>
+            </TouchableOpacity>
+          </>}
+        </View>
+      </ScrollView>
+    </KAV>
   </SafeAreaView>;
 }
 
@@ -499,7 +533,7 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout}) {
   const lastH = prog.quizHistory?.[0];
   const lastTopic = lastH?.topic?topicById(lastH.topic):null;
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:24}} showsVerticalScrollIndicator={false}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     {/* Header */}
     <Row style={{justifyContent:'space-between',paddingVertical:10}}>
       <View style={{flexDirection:'row-reverse',alignItems:'center',backgroundColor:'#fff7ed',paddingHorizontal:10,paddingVertical:5,borderRadius:20,borderWidth:1,borderColor:C.warning+'40'}}>
@@ -618,7 +652,7 @@ function QuizSetupScreen({onStart}) {
   const [mode,setMode]=useState('exam');
   const [timerMin,setTimerMin]=useState(0);
   const [adaptive,setAdaptive]=useState(false);
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:40}} showsVerticalScrollIndicator={false}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>הגדרות בחינה</Text>
     <Card style={{backgroundColor:C.primary,marginBottom:16}}>
       <Row style={{justifyContent:'space-between'}}>
@@ -693,8 +727,8 @@ function QuizSetupScreen({onStart}) {
 }
 
 // ─── QUIZ ENGINE SCREEN ───────────────────────────────────────────────────────
-function QuizScreen({config,dispatch,onFinish}) {
-  const [questions,setQuestions] = useState(()=>config.adaptive?[AdaptiveEngine.selectNext(0,[],QS,config.topic)].filter(Boolean):getPool(config.topic,config.count));
+function QuizScreen({config,dispatch,onFinish,allQs=QS}) {
+  const [questions,setQuestions] = useState(()=>config.adaptive?[AdaptiveEngine.selectNext(0,[],allQs,config.topic)].filter(Boolean):getPool(config.topic,config.count,allQs));
   const [idx,setIdx] = useState(0);
   const [answers,setAnswers] = useState({});
   const [selected,setSelected] = useState(null);
@@ -732,7 +766,7 @@ function QuizScreen({config,dispatch,onFinish}) {
       setAnswers(finalAns); setDone(true);
     } else if(config.adaptive) {
       const usedIds = questions.map(q=>q.id);
-      const next = AdaptiveEngine.selectNext(theta,usedIds,QS,config.topic);
+      const next = AdaptiveEngine.selectNext(theta,usedIds,allQs,config.topic);
       if(next) { animNext(()=>{ setQuestions(qs=>[...qs,next]); setIdx(i=>i+1); setSelected(null); setShowExp(false); }); }
       else { dispatch({type:'RECORD',payload:{questions,answers:finalAns,startTime}}); setAnswers(finalAns); setDone(true); }
     } else {
@@ -778,7 +812,7 @@ function QuizScreen({config,dispatch,onFinish}) {
       </Row>
     </View>}
 
-    <ScrollView contentContainerStyle={{padding:16,paddingBottom:110}} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={{padding:16,paddingBottom:isIOS?120:110}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <Animated.View style={{opacity:fadeAnim}}>
         {q.type==='reading'&&<PassageCard passage={q.passage}/>}
         <Card style={{marginBottom:14,borderTopWidth:3,borderTopColor:t?.color||C.primary}}>
@@ -817,7 +851,7 @@ function ResultsScreen({questions,answers,result,theta,onDismiss}) {
       <TouchableOpacity onPress={onDismiss}><Icon name="close" size={22} color={C.muted}/></TouchableOpacity>
       <Text style={{fontWeight:'800',fontSize:16}}>תוצאות</Text>
     </View>
-    <ScrollView contentContainerStyle={{padding:16,paddingBottom:100}} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={{padding:16,paddingBottom:isIOS?120:100}} showsVerticalScrollIndicator={false}>
       {/* Score */}
       <View style={{alignItems:'center',paddingVertical:20}}>
         <View style={{width:140,height:140,borderRadius:70,borderWidth:12,borderColor:gradeColor,alignItems:'center',justifyContent:'center'}}>
@@ -885,7 +919,7 @@ function ResultsScreen({questions,answers,result,theta,onDismiss}) {
 // ─── TOPICS SCREEN ────────────────────────────────────────────────────────────
 function TopicsScreen({prog,onQuiz}) {
   const tp = prog.topicProgress||{};
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:24}} showsVerticalScrollIndicator={false}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false}>
     <Text style={S.pgTitle}>נושאים</Text>
     {TOPICS.map(t=>{
       const p=tp[t.id], p2=p?pct(p.correct,p.answered):0;
@@ -949,7 +983,7 @@ function ProgressScreen({prog,dispatch,currentUser,onLogout}) {
   });
   const maxQs=Math.max(...last7.map(d=>d.qs),1);
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:32}} showsVerticalScrollIndicator={false}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>התקדמות</Text>
     {/* Summary card */}
     <Card style={{backgroundColor:C.primary,marginBottom:14}}>
@@ -1063,7 +1097,7 @@ function TabBar({tab,setTab}) {
   const tabs=[{id:'home',label:'בית',icon:'home-outline',active:'home'},{id:'topics',label:'נושאים',icon:'book-outline',active:'book'},{id:'quiz',label:'בחינה',icon:'pencil-outline',active:'pencil'},{id:'progress',label:'התקדמות',icon:'bar-chart-outline',active:'bar-chart'}];
   return <View style={S.tabBar}>
     {tabs.map(t=>{const on=tab===t.id;return(
-      <TouchableOpacity key={t.id} style={S.tabItem} onPress={()=>setTab(t.id)}>
+      <TouchableOpacity key={t.id} style={S.tabItem} onPress={()=>setTab(t.id)} activeOpacity={0.7}>
         {on&&<View style={S.tabInd}/>}
         <Icon name={on?t.active:t.icon} size={22} color={on?C.primary:C.muted}/>
         <Text style={{fontSize:11,color:on?C.primary:C.muted,fontWeight:on?'700':'400',marginTop:3}}>{t.label}</Text>
@@ -1081,57 +1115,65 @@ function AuthScreen({gsData,onLogin,onRegister}) {
   const [showPwd,setShowPwd]=useState(false);
   return <SafeAreaView style={{flex:1,backgroundColor:C.primary}}>
     <StatusBar barStyle="light-content"/>
-    <View style={{alignItems:'center',paddingTop:48,paddingBottom:28}}>
-      <Text style={{fontSize:56,marginBottom:6}}>🌐</Text>
-      <Text style={{fontSize:26,fontWeight:'900',color:'#fff'}}>AmirNet Plus</Text>
-      <Text style={{fontSize:13,color:'#bfdbfe',marginTop:4}}>הכנה מקצועית לבחינת אמירנט</Text>
-    </View>
-    <View style={{flex:1,backgroundColor:C.bg,borderTopLeftRadius:28,borderTopRightRadius:28,overflow:'hidden'}}>
-      <View style={{flexDirection:'row-reverse',backgroundColor:C.fill,margin:16,borderRadius:12,padding:4}}>
-        {[['login','התחברות'],['register','הרשמה']].map(([v,l])=>(
-          <TouchableOpacity key={v} onPress={()=>setTab(v)}
-            style={{flex:1,paddingVertical:10,borderRadius:10,alignItems:'center',
-              backgroundColor:tab===v?C.card:'transparent',elevation:tab===v?2:0}}>
-            <Text style={{fontWeight:'700',color:tab===v?C.primary:C.muted,fontSize:14}}>{l}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <ScrollView contentContainerStyle={{paddingHorizontal:20,paddingBottom:40}}>
-        {tab==='register'&&<>
-          <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>שם מלא</Text>
-          <TextInput style={[S.inp,{marginBottom:12}]} value={name} onChangeText={setName}
-            placeholder="הכנס שמך המלא..." placeholderTextColor={C.muted} textAlign="right"/>
-        </>}
-        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>שם משתמש</Text>
-        <TextInput style={[S.inp,{marginBottom:12}]} value={username} onChangeText={setUsername}
-          placeholder="username" placeholderTextColor={C.muted} textAlign="right" autoCapitalize="none"/>
-        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>סיסמה</Text>
-        <View style={{marginBottom:4}}>
-          <TextInput style={S.inp} value={password} onChangeText={setPassword}
-            placeholder="••••••" placeholderTextColor={C.muted} textAlign="right"
-            secureTextEntry={!showPwd} autoCapitalize="none"/>
-          <TouchableOpacity onPress={()=>setShowPwd(s=>!s)} style={{position:'absolute',left:12,top:14}}>
-            <Icon name={showPwd?'eye-off-outline':'eye-outline'} size={18} color={C.muted}/>
-          </TouchableOpacity>
+    <KAV>
+      <View style={{alignItems:'center',paddingTop:isIOS?32:40,paddingBottom:24}}>
+        <View style={{width:76,height:76,borderRadius:38,backgroundColor:'rgba(255,255,255,0.18)',alignItems:'center',justifyContent:'center',marginBottom:12}}>
+          <Text style={{fontSize:40}}>🌐</Text>
         </View>
-        <TouchableOpacity style={[S.btn,{marginTop:20}]}
-          onPress={()=>tab==='login'?onLogin(username.trim(),password):onRegister(name.trim(),username.trim(),password)}>
-          <Icon name={tab==='login'?'log-in-outline':'person-add-outline'} size={18} color="#fff"/>
-          <Text style={[S.btnTxt,{marginRight:8}]}>{tab==='login'?'התחבר':'הרשם'}</Text>
-        </TouchableOpacity>
-        {tab==='login'&&<View style={{backgroundColor:'#eff6ff',borderRadius:12,padding:12,marginTop:16,borderWidth:1,borderColor:C.primary+'30'}}>
-          <Row style={{justifyContent:'flex-end',gap:6,marginBottom:4}}>
-            <Text style={{fontSize:13,color:C.primary,fontWeight:'700'}}>כניסת מנהל</Text>
-            <Icon name="shield-checkmark" size={16} color={C.primary}/>
-          </Row>
-          <Text style={{textAlign:'right',fontSize:12,color:C.muted}}>משתמש: admin  •  סיסמה: admin123</Text>
-        </View>}
-        {tab==='register'&&!gsData.settings.regEnabled&&<View style={{backgroundColor:'#fef2f2',borderRadius:12,padding:12,marginTop:12,borderWidth:1,borderColor:C.danger+'30'}}>
-          <Text style={{textAlign:'right',fontSize:13,color:C.danger,fontWeight:'700'}}>⚠️ ההרשמה סגורה</Text>
-          <Text style={{textAlign:'right',fontSize:12,color:C.danger}}>צור קשר עם המנהל</Text>
-        </View>}
-      </ScrollView>
-    </View>
+        <Text style={{fontSize:26,fontWeight:'900',color:'#fff'}}>AmirNet Plus</Text>
+        <Text style={{fontSize:13,color:'#bfdbfe',marginTop:4}}>הכנה מקצועית לבחינת אמירנט</Text>
+      </View>
+      <View style={{flex:1,backgroundColor:C.bg,borderTopLeftRadius:28,borderTopRightRadius:28,overflow:'hidden'}}>
+        <View style={{flexDirection:'row-reverse',backgroundColor:C.fill,margin:16,borderRadius:12,padding:4}}>
+          {[['login','התחברות'],['register','הרשמה']].map(([v,l])=>(
+            <TouchableOpacity key={v} onPress={()=>setTab(v)}
+              style={{flex:1,paddingVertical:10,borderRadius:10,alignItems:'center',
+                backgroundColor:tab===v?C.card:'transparent',
+                shadowColor:tab===v?'#000':'transparent',shadowOpacity:0.08,shadowRadius:4,elevation:tab===v?2:0}}>
+              <Text style={{fontWeight:'700',color:tab===v?C.primary:C.muted,fontSize:14}}>{l}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <ScrollView contentContainerStyle={{paddingHorizontal:20,paddingBottom:40}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {tab==='register'&&<>
+            <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>שם מלא</Text>
+            <TextInput style={[S.inp,{marginBottom:12}]} value={name} onChangeText={setName}
+              placeholder="הכנס שמך המלא..." placeholderTextColor={C.muted} textAlign="right"
+              returnKeyType="next"/>
+          </>}
+          <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>שם משתמש</Text>
+          <TextInput style={[S.inp,{marginBottom:12}]} value={username} onChangeText={setUsername}
+            placeholder="username" placeholderTextColor={C.muted} textAlign="right"
+            autoCapitalize="none" autoCorrect={false} returnKeyType="next"/>
+          <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>סיסמה</Text>
+          <View style={{marginBottom:4}}>
+            <TextInput style={S.inp} value={password} onChangeText={setPassword}
+              placeholder="••••••" placeholderTextColor={C.muted} textAlign="right"
+              secureTextEntry={!showPwd} autoCapitalize="none" returnKeyType="done"
+              onSubmitEditing={()=>tab==='login'?onLogin(username.trim(),password):onRegister(name.trim(),username.trim(),password)}/>
+            <TouchableOpacity onPress={()=>setShowPwd(s=>!s)} style={{position:'absolute',left:12,top:14}}>
+              <Icon name={showPwd?'eye-off-outline':'eye-outline'} size={18} color={C.muted}/>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={[S.btn,{marginTop:20}]}
+            onPress={()=>tab==='login'?onLogin(username.trim(),password):onRegister(name.trim(),username.trim(),password)}>
+            <Icon name={tab==='login'?'log-in-outline':'person-add-outline'} size={18} color="#fff"/>
+            <Text style={[S.btnTxt,{marginRight:8}]}>{tab==='login'?'התחבר':'הרשם'}</Text>
+          </TouchableOpacity>
+          {tab==='login'&&<View style={{backgroundColor:'#eff6ff',borderRadius:12,padding:12,marginTop:16,borderWidth:1,borderColor:C.primary+'30'}}>
+            <Row style={{justifyContent:'flex-end',gap:6,marginBottom:4}}>
+              <Text style={{fontSize:13,color:C.primary,fontWeight:'700'}}>כניסת מנהל</Text>
+              <Icon name="shield-checkmark" size={16} color={C.primary}/>
+            </Row>
+            <Text style={{textAlign:'right',fontSize:12,color:C.muted}}>משתמש: admin  •  סיסמה: admin123</Text>
+          </View>}
+          {tab==='register'&&!gsData.settings.regEnabled&&<View style={{backgroundColor:'#fef2f2',borderRadius:12,padding:12,marginTop:12,borderWidth:1,borderColor:C.danger+'30'}}>
+            <Text style={{textAlign:'right',fontSize:13,color:C.danger,fontWeight:'700'}}>⚠️ ההרשמה סגורה</Text>
+            <Text style={{textAlign:'right',fontSize:12,color:C.danger}}>צור קשר עם המנהל</Text>
+          </View>}
+        </ScrollView>
+      </View>
+    </KAV>
   </SafeAreaView>;
 }
 
@@ -1296,7 +1338,7 @@ function AdminUsers({gsData,setGsData}) {
   })():null;
 
   return <View style={{flex:1}}>
-    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}}>
+    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
       <Text style={S.pgTitle}>ניהול משתמשים 👥</Text>
       <TextInput style={[S.inp,{marginBottom:10}]} value={search} onChangeText={setSearch}
         placeholder="🔍 חיפוש לפי שם..." placeholderTextColor={C.muted} textAlign="right"/>
@@ -1363,7 +1405,7 @@ function AdminQuestions({gsData,setGsData}) {
   const baseFiltered=QS.filter(q=>!filterTopic||q.topic===filterTopic);
   const customFiltered=gsData.customQs.filter(q=>!filterTopic||q.topic===filterTopic);
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>מנהל שאלות ❓</Text>
     <Row style={{gap:8,marginBottom:12}}>
       {[['base',`בסיס (${QS.length})`],['custom',`מותאמות (${gsData.customQs.length})`],['add',editingId?'עריכה':'הוסף']].map(([v,l])=>(
@@ -1572,7 +1614,7 @@ function AdminAnnouncements({gsData,setGsData}) {
   }
   function delAnn(id){setGsData(gd=>({...gd,announcements:gd.announcements.filter(a=>a.id!==id)}));}
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
     <Row style={{justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
       <TouchableOpacity style={[S.btn,{marginBottom:0,paddingHorizontal:16,paddingVertical:10}]} onPress={()=>setShowForm(s=>!s)}>
         <Icon name={showForm?'close':'add'} size={18} color="#fff"/>
@@ -1719,7 +1761,7 @@ function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
     Alert.alert(`דוח ביצועים (${students.length} סטודנטים)`,summary);
   }
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:40}}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:40}} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>הגדרות מנהל ⚙️</Text>
     <Card style={{backgroundColor:C.primary,marginBottom:14}}>
       <Row style={{justifyContent:'space-between',alignItems:'center'}}>
@@ -1893,7 +1935,7 @@ export default function App() {
   if(!currentUser)return <AuthScreen gsData={gsData} onLogin={handleLogin} onRegister={handleRegister}/>;
   if(currentUser.role==='admin')return <AdminPanel gsData={gsData} setGsData={setGsData} currentUser={currentUser} onLogout={handleLogout}/>;
   if(!prog.onboarded)return <OnboardingScreen onDone={p=>{dispatch({type:'SETTINGS',payload:{...p,onboarded:true}});setCurrentUser(u=>({...u,onboarded:true}));setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===currentUser.id?{...u,onboarded:true}:u)}));}}/>;
-  if(quiz)return <QuizScreen config={quiz} dispatch={go} onFinish={()=>setQuiz(null)}/>;
+  if(quiz)return <QuizScreen config={quiz} dispatch={go} onFinish={()=>setQuiz(null)} allQs={[...QS,...gsData.customQs]}/>;
   const activeAnn=gsData.announcements.filter(a=>!a.expiresAt||a.expiresAt>Date.now());
   return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
     <StatusBar barStyle="dark-content"/>
@@ -1907,7 +1949,7 @@ export default function App() {
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
-  scr:{flex:1,backgroundColor:C.bg,paddingHorizontal:16,paddingTop:12},
+  scr:{flex:1,backgroundColor:C.bg,paddingHorizontal:16,paddingTop:12,paddingBottom:0},
   center:{flex:1,justifyContent:'center',alignItems:'center',backgroundColor:C.bg},
   pgTitle:{fontSize:26,fontWeight:'900',textAlign:'right',color:C.text,marginBottom:14},
   sec:{fontSize:14,fontWeight:'800',textAlign:'right',color:C.text,marginTop:10,marginBottom:8},
@@ -1928,7 +1970,7 @@ const S = StyleSheet.create({
   onbInput:{backgroundColor:'rgba(255,255,255,0.15)',borderRadius:12,padding:14,fontSize:16,borderWidth:1.5,borderColor:'rgba(255,255,255,0.4)',color:'#fff'},
   timerBox:{flexDirection:'row-reverse',alignItems:'center',paddingHorizontal:10,paddingVertical:5,borderRadius:20,borderWidth:1,gap:4},
   qBar:{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',paddingHorizontal:16,paddingVertical:10},
-  qBottom:{position:'absolute',bottom:0,left:0,right:0,padding:16,backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border},
+  qBottom:{position:'absolute',bottom:0,left:0,right:0,padding:16,paddingBottom:Platform.OS==='ios'?32:16,backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border},
   tabBar:{flexDirection:'row-reverse',backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,paddingBottom:Platform.OS==='ios'?20:6,paddingTop:6},
   tabItem:{flex:1,alignItems:'center',paddingTop:4,position:'relative'},
   tabInd:{position:'absolute',top:0,left:'20%',right:'20%',height:2.5,backgroundColor:C.primary,borderBottomLeftRadius:2,borderBottomRightRadius:2},
