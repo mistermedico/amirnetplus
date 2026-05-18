@@ -1178,52 +1178,83 @@ function AuthScreen({gsData,onLogin,onRegister}) {
 }
 
 // ─── ADMIN: DASHBOARD ─────────────────────────────────────────────────────────
-function AdminDashboard({gsData,onNav}) {
+function AdminDashboard({gsData,setGsData,onNav}) {
   const students=gsData.users.filter(u=>u.role==='student');
   const today=new Date().toDateString();
+  const yesterday=new Date(Date.now()-86400000).toDateString();
   const activeToday=students.filter(u=>(u.prog?.quizHistory||[]).some(h=>new Date(h.date).toDateString()===today)).length;
+  const activeYest=students.filter(u=>(u.prog?.quizHistory||[]).some(h=>new Date(h.date).toDateString()===yesterday)).length;
   const allHistory=students.flatMap(u=>u.prog?.quizHistory||[]);
   const overallPassRate=allHistory.length>0?pct(allHistory.filter(h=>h.pass).length,allHistory.length):0;
   const totalAnswered=students.reduce((s,u)=>s+(u.prog?.totalAnswered||0),0);
+  const totalCorrect=students.reduce((s,u)=>s+(u.prog?.totalCorrect||0),0);
+  const avgScore=totalAnswered>0?pct(totalCorrect,totalAnswered):0;
+  const atRisk=students.filter(u=>(u.prog?.totalAnswered||0)>=10&&pct(u.prog.totalCorrect,u.prog.totalAnswered)<70).length;
+  const newToday=students.filter(u=>new Date(u.createdAt).toDateString()===today).length;
   const last7=Array.from({length:7},(_,i)=>{
     const d=new Date();d.setDate(d.getDate()-(6-i));
     const ds=d.toDateString();
     const qs=allHistory.filter(h=>new Date(h.date).toDateString()===ds).reduce((s,h)=>s+h.total,0);
-    return {label:['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'][d.getDay()],qs};
+    const uniq=new Set(allHistory.filter(h=>new Date(h.date).toDateString()===ds).map(h=>students.find(u=>(u.prog?.quizHistory||[]).includes(h))?.id)).size;
+    return {label:['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'][d.getDay()],qs,uniq};
   });
   const maxBar=Math.max(...last7.map(d=>d.qs),1);
   const topStudents=students.filter(u=>(u.prog?.totalAnswered||0)>=5)
     .map(u=>({...u,score:pct(u.prog.totalCorrect,u.prog.totalAnswered)}))
-    .sort((a,b)=>b.score-a.score).slice(0,5);
+    .sort((a,b)=>b.score-a.score).slice(0,3);
+  const recentQuizzes=allHistory.sort((a,b)=>b.date-a.date).slice(0,5);
   const allQsCount=QS.length+gsData.customQs.length;
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}}>
-    <Text style={S.pgTitle}>לוח בקרה 📊</Text>
+  const activeGroups=(gsData.groups||[]).length;
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} showsVerticalScrollIndicator={false}>
+    {/* Hero stats */}
+    <Card style={{backgroundColor:C.primary,marginBottom:8}}>
+      <Row style={{justifyContent:'space-between',marginBottom:10}}>
+        <Text style={{color:'#bfdbfe',fontSize:12}}>{new Date().toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long'})}</Text>
+        <Text style={{color:'#fff',fontSize:17,fontWeight:'900'}}>לוח בקרה 📊</Text>
+      </Row>
+      <Row style={{gap:0}}>
+        {[{v:students.length,l:'סטודנטים',sub:newToday>0?`+${newToday} היום`:null},{v:`${avgScore}%`,l:'ממוצע',sub:null},{v:`${overallPassRate}%`,l:'עובר',sub:null},{v:activeToday,l:'פעילים',sub:activeYest>0?`${activeYest} אתמול`:null}].map((s,i,arr)=>(
+          <View key={s.l} style={[{flex:1,alignItems:'center',paddingVertical:6},i<arr.length-1&&{borderRightWidth:1,borderRightColor:'rgba(255,255,255,0.2)'}]}>
+            <Text style={{fontSize:22,fontWeight:'900',color:'#fff'}}>{s.v}</Text>
+            <Text style={{fontSize:10,color:'#bfdbfe',marginTop:1}}>{s.l}</Text>
+            {s.sub&&<Text style={{fontSize:9,color:'#4ade80',marginTop:1}}>{s.sub}</Text>}
+          </View>
+        ))}
+      </Row>
+    </Card>
+    {/* Secondary KPIs */}
     <Row style={{gap:8,marginBottom:4}}>
-      {[{v:students.length,l:'סטודנטים',i:'people',c:C.primary},{v:activeToday,l:'פעילים היום',i:'today-outline',c:C.success},
-        {v:totalAnswered,l:'שאלות נענו',i:'help-circle',c:C.purple},{v:`${overallPassRate}%`,l:'עבר בחינה',i:'trophy',c:C.warning}]
+      {[{v:allQsCount,l:'שאלות בבנק',i:'book',c:C.cyan},{v:gsData.customQs.length,l:'מותאמות',i:'create-outline',c:C.orange},
+        {v:gsData.announcements.filter(a=>!a.expiresAt||a.expiresAt>Date.now()).length,l:'הודעות',i:'megaphone',c:C.purple},
+        {v:atRisk,l:'בסיכון',i:'warning',c:atRisk>0?C.danger:C.muted}]
         .map(s=><Card key={s.l} style={{flex:1,alignItems:'center',padding:10,marginBottom:0}}>
-          <Icon name={s.i} size={20} color={s.c}/>
-          <Text style={{fontSize:18,fontWeight:'900',color:s.c,marginTop:3}}>{s.v}</Text>
-          <Text style={{fontSize:10,color:C.muted,textAlign:'center',marginTop:1}}>{s.l}</Text>
-        </Card>)}
-    </Row>
-    <Row style={{gap:8,marginBottom:12}}>
-      {[{v:allQsCount,l:'שאלות בבנק',i:'book',c:C.cyan},{v:gsData.customQs.length,l:'מותאמות',i:'create',c:C.orange},
-        {v:gsData.announcements.filter(a=>!a.expiresAt||a.expiresAt>Date.now()).length,l:'הודעות פעילות',i:'megaphone',c:C.danger},
-        {v:students.filter(u=>u.blocked).length,l:'חסומים',i:'ban-outline',c:C.muted}]
-        .map(s=><Card key={s.l} style={{flex:1,alignItems:'center',padding:10,marginBottom:0}}>
-          <Icon name={s.i} size={18} color={s.c}/>
+          <Icon name={s.i} size={16} color={s.c}/>
           <Text style={{fontSize:17,fontWeight:'900',color:s.c,marginTop:2}}>{s.v}</Text>
-          <Text style={{fontSize:10,color:C.muted,textAlign:'center',marginTop:1}}>{s.l}</Text>
+          <Text style={{fontSize:9,color:C.muted,textAlign:'center',marginTop:1}}>{s.l}</Text>
         </Card>)}
     </Row>
+    <Row style={{gap:8,marginBottom:10}}>
+      {[{v:students.filter(u=>u.blocked).length,l:'חסומים',i:'ban-outline',c:C.muted},
+        {v:activeGroups,l:'קבוצות',i:'people-circle-outline',c:C.cyan},
+        {v:totalAnswered,l:'שאלות נענו',i:'help-circle',c:C.success},
+        {v:allHistory.filter(h=>h.pass).length,l:'בחינות עברו',i:'trophy',c:C.warning}]
+        .map(s=><Card key={s.l} style={{flex:1,alignItems:'center',padding:10,marginBottom:0}}>
+          <Icon name={s.i} size={16} color={s.c}/>
+          <Text style={{fontSize:17,fontWeight:'900',color:s.c,marginTop:2}}>{s.v}</Text>
+          <Text style={{fontSize:9,color:C.muted,textAlign:'center',marginTop:1}}>{s.l}</Text>
+        </Card>)}
+    </Row>
+    {/* 7-day chart */}
     <Card>
-      <Text style={{textAlign:'right',fontWeight:'700',fontSize:14,marginBottom:12}}>פעילות 7 ימים</Text>
+      <Row style={{justifyContent:'space-between',marginBottom:12}}>
+        <Text style={{fontSize:12,color:C.muted}}>שאלות שנענו</Text>
+        <Text style={{fontWeight:'700',fontSize:14}}>פעילות 7 ימים</Text>
+      </Row>
       <Row style={{alignItems:'flex-end',justifyContent:'space-between',height:80}}>
         {last7.map((d,i)=>(
           <View key={i} style={{alignItems:'center',flex:1}}>
             <View style={{flex:1,justifyContent:'flex-end',width:'70%'}}>
-              <View style={{height:`${Math.max(d.qs/maxBar*100,d.qs>0?10:4)}%`,backgroundColor:d.qs>0?C.primary:C.fill,borderRadius:4}}/>
+              <View style={{height:`${Math.max(d.qs/maxBar*100,d.qs>0?8:3)}%`,backgroundColor:d.qs>0?C.primary:C.fill,borderRadius:4}}/>
             </View>
             <Text style={{fontSize:10,color:C.muted,marginTop:4}}>{d.label}</Text>
             {d.qs>0&&<Text style={{fontSize:9,color:C.primary,fontWeight:'700'}}>{d.qs}</Text>}
@@ -1231,32 +1262,74 @@ function AdminDashboard({gsData,onNav}) {
         ))}
       </Row>
     </Card>
+    {/* At-risk alert */}
+    {atRisk>0&&<TouchableOpacity onPress={()=>onNav('reports')}>
+      <View style={{backgroundColor:C.danger+'14',borderRadius:14,padding:14,marginBottom:8,borderWidth:1,borderColor:C.danger+'40',flexDirection:'row-reverse',alignItems:'center',gap:10}}>
+        <View style={{flex:1}}>
+          <Text style={{fontWeight:'800',fontSize:14,color:C.danger,textAlign:'right'}}>⚠️ {atRisk} סטודנטים בסיכון</Text>
+          <Text style={{fontSize:12,color:C.danger,textAlign:'right',marginTop:2}}>ביצועים מתחת ל-70% אחרי 10+ שאלות</Text>
+        </View>
+        <Icon name="arrow-back" size={16} color={C.danger}/>
+      </View>
+    </TouchableOpacity>}
+    {/* Quick actions */}
+    <Sec title="פעולות מהירות"/>
+    <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:10,marginBottom:8}}>
+      {[{l:'הוסף שאלה',i:'add-circle',c:C.success,t:'questions'},{l:'הודעה חדשה',i:'megaphone',c:C.orange,t:'announcements'},
+        {l:'משתמשים',i:'people',c:C.primary,t:'users'},{l:'קבוצות',i:'people-circle',c:C.cyan,t:'groups'},
+        {l:'דוחות',i:'document-text',c:C.purple,t:'reports'},{l:'אנליטיקה',i:'bar-chart',c:C.warning,t:'analytics'}]
+        .map(a=>(
+        <TouchableOpacity key={a.t} style={[S.card,{width:(W-52)/3,alignItems:'center',padding:14,marginBottom:0}]} onPress={()=>onNav(a.t)}>
+          <View style={{width:40,height:40,borderRadius:20,backgroundColor:a.c+'15',alignItems:'center',justifyContent:'center',marginBottom:6}}>
+            <Icon name={a.i} size={22} color={a.c}/>
+          </View>
+          <Text style={{fontSize:12,fontWeight:'700',color:a.c,textAlign:'center'}}>{a.l}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+    {/* Top students */}
     {topStudents.length>0&&<>
       <Sec title="🏆 מובילי לוח"/>
       {topStudents.map((u,i)=>(
         <Card key={u.id} style={{marginBottom:8}}>
-          <Row style={{justifyContent:'space-between',marginBottom:6}}>
-            <Row style={{flex:0,gap:8}}><Pill label={`${u.score}%`} color={u.score>=70?C.success:C.warning}/>
-              <Text style={{fontSize:12,color:C.muted}}>{u.prog?.totalAnswered} שאלות</Text></Row>
-            <Row style={{flex:0,gap:8}}><Text style={{fontWeight:'700',fontSize:14}}>{u.name}</Text>
-              <View style={{width:26,height:26,borderRadius:13,backgroundColor:C.primary+'20',alignItems:'center',justifyContent:'center'}}>
-                <Text style={{fontSize:12,fontWeight:'900',color:C.primary}}>#{i+1}</Text></View></Row>
+          <Row style={{justifyContent:'space-between',marginBottom:5}}>
+            <Row style={{flex:0,gap:8}}>
+              <Pill label={`${u.score}%`} color={u.score>=70?C.success:C.warning} small/>
+              <Text style={{fontSize:11,color:C.muted}}>{u.prog?.totalAnswered} שאלות</Text>
+            </Row>
+            <Row style={{flex:0,gap:8}}>
+              <Text style={{fontWeight:'700',fontSize:14}}>{u.name}</Text>
+              <View style={{width:26,height:26,borderRadius:13,backgroundColor:[C.warning,C.muted,C.orange][i]+'25',alignItems:'center',justifyContent:'center'}}>
+                <Text style={{fontSize:13}}>{['🥇','🥈','🥉'][i]}</Text>
+              </View>
+            </Row>
           </Row>
           <Bar value={u.score} total={100} color={u.score>=70?C.success:C.warning} h={4}/>
         </Card>
       ))}
     </>}
-    <Sec title="פעולות מהירות"/>
-    <Row style={{gap:10}}>
-      {[{l:'הוסף שאלה',i:'add-circle',c:C.success,t:'questions'},
-        {l:'הודעה חדשה',i:'megaphone',c:C.orange,t:'announcements'},
-        {l:'ניהול משתמשים',i:'people',c:C.primary,t:'users'}].map(a=>(
-        <TouchableOpacity key={a.t} style={[S.card,{flex:1,alignItems:'center',padding:12,marginBottom:0}]} onPress={()=>onNav(a.t)}>
-          <Icon name={a.i} size={22} color={a.c}/>
-          <Text style={{fontSize:11,fontWeight:'700',color:a.c,marginTop:4,textAlign:'center'}}>{a.l}</Text>
-        </TouchableOpacity>
-      ))}
-    </Row>
+    {/* Recent activity */}
+    {recentQuizzes.length>0&&<>
+      <Sec title="פעילות אחרונה"/>
+      {recentQuizzes.map((h,i)=>{
+        const owner=students.find(u=>(u.prog?.quizHistory||[]).some(x=>x.date===h.date&&x.base===h.base));
+        const t=h.topic?topicById(h.topic):null;
+        return <Card key={i} style={{marginBottom:7}}>
+          <Row style={{justifyContent:'space-between'}}>
+            <Row style={{flex:0,gap:6}}>
+              <Pill label={`${h.base}%`} color={h.pass?C.success:C.danger} small/>
+              <Text style={{fontSize:11,color:C.muted}}>{new Date(h.date).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</Text>
+            </Row>
+            <Row style={{flex:0,gap:6}}>
+              <Col style={{alignItems:'flex-end'}}>
+                <Text style={{fontWeight:'700',fontSize:13}}>{owner?.name||'?'}</Text>
+                <Text style={{fontSize:11,color:C.muted}}>{t?`${t.icon} ${t.name}`:'כולם'} • {h.total} שאלות</Text>
+              </Col>
+            </Row>
+          </Row>
+        </Card>;
+      })}
+    </>}
   </ScrollView>;
 }
 
@@ -1264,120 +1337,288 @@ function AdminDashboard({gsData,onNav}) {
 function AdminUsers({gsData,setGsData}) {
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
-  const [selectedUser,setSelectedUser]=useState(null);
+  const [sort,setSort]=useState('name'); // name | score | date | answered
+  const [selected,setSelected]=useState(null); // user detail sheet
+  const [addMode,setAddMode]=useState(false);
+  const [bulkSel,setBulkSel]=useState(new Set());
+  const [bulkMode,setBulkMode]=useState(false);
+  const [noteEdit,setNoteEdit]=useState('');
+  const [editName,setEditName]=useState('');
+  const [editUser,setEditUser]=useState('');
+  const [newName,setNewName]=useState('');
+  const [newUser,setNewUser]=useState('');
+  const [newPwd,setNewPwd]=useState('');
+  const [newGroup,setNewGroup]=useState('');
   const students=gsData.users.filter(u=>u.role==='student');
+
   const filtered=students
-    .filter(u=>filter==='blocked'?u.blocked:filter==='active'?!u.blocked:true)
-    .filter(u=>!search||u.name.includes(search)||u.username.includes(search));
+    .filter(u=>{
+      if(filter==='blocked')return u.blocked;
+      if(filter==='active')return !u.blocked&&(u.prog?.totalAnswered||0)>0;
+      if(filter==='new')return !u.blocked&&!(u.prog?.totalAnswered>0);
+      if(filter==='atrisk')return (u.prog?.totalAnswered||0)>=10&&pct(u.prog.totalCorrect,u.prog.totalAnswered)<70;
+      return true;
+    })
+    .filter(u=>!search||u.name.includes(search)||u.username.includes(search)||(u.note||'').includes(search))
+    .sort((a,b)=>{
+      if(sort==='score')return pct(b.prog?.totalCorrect||0,b.prog?.totalAnswered||1)-pct(a.prog?.totalCorrect||0,a.prog?.totalAnswered||1);
+      if(sort==='answered')return (b.prog?.totalAnswered||0)-(a.prog?.totalAnswered||0);
+      if(sort==='date')return b.createdAt-a.createdAt;
+      return a.name.localeCompare(b.name,'he');
+    });
 
   function toggleBlock(id){setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===id?{...u,blocked:!u.blocked}:u)}));}
   function resetProg(id){Alert.alert('איפוס','למחוק את כל ההתקדמות?',[{text:'ביטול',style:'cancel'},{text:'איפוס',style:'destructive',onPress:()=>setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===id?{...u,prog:INIT_PROG}:u)}))}]);}
-  function deleteUser(id){Alert.alert('מחיקה','למחוק משתמש לצמיתות?',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>{setGsData(gd=>({...gd,users:gd.users.filter(u=>u.id!==id)}));if(selectedUser?.id===id)setSelectedUser(null);}}]);}
+  function deleteUser(id){Alert.alert('מחיקה','למחוק משתמש לצמיתות?',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>{setGsData(gd=>({...gd,users:gd.users.filter(u=>u.id!==id)}));if(selected?.id===id)setSelected(null);}}]);}
+  function saveNote(id,note){setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===id?{...u,note}:u)}));}
+  function saveEdit(id){
+    if(!editName.trim()||!editUser.trim()){Alert.alert('שגיאה','מלא שם ושם משתמש');return;}
+    if(gsData.users.find(u=>u.username===editUser.trim()&&u.id!==id)){Alert.alert('שגיאה','שם משתמש תפוס');return;}
+    setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===id?{...u,name:editName.trim(),username:editUser.trim()}:u)}));
+    Alert.alert('✓','נשמר');
+  }
+  function addStudent(){
+    if(!newName.trim()||!newUser.trim()||!newPwd.trim()){Alert.alert('שגיאה','מלא את כל השדות');return;}
+    if(newPwd.length<4){Alert.alert('שגיאה','סיסמה קצרה מדי');return;}
+    if(gsData.users.find(u=>u.username===newUser.trim())){Alert.alert('שגיאה','שם משתמש קיים');return;}
+    const u={id:Date.now().toString(),username:newUser.trim(),password:newPwd,name:newName.trim(),role:'student',blocked:false,createdAt:Date.now(),prog:INIT_PROG,group:newGroup||null};
+    setGsData(gd=>({...gd,users:[...gd.users,u]}));
+    setNewName('');setNewUser('');setNewPwd('');setNewGroup('');setAddMode(false);
+    Alert.alert('✓',`סטודנט ${u.name} נוסף`);
+  }
+  function bulkAction(action){
+    if(bulkSel.size===0){Alert.alert('שגיאה','לא נבחרו משתמשים');return;}
+    const ids=[...bulkSel];
+    if(action==='block'){setGsData(gd=>({...gd,users:gd.users.map(u=>ids.includes(u.id)?{...u,blocked:true}:u)}));}
+    if(action==='unblock'){setGsData(gd=>({...gd,users:gd.users.map(u=>ids.includes(u.id)?{...u,blocked:false}:u)}));}
+    if(action==='reset'){Alert.alert('איפוס קבוצתי',`איפוס ${ids.length} משתמשים?`,[{text:'ביטול',style:'cancel'},{text:'איפוס',style:'destructive',onPress:()=>setGsData(gd=>({...gd,users:gd.users.map(u=>ids.includes(u.id)?{...u,prog:INIT_PROG}:u)}))}]);}
+    if(action==='delete'){Alert.alert('מחיקה קבוצתית',`מחיקת ${ids.length} משתמשים?`,[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>setGsData(gd=>({...gd,users:gd.users.filter(u=>!ids.includes(u.id))}))}]);}
+    setBulkSel(new Set());setBulkMode(false);
+  }
 
-  const DetailOverlay=selectedUser?(()=>{
-    const u=gsData.users.find(x=>x.id===selectedUser.id)||selectedUser;
-    const p=u.prog||INIT_PROG;
-    const overall=pct(p.totalCorrect,p.totalAnswered);
-    return <View style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'rgba(0,0,0,0.5)',justifyContent:'flex-end'}}>
-      <View style={{backgroundColor:C.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:'88%'}}>
-        <View style={{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',padding:18,borderBottomWidth:1,borderBottomColor:C.border}}>
-          <TouchableOpacity onPress={()=>setSelectedUser(null)}><Icon name="close" size={22} color={C.muted}/></TouchableOpacity>
-          <Text style={{fontWeight:'800',fontSize:17}}>{u.name}</Text>
+  const sel=selected?gsData.users.find(x=>x.id===selected.id)||selected:null;
+
+  return <View style={{flex:1}}>
+    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
+      <Row style={{justifyContent:'space-between',marginBottom:4}}>
+        <Row style={{flex:0,gap:8}}>
+          <TouchableOpacity style={[S.cntBtn,{paddingHorizontal:12,paddingVertical:8},bulkMode&&S.cntBtnOn]} onPress={()=>{setBulkMode(b=>!b);setBulkSel(new Set());}}>
+            <Text style={[{fontSize:12,fontWeight:'700',color:C.text},bulkMode&&{color:'#fff'}]}>בחירה מרובה</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[S.cntBtn,{paddingHorizontal:12,paddingVertical:8},addMode&&S.cntBtnOn]} onPress={()=>setAddMode(m=>!m)}>
+            <Icon name={addMode?'close':'person-add-outline'} size={16} color={addMode?'#fff':C.text}/>
+          </TouchableOpacity>
+        </Row>
+        <Text style={S.pgTitle}>משתמשים 👥</Text>
+      </Row>
+      {/* Add student form */}
+      {addMode&&<Card style={{marginBottom:12}}>
+        <Text style={{textAlign:'right',fontWeight:'700',fontSize:15,color:C.primary,marginBottom:12}}>➕ הוסף סטודנט</Text>
+        {[{v:newName,s:setNewName,ph:'שם מלא',kb:'default'},{v:newUser,s:setNewUser,ph:'שם משתמש',kb:'default'},{v:newPwd,s:setNewPwd,ph:'סיסמה',kb:'default'}].map(({v,s,ph})=>(
+          <TextInput key={ph} style={[S.inp,{marginBottom:8}]} value={v} onChangeText={s} placeholder={ph} placeholderTextColor={C.muted} textAlign="right" autoCapitalize="none"/>
+        ))}
+        {(gsData.groups||[]).length>0&&<>
+          <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:6}}>קבוצה (אופציונלי)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:8}}>
+            <TouchableOpacity style={[S.cntBtn,!newGroup&&S.cntBtnOn,{paddingHorizontal:10,paddingVertical:6}]} onPress={()=>setNewGroup('')}>
+              <Text style={[{fontSize:12,fontWeight:'700',color:C.text},!newGroup&&{color:'#fff'}]}>ללא</Text>
+            </TouchableOpacity>
+            {(gsData.groups||[]).map(g=>(
+              <TouchableOpacity key={g.id} style={[S.cntBtn,newGroup===g.id&&{backgroundColor:g.color,borderColor:g.color},{paddingHorizontal:10,paddingVertical:6}]} onPress={()=>setNewGroup(g.id)}>
+                <Text style={{fontSize:12,fontWeight:'700',color:newGroup===g.id?'#fff':C.text}}>{g.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </>}
+        <Row style={{gap:8}}>
+          <TouchableOpacity style={[S.outBtn,{flex:1,borderColor:C.border}]} onPress={()=>setAddMode(false)}><Text style={{color:C.muted,fontWeight:'700'}}>ביטול</Text></TouchableOpacity>
+          <TouchableOpacity style={[S.btn,{flex:2,marginBottom:0}]} onPress={addStudent}><Icon name="person-add-outline" size={16} color="#fff"/><Text style={[S.btnTxt,{marginRight:6,fontSize:14}]}>הוסף</Text></TouchableOpacity>
+        </Row>
+      </Card>}
+      {/* Bulk action bar */}
+      {bulkMode&&bulkSel.size>0&&<Card style={{backgroundColor:C.primary+'12',borderWidth:1,borderColor:C.primary+'40',marginBottom:10}}>
+        <Text style={{textAlign:'right',fontWeight:'700',color:C.primary,marginBottom:8}}>נבחרו {bulkSel.size} משתמשים</Text>
+        <Row style={{gap:6,flexWrap:'wrap'}}>
+          {[{l:'חסום',c:C.warning,a:'block'},{l:'בטל חסימה',c:C.success,a:'unblock'},{l:'איפוס',c:C.orange,a:'reset'},{l:'מחק',c:C.danger,a:'delete'}].map(a=>(
+            <TouchableOpacity key={a.a} style={{backgroundColor:a.c+'18',borderRadius:8,paddingHorizontal:12,paddingVertical:6,borderWidth:1,borderColor:a.c+'40'}} onPress={()=>bulkAction(a.a)}>
+              <Text style={{fontSize:12,fontWeight:'700',color:a.c}}>{a.l}</Text>
+            </TouchableOpacity>
+          ))}
+        </Row>
+      </Card>}
+      {/* Search */}
+      <TextInput style={[S.inp,{marginBottom:8}]} value={search} onChangeText={setSearch}
+        placeholder="🔍 חיפוש לפי שם, משתמש או הערה..." placeholderTextColor={C.muted} textAlign="right"/>
+      {/* Filter chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:8}}>
+        {[['all','הכל'],['active','פעילים'],['new','חדשים'],['atrisk','⚠️ בסיכון'],['blocked','חסומים']].map(([v,l])=>(
+          <TouchableOpacity key={v} style={[S.cntBtn,filter===v&&S.cntBtnOn,{paddingHorizontal:12,paddingVertical:7}]} onPress={()=>setFilter(v)}>
+            <Text style={[S.cntTxt,filter===v&&{color:'#fff'},{fontSize:12}]}>{l}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      {/* Sort */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:12}}>
+        {[['name','שם'],['score','ציון'],['answered','שאלות'],['date','תאריך']].map(([v,l])=>(
+          <TouchableOpacity key={v} style={{flexDirection:'row-reverse',alignItems:'center',gap:4,paddingHorizontal:10,paddingVertical:5,borderRadius:8,backgroundColor:sort===v?C.primary+'15':C.fill,borderWidth:1,borderColor:sort===v?C.primary+'40':C.border}} onPress={()=>setSort(v)}>
+            {sort===v&&<Icon name="chevron-down" size={12} color={C.primary}/>}
+            <Text style={{fontSize:12,fontWeight:'700',color:sort===v?C.primary:C.muted}}>{l}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:8}}>{filtered.length} תוצאות</Text>
+      {filtered.length===0&&<Card style={{alignItems:'center',padding:20}}><Text style={{color:C.muted}}>אין משתמשים</Text></Card>}
+      {filtered.map(u=>{
+        const p=u.prog,score=p?pct(p.totalCorrect,p.totalAnswered):0;
+        const isChecked=bulkSel.has(u.id);
+        return <TouchableOpacity key={u.id} activeOpacity={bulkMode?0.7:1}
+          onPress={()=>{if(bulkMode){const s=new Set(bulkSel);s.has(u.id)?s.delete(u.id):s.add(u.id);setBulkSel(s);}else setSelected(u);}}>
+          <Card style={{marginBottom:8,borderWidth:bulkMode&&isChecked?2:1,borderColor:bulkMode&&isChecked?C.primary:C.border}}>
+            <Row style={{justifyContent:'space-between',marginBottom:6}}>
+              <Row style={{flex:0,gap:6}}>
+                {bulkMode&&<View style={{width:20,height:20,borderRadius:10,backgroundColor:isChecked?C.primary:C.fill,borderWidth:1.5,borderColor:isChecked?C.primary:C.border,alignItems:'center',justifyContent:'center'}}>
+                  {isChecked&&<Icon name="checkmark" size={12} color="#fff"/>}
+                </View>}
+                {u.blocked&&<Pill label="חסום" color={C.danger} small/>}
+                {(u.prog?.totalAnswered||0)>=10&&score<70&&<Pill label="בסיכון" color={C.warning} small/>}
+                {(gsData.groups||[]).find(g=>g.id===u.group)&&<Pill label={(gsData.groups||[]).find(g=>g.id===u.group)?.name} color={C.cyan} small/>}
+                <Text style={{fontSize:10,color:C.muted}}>{new Date(u.createdAt).toLocaleDateString('he-IL')}</Text>
+              </Row>
+              <Row style={{flex:0,gap:8}}>
+                <View style={{width:36,height:36,borderRadius:18,backgroundColor:C.primary+'20',alignItems:'center',justifyContent:'center'}}>
+                  <Text style={{fontSize:14,fontWeight:'900',color:C.primary}}>{u.name.charAt(0)}</Text>
+                </View>
+                <Col style={{alignItems:'flex-end'}}>
+                  <Text style={{fontWeight:'800',fontSize:15}}>{u.name}</Text>
+                  <Text style={{fontSize:11,color:C.muted}}>@{u.username}</Text>
+                </Col>
+              </Row>
+            </Row>
+            {p&&p.totalAnswered>0?<>
+              <Row style={{justifyContent:'space-between',marginBottom:4}}>
+                <Row style={{flex:0,gap:8}}>
+                  <Text style={{fontSize:11,color:C.muted}}>🔥{p.streakDays||0} ימים</Text>
+                  <Text style={{fontSize:11,color:C.muted}}>{p.totalAnswered} שאלות</Text>
+                </Row>
+                <Text style={{fontSize:13,fontWeight:'700',color:score>=70?C.success:C.warning}}>{score}%</Text>
+              </Row>
+              <Bar value={score} total={100} color={score>=70?C.success:C.warning} h={4}/>
+            </>:<Text style={{textAlign:'right',fontSize:11,color:C.muted}}>טרם התחיל</Text>}
+            {u.note&&<Text style={{textAlign:'right',fontSize:11,color:C.orange,marginTop:6}}>📝 {u.note}</Text>}
+          </Card>
+        </TouchableOpacity>;
+      })}
+    </ScrollView>
+    {/* User detail sheet */}
+    {sel&&<View style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'rgba(0,0,0,0.55)',justifyContent:'flex-end'}}>
+      <View style={{backgroundColor:C.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:'92%'}}>
+        <View style={{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',padding:16,borderBottomWidth:1,borderBottomColor:C.border}}>
+          <TouchableOpacity onPress={()=>setSelected(null)}><Icon name="close" size={22} color={C.muted}/></TouchableOpacity>
+          <Row style={{flex:0,gap:8}}>
+            <View style={{width:36,height:36,borderRadius:18,backgroundColor:C.primary+'20',alignItems:'center',justifyContent:'center'}}>
+              <Text style={{fontSize:16,fontWeight:'900',color:C.primary}}>{sel.name.charAt(0)}</Text>
+            </View>
+            <Text style={{fontWeight:'800',fontSize:17}}>{sel.name}</Text>
+          </Row>
         </View>
-        <ScrollView contentContainerStyle={{padding:16}}>
-          <Row style={{gap:8,marginBottom:12,flexWrap:'wrap'}}>
-            <Pill label={`@${u.username}`} color={C.primary}/>
-            <Pill label={`נרשם: ${new Date(u.createdAt).toLocaleDateString('he-IL')}`} color={C.muted}/>
-            {u.blocked&&<Pill label="חסום" color={C.danger}/>}
+        <ScrollView contentContainerStyle={{padding:16}} keyboardShouldPersistTaps="handled">
+          {/* Tags */}
+          <Row style={{gap:6,marginBottom:12,flexWrap:'wrap'}}>
+            <Pill label={`@${sel.username}`} color={C.primary}/>
+            <Pill label={new Date(sel.createdAt).toLocaleDateString('he-IL')} color={C.muted}/>
+            {sel.blocked&&<Pill label="חסום" color={C.danger}/>}
+            {(gsData.groups||[]).find(g=>g.id===sel.group)&&<Pill label={(gsData.groups||[]).find(g=>g.id===sel.group)?.name} color={C.cyan}/>}
           </Row>
+          {/* Stats */}
+          {(()=>{const p=sel.prog||INIT_PROG,ov=pct(p.totalCorrect,p.totalAnswered);return(
           <Row style={{gap:8,marginBottom:12}}>
-            {[{v:p.totalAnswered||0,l:'שאלות',c:C.primary},{v:`${overall}%`,l:'הצלחה',c:overall>=70?C.success:C.warning},{v:p.streakDays||0,l:'רצף',c:C.orange}]
-              .map(s=><Card key={s.l} style={{flex:1,alignItems:'center',padding:10,marginBottom:0}}>
-                <Text style={{fontSize:18,fontWeight:'900',color:s.c}}>{s.v}</Text>
-                <Text style={{fontSize:11,color:C.muted}}>{s.l}</Text>
+            {[{v:p.totalAnswered||0,l:'שאלות',c:C.primary},{v:`${ov}%`,l:'ציון',c:ov>=70?C.success:C.warning},{v:p.streakDays||0,l:'רצף',c:C.orange},{v:(p.quizHistory||[]).filter(h=>h.pass).length,l:'עברו',c:C.success}]
+              .map(s=><Card key={s.l} style={{flex:1,alignItems:'center',padding:9,marginBottom:0}}>
+                <Text style={{fontSize:16,fontWeight:'900',color:s.c}}>{s.v}</Text>
+                <Text style={{fontSize:10,color:C.muted}}>{s.l}</Text>
               </Card>)}
-          </Row>
+          </Row>)})()}
+          {/* Edit name/username */}
+          <Sec title="עריכת פרטים"/>
+          <Card style={{marginBottom:8}}>
+            {[{v:editName||sel.name,s:setEditName,ph:'שם מלא',lbl:'שם'},{v:editUser||sel.username,s:setEditUser,ph:'username',lbl:'שם משתמש'}].map(({v,s,ph,lbl})=>(
+              <View key={lbl} style={{marginBottom:8}}>
+                <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:4}}>{lbl}</Text>
+                <TextInput style={S.inp} value={editName===''&&lbl==='שם'?sel.name:editUser===''&&lbl==='שם משתמש'?sel.username:v}
+                  onChangeText={s} placeholder={ph} placeholderTextColor={C.muted} textAlign="right" autoCapitalize="none"/>
+              </View>
+            ))}
+            <TouchableOpacity style={[S.btn,{marginTop:4,marginBottom:0}]} onPress={()=>saveEdit(sel.id)}>
+              <Icon name="save-outline" size={16} color="#fff"/><Text style={[S.btnTxt,{marginRight:6,fontSize:14}]}>שמור שינויים</Text>
+            </TouchableOpacity>
+          </Card>
+          {/* Note */}
+          <Sec title="הערת מנהל"/>
+          <Card style={{marginBottom:8}}>
+            <TextInput style={[S.inp,{height:60,textAlignVertical:'top',marginBottom:8}]}
+              value={noteEdit||sel.note||''} onChangeText={setNoteEdit}
+              placeholder="הוסף הערה על הסטודנט..." placeholderTextColor={C.muted} textAlign="right" multiline/>
+            <TouchableOpacity style={[S.outBtn,{borderColor:C.primary+'50'}]} onPress={()=>{saveNote(sel.id,noteEdit||sel.note||'');Alert.alert('✓','הערה נשמרה');}}>
+              <Icon name="document-text-outline" size={15} color={C.primary}/><Text style={{color:C.primary,fontWeight:'700',marginRight:6}}>שמור הערה</Text>
+            </TouchableOpacity>
+          </Card>
+          {/* Topic progress */}
           <Sec title="לפי נושא"/>
-          {TOPICS.map(t=>{const tp=p.topicProgress?.[t.id],p2=tp?pct(tp.correct,tp.answered):0;return(
+          {TOPICS.map(t=>{const tp=(sel.prog||INIT_PROG).topicProgress?.[t.id],p2=tp?pct(tp.correct,tp.answered):0;return(
             <Card key={t.id} style={{marginBottom:6}}>
               <Row style={{justifyContent:'space-between',marginBottom:4}}>
-                <Text style={{fontSize:12,color:p2>=70?C.success:p2>0?C.warning:C.muted}}>{tp?`${p2}%`:'טרם התחיל'}</Text>
+                <Text style={{fontSize:12,color:p2>=70?C.success:p2>0?C.warning:C.muted}}>{tp?`${p2}% (${tp.correct}/${tp.answered})`:'טרם התחיל'}</Text>
                 <Row style={{flex:0,gap:4}}><Text style={{fontSize:14}}>{t.icon}</Text><Text style={{fontWeight:'700',fontSize:13}}>{t.name}</Text></Row>
               </Row>
               {tp&&<Bar value={p2} total={100} color={t.color} h={4}/>}
-            </Card>);
-          })}
-          {(p.quizHistory||[]).length>0&&<><Sec title="5 בחינות אחרונות"/>
-            {(p.quizHistory||[]).slice(0,5).map((h,i)=>{const t=h.topic?topicById(h.topic):null;return(
+            </Card>);})}
+          {/* Last quizzes */}
+          {((sel.prog||INIT_PROG).quizHistory||[]).length>0&&<>
+            <Sec title="בחינות אחרונות"/>
+            {((sel.prog||INIT_PROG).quizHistory||[]).slice(0,6).map((h,i)=>{const t=h.topic?topicById(h.topic):null;return(
               <Card key={i} style={{marginBottom:6}}>
                 <Row style={{justifyContent:'space-between'}}>
-                  <Row style={{flex:0,gap:4}}><Text style={{fontSize:11,color:C.muted}}>{new Date(h.date).toLocaleDateString('he-IL')}</Text>
-                    <Pill label={`${h.base}%`} color={h.pass?C.success:C.danger} small/></Row>
+                  <Row style={{flex:0,gap:6}}>
+                    <Text style={{fontSize:11,color:C.muted}}>{new Date(h.date).toLocaleDateString('he-IL')}</Text>
+                    <Pill label={`${h.base}%`} color={h.pass?C.success:C.danger} small/>
+                  </Row>
                   <Text style={{fontWeight:'700',fontSize:13}}>{t?`${t.icon} ${t.name}`:'🔲 כולם'}</Text>
                 </Row>
                 <Text style={{textAlign:'right',fontSize:11,color:C.muted,marginTop:3}}>{h.score}/{h.total} • {fmtTime(h.secs)}</Text>
               </Card>);})}
           </>}
+          {/* Group assignment */}
+          {(gsData.groups||[]).length>0&&<>
+            <Sec title="קבוצה"/>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:8}}>
+              <TouchableOpacity style={[S.cntBtn,!sel.group&&S.cntBtnOn,{paddingHorizontal:10,paddingVertical:6}]}
+                onPress={()=>setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===sel.id?{...u,group:null}:u)}))}>
+                <Text style={[{fontSize:12,fontWeight:'700',color:C.text},!sel.group&&{color:'#fff'}]}>ללא</Text>
+              </TouchableOpacity>
+              {(gsData.groups||[]).map(g=>(
+                <TouchableOpacity key={g.id} style={[S.cntBtn,sel.group===g.id&&{backgroundColor:g.color,borderColor:g.color},{paddingHorizontal:10,paddingVertical:6}]}
+                  onPress={()=>setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===sel.id?{...u,group:g.id}:u)}))}>
+                  <Text style={{fontSize:12,fontWeight:'700',color:sel.group===g.id?'#fff':C.text}}>{g.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>}
+          {/* Actions */}
           <Sec title="פעולות"/>
-          <TouchableOpacity style={[S.outBtn,{marginBottom:10,borderColor:(u.blocked?C.success:C.warning)+'60'}]}
-            onPress={()=>{toggleBlock(u.id);setSelectedUser(prev=>({...prev,blocked:!prev.blocked}));}}>
-            <Icon name={u.blocked?'checkmark-circle-outline':'ban-outline'} size={16} color={u.blocked?C.success:C.warning}/>
-            <Text style={{color:u.blocked?C.success:C.warning,fontWeight:'700',marginRight:6}}>{u.blocked?'בטל חסימה':'חסום משתמש'}</Text>
+          <TouchableOpacity style={[S.outBtn,{marginBottom:8,borderColor:(sel.blocked?C.success:C.warning)+'60'}]}
+            onPress={()=>{toggleBlock(sel.id);setSelected(prev=>({...prev,blocked:!prev.blocked}));}}>
+            <Icon name={sel.blocked?'checkmark-circle-outline':'ban-outline'} size={16} color={sel.blocked?C.success:C.warning}/>
+            <Text style={{color:sel.blocked?C.success:C.warning,fontWeight:'700',marginRight:6}}>{sel.blocked?'בטל חסימה':'חסום משתמש'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[S.outBtn,{marginBottom:10,borderColor:C.orange+'60'}]} onPress={()=>resetProg(u.id)}>
-            <Icon name="refresh-circle-outline" size={16} color={C.orange}/>
-            <Text style={{color:C.orange,fontWeight:'700',marginRight:6}}>איפוס התקדמות</Text>
+          <TouchableOpacity style={[S.outBtn,{marginBottom:8,borderColor:C.orange+'60'}]} onPress={()=>resetProg(sel.id)}>
+            <Icon name="refresh-circle-outline" size={16} color={C.orange}/><Text style={{color:C.orange,fontWeight:'700',marginRight:6}}>איפוס התקדמות</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[S.outBtn,{borderColor:C.danger+'60'}]} onPress={()=>{setSelectedUser(null);deleteUser(u.id);}}>
-            <Icon name="trash-outline" size={16} color={C.danger}/>
-            <Text style={{color:C.danger,fontWeight:'700',marginRight:6}}>מחק משתמש</Text>
+          <TouchableOpacity style={[S.outBtn,{borderColor:C.danger+'60'}]} onPress={()=>{setSelected(null);deleteUser(sel.id);}}>
+            <Icon name="trash-outline" size={16} color={C.danger}/><Text style={{color:C.danger,fontWeight:'700',marginRight:6}}>מחק משתמש</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
-    </View>;
-  })():null;
-
-  return <View style={{flex:1}}>
-    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
-      <Text style={S.pgTitle}>ניהול משתמשים 👥</Text>
-      <TextInput style={[S.inp,{marginBottom:10}]} value={search} onChangeText={setSearch}
-        placeholder="🔍 חיפוש לפי שם..." placeholderTextColor={C.muted} textAlign="right"/>
-      <Row style={{gap:8,marginBottom:14}}>
-        {[['all','הכל'],['active','פעילים'],['blocked','חסומים']].map(([v,l])=>(
-          <TouchableOpacity key={v} style={[S.cntBtn,filter===v&&S.cntBtnOn,{flex:1}]} onPress={()=>setFilter(v)}>
-            <Text style={[S.cntTxt,filter===v&&{color:'#fff'}]}>{l}</Text>
-          </TouchableOpacity>
-        ))}
-      </Row>
-      {filtered.length===0&&<Card><Text style={{textAlign:'center',color:C.muted}}>אין משתמשים</Text></Card>}
-      {filtered.map(u=>{
-        const p=u.prog,score=p?pct(p.totalCorrect,p.totalAnswered):0;
-        return <Card key={u.id} style={{marginBottom:10}}>
-          <Row style={{justifyContent:'space-between',marginBottom:8}}>
-            <Row style={{flex:0,gap:6}}>{u.blocked&&<Pill label="חסום" color={C.danger} small/>}
-              <Text style={{fontSize:11,color:C.muted}}>{new Date(u.createdAt).toLocaleDateString('he-IL')}</Text></Row>
-            <Col style={{alignItems:'flex-end'}}>
-              <Text style={{fontWeight:'800',fontSize:15}}>{u.name}</Text>
-              <Text style={{fontSize:11,color:C.muted}}>@{u.username}</Text>
-            </Col>
-          </Row>
-          {p&&p.totalAnswered>0&&<><Row style={{justifyContent:'space-between',marginBottom:4}}>
-            <Text style={{fontSize:12,color:score>=70?C.success:C.warning,fontWeight:'700'}}>{score}%</Text>
-            <Text style={{fontSize:12,color:C.muted}}>{p.totalAnswered} שאלות • 🔥{p.streakDays||0}</Text>
-          </Row><Bar value={score} total={100} color={score>=70?C.success:C.warning} h={4}/></>}
-          <Row style={{gap:8,marginTop:10}}>
-            {[{l:'פרטים',c:C.primary,fn:()=>setSelectedUser(u)},
-              {l:u.blocked?'בטל חסימה':'חסום',c:u.blocked?C.success:C.warning,fn:()=>toggleBlock(u.id)},
-              {l:'מחק',c:C.danger,fn:()=>deleteUser(u.id)}].map(a=>(
-              <TouchableOpacity key={a.l} style={{flex:1,backgroundColor:a.c+'15',borderRadius:10,paddingVertical:8,alignItems:'center'}} onPress={a.fn}>
-                <Text style={{fontSize:12,fontWeight:'700',color:a.c}}>{a.l}</Text>
-              </TouchableOpacity>
-            ))}
-          </Row>
-        </Card>;
-      })}
-    </ScrollView>
-    {DetailOverlay}
+    </View>}
   </View>;
 }
 
@@ -1385,7 +1626,11 @@ function AdminUsers({gsData,setGsData}) {
 function AdminQuestions({gsData,setGsData}) {
   const [tab,setTab]=useState('base');
   const [filterTopic,setFilterTopic]=useState(null);
+  const [filterDiff,setFilterDiff]=useState(null);
+  const [filterType,setFilterType]=useState(null);
   const [editingId,setEditingId]=useState(null);
+  const [previewQ,setPreviewQ]=useState(null);
+  const [search,setSearch]=useState('');
   const EMPTY={topic:'networking',diff:'intermediate',type:'mc',q:'',opts:['','','',''],a:0,exp:''};
   const [form,setForm]=useState(EMPTY);
 
@@ -1401,119 +1646,254 @@ function AdminQuestions({gsData,setGsData}) {
   }
   function delQ(id){Alert.alert('מחיקה','למחוק שאלה זו?',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>setGsData(gd=>({...gd,customQs:gd.customQs.filter(q=>q.id!==id)}))}]);}
   function editQ(q){setForm({topic:q.topic,diff:q.diff,type:q.type||'mc',q:q.q,opts:[...q.opts],a:q.a,exp:q.exp});setEditingId(q.id);setTab('add');}
+  function dupQ(q){setForm({topic:q.topic,diff:q.diff,type:q.type||'mc',q:q.q+' (עותק)',opts:[...q.opts],a:q.a,exp:q.exp});setEditingId(null);setTab('add');}
 
-  const baseFiltered=QS.filter(q=>!filterTopic||q.topic===filterTopic);
-  const customFiltered=gsData.customQs.filter(q=>!filterTopic||q.topic===filterTopic);
+  function applyFilters(list){
+    return list.filter(q=>{
+      if(filterTopic&&q.topic!==filterTopic)return false;
+      if(filterDiff&&q.diff!==filterDiff)return false;
+      if(filterType&&q.type!==filterType)return false;
+      if(search&&!q.q.includes(search)&&!q.opts.some(o=>o.includes(search)))return false;
+      return true;
+    });
+  }
+  const baseFiltered=applyFilters(QS);
+  const customFiltered=applyFilters(gsData.customQs);
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
-    <Text style={S.pgTitle}>מנהל שאלות ❓</Text>
-    <Row style={{gap:8,marginBottom:12}}>
-      {[['base',`בסיס (${QS.length})`],['custom',`מותאמות (${gsData.customQs.length})`],['add',editingId?'עריכה':'הוסף']].map(([v,l])=>(
-        <TouchableOpacity key={v} style={[S.cntBtn,tab===v&&S.cntBtnOn,{flex:1,paddingHorizontal:4}]} onPress={()=>setTab(v)}>
-          <Text style={[{fontSize:11,fontWeight:'700',color:C.text,textAlign:'center'},tab===v&&{color:'#fff'}]}>{l}</Text>
-        </TouchableOpacity>
-      ))}
-    </Row>
-    {tab!=='add'&&<ScrollView horizontal showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:10}}>
-      <TouchableOpacity style={[S.cntBtn,!filterTopic&&S.cntBtnOn,{paddingHorizontal:14,paddingVertical:7}]} onPress={()=>setFilterTopic(null)}>
-        <Text style={[S.cntTxt,!filterTopic&&{color:'#fff'},{fontSize:12}]}>הכל</Text>
-      </TouchableOpacity>
-      {TOPICS.map(t=>(
-        <TouchableOpacity key={t.id} style={[S.cntBtn,filterTopic===t.id&&S.cntBtnOn,{paddingHorizontal:10,paddingVertical:7}]}
-          onPress={()=>setFilterTopic(filterTopic===t.id?null:t.id)}>
-          <Text style={[S.cntTxt,filterTopic===t.id&&{color:'#fff'},{fontSize:12}]}>{t.icon}</Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>}
+  const letters=['א','ב','ג','ד'];
+  const typeLabel={mc:'MC',reading:'קריאה',restatement:'שקילות'};
 
-    {tab==='base'&&baseFiltered.map(q=>{const t=topicById(q.topic);return(
-      <Card key={q.id} style={{marginBottom:8}}>
-        <Row style={{justifyContent:'space-between',marginBottom:6}}>
-          <Row style={{flex:0,gap:4}}><Pill label={DIFF_LABEL[q.diff]} color={DIFF_COLOR[q.diff]} small/>
-            <Pill label={q.type==='mc'?'MC':q.type==='reading'?'קריאה':'שקילות'} color={C.cyan} small/></Row>
-          <Row style={{flex:0,gap:4}}><Text style={{fontSize:12,color:C.muted}}>{t?.name}</Text><Text style={{fontSize:16}}>{t?.icon}</Text></Row>
+  return <View style={{flex:1}}>
+    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
+      {/* Stats bar */}
+      <Row style={{gap:8,marginBottom:8}}>
+        {[{v:QS.length,l:'בסיס',c:C.cyan},{v:gsData.customQs.length,l:'מותאמות',c:C.orange},
+          {v:QS.length+gsData.customQs.length,l:'סה"כ',c:C.primary},
+          {v:TOPICS.length,l:'נושאים',c:C.purple}].map(s=>(
+          <Card key={s.l} style={{flex:1,alignItems:'center',padding:9,marginBottom:0}}>
+            <Text style={{fontSize:16,fontWeight:'900',color:s.c}}>{s.v}</Text>
+            <Text style={{fontSize:10,color:C.muted}}>{s.l}</Text>
+          </Card>))}
+      </Row>
+      {/* Tabs */}
+      <Row style={{gap:8,marginBottom:10}}>
+        {[['base',`בסיס (${QS.length})`],['custom',`מותאמות (${gsData.customQs.length})`],['add',editingId?'✏️ עריכה':'➕ הוסף']].map(([v,l])=>(
+          <TouchableOpacity key={v} style={[S.cntBtn,tab===v&&S.cntBtnOn,{flex:1,paddingHorizontal:4}]} onPress={()=>setTab(v)}>
+            <Text style={[{fontSize:11,fontWeight:'700',color:C.text,textAlign:'center'},tab===v&&{color:'#fff'}]}>{l}</Text>
+          </TouchableOpacity>
+        ))}
+      </Row>
+      {tab!=='add'&&<>
+        <TextInput style={[S.inp,{marginBottom:8}]} value={search} onChangeText={setSearch}
+          placeholder="🔍 חיפוש בשאלות..." placeholderTextColor={C.muted} textAlign="right"/>
+        {/* Topic filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:6}}>
+          <TouchableOpacity style={[S.cntBtn,!filterTopic&&S.cntBtnOn,{paddingHorizontal:12,paddingVertical:6}]} onPress={()=>setFilterTopic(null)}>
+            <Text style={[S.cntTxt,!filterTopic&&{color:'#fff'},{fontSize:12}]}>כל הנושאים</Text>
+          </TouchableOpacity>
+          {TOPICS.map(t=>(
+            <TouchableOpacity key={t.id} style={[S.cntBtn,filterTopic===t.id&&{backgroundColor:t.color,borderColor:t.color},{paddingHorizontal:10,paddingVertical:6}]}
+              onPress={()=>setFilterTopic(filterTopic===t.id?null:t.id)}>
+              <Text style={{fontSize:13,color:filterTopic===t.id?'#fff':C.text}}>{t.icon}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        {/* Diff + type filter */}
+        <Row style={{gap:6,marginBottom:10}}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:5}}>
+            {[null,'beginner','intermediate','advanced','expert'].map(d=>(
+              <TouchableOpacity key={d||'all'} style={[S.cntBtn,filterDiff===d&&(d?{backgroundColor:DIFF_COLOR[d],borderColor:DIFF_COLOR[d]}:S.cntBtnOn),{paddingHorizontal:10,paddingVertical:6}]}
+                onPress={()=>setFilterDiff(d)}>
+                <Text style={{fontSize:11,fontWeight:'700',color:filterDiff===d?'#fff':C.text}}>{d?DIFF_LABEL[d]:'הכל'}</Text>
+              </TouchableOpacity>
+            ))}
+            {[null,'mc','reading','restatement'].map(tp=>(
+              <TouchableOpacity key={tp||'alltype'} style={[S.cntBtn,filterType===tp&&S.cntBtnOn,{paddingHorizontal:10,paddingVertical:6}]}
+                onPress={()=>setFilterType(tp)}>
+                <Text style={{fontSize:11,fontWeight:'700',color:filterType===tp?'#fff':C.text}}>{tp?typeLabel[tp]:'כל סוג'}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </Row>
-        <Text style={{textAlign:'right',fontSize:13,fontWeight:'600',marginBottom:4}} numberOfLines={2}>{q.q}</Text>
-        <Text style={{textAlign:'right',fontSize:11,color:C.success}}>✓ {q.opts[q.a]}</Text>
-      </Card>);})}
+      </>}
 
-    {tab==='custom'&&<>
-      {customFiltered.length===0&&<Card style={{alignItems:'center',padding:24}}>
-        <Text style={{fontSize:32,marginBottom:8}}>📝</Text>
-        <Text style={{color:C.muted}}>אין שאלות מותאמות עדיין</Text>
+      {tab==='base'&&<>
+        <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:8}}>{baseFiltered.length} שאלות</Text>
+        {baseFiltered.map(q=>{const t=topicById(q.topic);return(
+          <Card key={q.id} style={{marginBottom:8}}>
+            <Row style={{justifyContent:'space-between',marginBottom:6}}>
+              <Row style={{flex:0,gap:4}}>
+                <Pill label={DIFF_LABEL[q.diff]} color={DIFF_COLOR[q.diff]} small/>
+                <Pill label={typeLabel[q.type]||'MC'} color={C.cyan} small/>
+              </Row>
+              <Row style={{flex:0,gap:6}}>
+                <Text style={{fontSize:12,color:C.muted}}>{t?.name}</Text>
+                <Text style={{fontSize:16}}>{t?.icon}</Text>
+              </Row>
+            </Row>
+            <Text style={{textAlign:'right',fontSize:13,fontWeight:'600',marginBottom:4}} numberOfLines={2}>{q.q}</Text>
+            <Row style={{justifyContent:'space-between',marginTop:4}}>
+              <TouchableOpacity style={{backgroundColor:C.orange+'18',borderRadius:8,paddingHorizontal:10,paddingVertical:6,flexDirection:'row-reverse',alignItems:'center',gap:4}} onPress={()=>dupQ(q)}>
+                <Icon name="copy-outline" size={13} color={C.orange}/>
+                <Text style={{fontSize:11,fontWeight:'700',color:C.orange}}>שכפל</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{backgroundColor:C.primary+'15',borderRadius:8,paddingHorizontal:10,paddingVertical:6,flexDirection:'row-reverse',alignItems:'center',gap:4}} onPress={()=>setPreviewQ(q)}>
+                <Icon name="eye-outline" size={13} color={C.primary}/>
+                <Text style={{fontSize:11,fontWeight:'700',color:C.primary}}>תצוגה</Text>
+              </TouchableOpacity>
+            </Row>
+          </Card>);})}
+      </>}
+
+      {tab==='custom'&&<>
+        <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:8}}>{customFiltered.length} שאלות</Text>
+        {customFiltered.length===0&&<Card style={{alignItems:'center',padding:24}}>
+          <Text style={{fontSize:32,marginBottom:8}}>📝</Text>
+          <Text style={{color:C.muted}}>אין שאלות מותאמות עדיין</Text>
+          <TouchableOpacity style={[S.btn,{marginTop:12,marginBottom:0,paddingHorizontal:20}]} onPress={()=>setTab('add')}>
+            <Icon name="add" size={16} color="#fff"/><Text style={[S.btnTxt,{marginRight:6,fontSize:14}]}>הוסף שאלה</Text>
+          </TouchableOpacity>
+        </Card>}
+        {customFiltered.map(q=>{const t=topicById(q.topic);return(
+          <Card key={q.id} style={{marginBottom:8}}>
+            <Row style={{justifyContent:'space-between',marginBottom:6}}>
+              <Row style={{flex:0,gap:4}}>
+                <Pill label={DIFF_LABEL[q.diff]} color={DIFF_COLOR[q.diff]} small/>
+                <Pill label="מותאם" color={C.orange} small/>
+                <Pill label={typeLabel[q.type]||'MC'} color={C.cyan} small/>
+              </Row>
+              <Row style={{flex:0,gap:4}}><Text style={{fontSize:12,color:C.muted}}>{t?.name}</Text><Text style={{fontSize:16}}>{t?.icon}</Text></Row>
+            </Row>
+            <Text style={{textAlign:'right',fontSize:13,fontWeight:'600',marginBottom:4}} numberOfLines={2}>{q.q}</Text>
+            <Text style={{textAlign:'right',fontSize:11,color:C.success,marginBottom:8}}>✓ {q.opts[q.a]}</Text>
+            <Row style={{gap:6}}>
+              {[{l:'תצוגה',c:C.primary,i:'eye-outline',fn:()=>setPreviewQ(q)},
+                {l:'שכפל',c:C.orange,i:'copy-outline',fn:()=>dupQ(q)},
+                {l:'עריכה',c:C.cyan,i:'create-outline',fn:()=>editQ(q)},
+                {l:'מחק',c:C.danger,i:'trash-outline',fn:()=>delQ(q.id)}].map(a=>(
+                <TouchableOpacity key={a.l} style={{flex:1,backgroundColor:a.c+'15',borderRadius:8,paddingVertical:7,alignItems:'center',flexDirection:'row-reverse',justifyContent:'center',gap:3}} onPress={a.fn}>
+                  <Icon name={a.i} size={12} color={a.c}/>
+                  <Text style={{fontSize:11,fontWeight:'700',color:a.c}}>{a.l}</Text>
+                </TouchableOpacity>
+              ))}
+            </Row>
+          </Card>);})}
+      </>}
+
+      {tab==='add'&&<Card>
+        <Text style={{textAlign:'right',fontWeight:'700',fontSize:16,marginBottom:14,color:C.primary}}>{editingId?'✏️ עריכת שאלה':'➕ שאלה חדשה'}</Text>
+        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>נושא</Text>
+        <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:6,marginBottom:12}}>
+          {TOPICS.map(t=>(
+            <TouchableOpacity key={t.id} onPress={()=>setForm(f=>({...f,topic:t.id}))}
+              style={{backgroundColor:form.topic===t.id?t.color:C.fill,borderRadius:8,paddingHorizontal:10,paddingVertical:6,borderWidth:1,borderColor:form.topic===t.id?t.color:C.border}}>
+              <Text style={{fontSize:12,fontWeight:'700',color:form.topic===t.id?'#fff':C.text}}>{t.icon} {t.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>רמת קושי</Text>
+        <Row style={{gap:6,marginBottom:12}}>
+          {['beginner','intermediate','advanced','expert'].map(d=>(
+            <TouchableOpacity key={d} onPress={()=>setForm(f=>({...f,diff:d}))}
+              style={[S.cntBtn,form.diff===d&&{backgroundColor:DIFF_COLOR[d],borderColor:DIFF_COLOR[d]},{flex:1,paddingVertical:8}]}>
+              <Text style={{fontSize:11,fontWeight:'700',color:form.diff===d?'#fff':C.text}}>{DIFF_LABEL[d]}</Text>
+            </TouchableOpacity>
+          ))}
+        </Row>
+        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>סוג שאלה</Text>
+        <Row style={{gap:8,marginBottom:12}}>
+          {[['mc','רב-ברירה'],['reading','קריאה'],['restatement','שקילות']].map(([v,l])=>(
+            <TouchableOpacity key={v} style={[S.cntBtn,form.type===v&&S.cntBtnOn,{flex:1}]} onPress={()=>setForm(f=>({...f,type:v}))}>
+              <Text style={[S.cntTxt,form.type===v&&{color:'#fff'},{fontSize:11}]}>{l}</Text>
+            </TouchableOpacity>
+          ))}
+        </Row>
+        {form.type==='reading'&&<>
+          <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>קטע קריאה</Text>
+          <TextInput style={[S.inp,{height:90,textAlignVertical:'top',marginBottom:12}]}
+            value={form.passage||''} onChangeText={v=>setForm(f=>({...f,passage:v}))}
+            placeholder="הכנס את קטע הקריאה..." placeholderTextColor={C.muted} textAlign="right" multiline/>
+        </>}
+        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>שאלה</Text>
+        <TextInput style={[S.inp,{height:80,textAlignVertical:'top',marginBottom:12}]}
+          value={form.q} onChangeText={v=>setForm(f=>({...f,q:v}))}
+          placeholder="הכנס את השאלה..." placeholderTextColor={C.muted} textAlign="right" multiline/>
+        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>תשובות — לחץ על האות לסימון הנכונה</Text>
+        {form.opts.map((opt,i)=>(
+          <View key={i} style={{flexDirection:'row-reverse',alignItems:'center',marginBottom:8,gap:8}}>
+            <TouchableOpacity onPress={()=>setForm(f=>({...f,a:i}))}
+              style={{width:34,height:34,borderRadius:17,backgroundColor:form.a===i?C.success:C.fill,borderWidth:2,borderColor:form.a===i?C.success:C.border,alignItems:'center',justifyContent:'center'}}>
+              <Text style={{fontWeight:'800',color:form.a===i?'#fff':C.muted,fontSize:13}}>{letters[i]}</Text>
+            </TouchableOpacity>
+            <TextInput style={[S.inp,{flex:1,marginBottom:0,paddingVertical:10}]}
+              value={opt} onChangeText={v=>setForm(f=>({...f,opts:f.opts.map((o,j)=>j===i?v:o)}))}
+              placeholder={`אפשרות ${letters[i]}...`} placeholderTextColor={C.muted} textAlign="right"/>
+          </View>
+        ))}
+        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>הסבר</Text>
+        <TextInput style={[S.inp,{height:70,textAlignVertical:'top',marginBottom:16}]}
+          value={form.exp} onChangeText={v=>setForm(f=>({...f,exp:v}))}
+          placeholder="הסבר לתשובה הנכונה..." placeholderTextColor={C.muted} textAlign="right" multiline/>
+        {/* live preview */}
+        {form.q.trim()&&<>
+          <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>תצוגה מקדימה</Text>
+          <Card style={{backgroundColor:'#eff6ff',borderWidth:1,borderColor:C.primary+'40',marginBottom:14}}>
+            <Text style={{textAlign:'right',fontSize:15,fontWeight:'700',color:C.text,marginBottom:8}}>{form.q}</Text>
+            {form.opts.map((o,i)=><View key={i} style={{flexDirection:'row-reverse',alignItems:'center',gap:8,marginBottom:5,backgroundColor:form.a===i?C.success+'15':C.fill,borderRadius:8,padding:8}}>
+              <View style={{width:24,height:24,borderRadius:12,backgroundColor:form.a===i?C.success:C.border,alignItems:'center',justifyContent:'center'}}>
+                <Text style={{fontSize:11,fontWeight:'800',color:form.a===i?'#fff':C.muted}}>{letters[i]}</Text>
+              </View>
+              <Text style={{flex:1,textAlign:'right',fontSize:13,color:C.text}}>{o||`אפשרות ${letters[i]}`}</Text>
+            </View>)}
+          </Card>
+        </>}
+        <Row style={{gap:10}}>
+          <TouchableOpacity style={[S.outBtn,{flex:1,borderColor:C.border}]} onPress={()=>{setForm(EMPTY);setEditingId(null);setTab('custom');}}>
+            <Text style={{color:C.muted,fontWeight:'700'}}>ביטול</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[S.btn,{flex:2,marginBottom:0}]} onPress={saveQ}>
+            <Icon name="save-outline" size={16} color="#fff"/>
+            <Text style={[S.btnTxt,{marginRight:8}]}>{editingId?'עדכן':'שמור שאלה'}</Text>
+          </TouchableOpacity>
+        </Row>
       </Card>}
-      {customFiltered.map(q=>{const t=topicById(q.topic);return(
-        <Card key={q.id} style={{marginBottom:8}}>
-          <Row style={{justifyContent:'space-between',marginBottom:6}}>
-            <Row style={{flex:0,gap:4}}><Pill label={DIFF_LABEL[q.diff]} color={DIFF_COLOR[q.diff]} small/><Pill label="מותאם" color={C.orange} small/></Row>
-            <Row style={{flex:0,gap:4}}><Text style={{fontSize:12,color:C.muted}}>{t?.name}</Text><Text style={{fontSize:16}}>{t?.icon}</Text></Row>
+    </ScrollView>
+    {/* Preview modal */}
+    {previewQ&&<View style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'rgba(0,0,0,0.55)',justifyContent:'flex-end'}}>
+      <View style={{backgroundColor:C.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:'80%'}}>
+        <Row style={{justifyContent:'space-between',padding:16,borderBottomWidth:1,borderBottomColor:C.border}}>
+          <TouchableOpacity onPress={()=>setPreviewQ(null)}><Icon name="close" size={22} color={C.muted}/></TouchableOpacity>
+          <Text style={{fontWeight:'800',fontSize:16}}>תצוגה מקדימה</Text>
+        </Row>
+        <ScrollView contentContainerStyle={{padding:16}}>
+          <Row style={{gap:6,marginBottom:10}}>
+            <Pill label={DIFF_LABEL[previewQ.diff]} color={DIFF_COLOR[previewQ.diff]} small/>
+            <Pill label={typeLabel[previewQ.type]||'MC'} color={C.cyan} small/>
+            {previewQ.custom&&<Pill label="מותאם" color={C.orange} small/>}
+            <Text style={{fontSize:12,color:C.muted}}>{topicById(previewQ.topic)?.icon} {topicById(previewQ.topic)?.name}</Text>
           </Row>
-          <Text style={{textAlign:'right',fontSize:13,fontWeight:'600',marginBottom:4}} numberOfLines={2}>{q.q}</Text>
-          <Text style={{textAlign:'right',fontSize:11,color:C.success,marginBottom:8}}>✓ {q.opts[q.a]}</Text>
-          <Row style={{gap:8}}>
-            <TouchableOpacity style={{flex:1,backgroundColor:C.primary+'15',borderRadius:8,paddingVertical:7,alignItems:'center'}} onPress={()=>editQ(q)}>
-              <Text style={{fontSize:12,fontWeight:'700',color:C.primary}}>עריכה</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={{flex:1,backgroundColor:C.danger+'15',borderRadius:8,paddingVertical:7,alignItems:'center'}} onPress={()=>delQ(q.id)}>
-              <Text style={{fontSize:12,fontWeight:'700',color:C.danger}}>מחק</Text>
-            </TouchableOpacity>
-          </Row>
-        </Card>);})}
-    </>}
-
-    {tab==='add'&&<Card>
-      <Text style={{textAlign:'right',fontWeight:'700',fontSize:16,marginBottom:14,color:C.primary}}>{editingId?'✏️ עריכת שאלה':'➕ שאלה חדשה'}</Text>
-      <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>נושא</Text>
-      <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:6,marginBottom:12}}>
-        {TOPICS.map(t=>(
-          <TouchableOpacity key={t.id} onPress={()=>setForm(f=>({...f,topic:t.id}))}
-            style={{backgroundColor:form.topic===t.id?t.color:C.fill,borderRadius:8,paddingHorizontal:10,paddingVertical:6,borderWidth:1,borderColor:form.topic===t.id?t.color:C.border}}>
-            <Text style={{fontSize:12,fontWeight:'700',color:form.topic===t.id?'#fff':C.text}}>{t.icon} {t.name}</Text>
-          </TouchableOpacity>
-        ))}
+          {previewQ.passage&&<Card style={{backgroundColor:'#eff6ff',borderWidth:1,borderColor:C.primary+'30',marginBottom:10}}>
+            <Text style={{textAlign:'right',fontSize:13,color:C.text,lineHeight:20}}>{previewQ.passage}</Text>
+          </Card>}
+          <Text style={{textAlign:'right',fontSize:16,fontWeight:'700',color:C.text,marginBottom:14}}>{previewQ.q}</Text>
+          {previewQ.opts.map((o,i)=>(
+            <View key={i} style={{flexDirection:'row-reverse',alignItems:'center',gap:8,marginBottom:8,
+              backgroundColor:previewQ.a===i?C.success+'18':C.fill,borderRadius:10,padding:10,
+              borderWidth:1.5,borderColor:previewQ.a===i?C.success:C.border}}>
+              <View style={{width:28,height:28,borderRadius:14,backgroundColor:previewQ.a===i?C.success:C.border+'80',alignItems:'center',justifyContent:'center'}}>
+                {previewQ.a===i?<Icon name="checkmark" size={16} color="#fff"/>:<Text style={{fontSize:12,fontWeight:'700',color:C.muted}}>{letters[i]}</Text>}
+              </View>
+              <Text style={{flex:1,textAlign:'right',fontSize:14,color:C.text}}>{o}</Text>
+            </View>
+          ))}
+          {previewQ.exp&&<Card style={{backgroundColor:'#fffbeb',borderWidth:1,borderColor:C.warning+'50',marginTop:8}}>
+            <Row style={{justifyContent:'flex-end',marginBottom:6}}><Text style={{fontWeight:'700',color:C.warning,fontSize:13}}>💡 הסבר</Text></Row>
+            <Text style={{textAlign:'right',fontSize:14,color:C.text,lineHeight:22}}>{previewQ.exp}</Text>
+          </Card>}
+        </ScrollView>
       </View>
-      <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>רמת קושי</Text>
-      <Row style={{gap:6,marginBottom:12}}>
-        {['beginner','intermediate','advanced','expert'].map(d=>(
-          <TouchableOpacity key={d} onPress={()=>setForm(f=>({...f,diff:d}))}
-            style={[S.cntBtn,form.diff===d&&{backgroundColor:DIFF_COLOR[d],borderColor:DIFF_COLOR[d]},{flex:1,paddingVertical:8}]}>
-            <Text style={{fontSize:11,fontWeight:'700',color:form.diff===d?'#fff':C.text}}>{DIFF_LABEL[d]}</Text>
-          </TouchableOpacity>
-        ))}
-      </Row>
-      <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>שאלה</Text>
-      <TextInput style={[S.inp,{height:80,textAlignVertical:'top',marginBottom:12}]}
-        value={form.q} onChangeText={v=>setForm(f=>({...f,q:v}))}
-        placeholder="הכנס את השאלה..." placeholderTextColor={C.muted} textAlign="right" multiline/>
-      <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>תשובות (לחץ על האות לסימון כנכונה)</Text>
-      {form.opts.map((opt,i)=>{
-        const letters=['א','ב','ג','ד'];
-        return <View key={i} style={{flexDirection:'row-reverse',alignItems:'center',marginBottom:8,gap:8}}>
-          <TouchableOpacity onPress={()=>setForm(f=>({...f,a:i}))}
-            style={{width:32,height:32,borderRadius:16,backgroundColor:form.a===i?C.success:C.fill,borderWidth:2,borderColor:form.a===i?C.success:C.border,alignItems:'center',justifyContent:'center'}}>
-            <Text style={{fontWeight:'800',color:form.a===i?'#fff':C.muted,fontSize:13}}>{letters[i]}</Text>
-          </TouchableOpacity>
-          <TextInput style={[S.inp,{flex:1,marginBottom:0,paddingVertical:10}]}
-            value={opt} onChangeText={v=>setForm(f=>({...f,opts:f.opts.map((o,j)=>j===i?v:o)}))}
-            placeholder={`אפשרות ${letters[i]}...`} placeholderTextColor={C.muted} textAlign="right"/>
-        </View>;
-      })}
-      <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>הסבר</Text>
-      <TextInput style={[S.inp,{height:70,textAlignVertical:'top',marginBottom:16}]}
-        value={form.exp} onChangeText={v=>setForm(f=>({...f,exp:v}))}
-        placeholder="הסבר לתשובה הנכונה..." placeholderTextColor={C.muted} textAlign="right" multiline/>
-      <Row style={{gap:10}}>
-        <TouchableOpacity style={[S.outBtn,{flex:1,borderColor:C.border}]} onPress={()=>{setForm(EMPTY);setEditingId(null);setTab('custom');}}>
-          <Text style={{color:C.muted,fontWeight:'700'}}>ביטול</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[S.btn,{flex:2,marginBottom:0}]} onPress={saveQ}>
-          <Icon name="save-outline" size={16} color="#fff"/>
-          <Text style={[S.btnTxt,{marginRight:8}]}>{editingId?'עדכן':'שמור שאלה'}</Text>
-        </TouchableOpacity>
-      </Row>
-    </Card>}
-  </ScrollView>;
+    </View>}
+  </View>;
 }
 
 // ─── ADMIN: ANALYTICS ─────────────────────────────────────────────────────────
@@ -1829,6 +2209,339 @@ function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
   </ScrollView>;
 }
 
+// ─── ADMIN: GROUPS ────────────────────────────────────────────────────────────
+function AdminGroups({gsData,setGsData}) {
+  const [showForm,setShowForm]=useState(false);
+  const [gName,setGName]=useState('');
+  const [gColor,setGColor]=useState(C.primary);
+  const [gDesc,setGDesc]=useState('');
+  const [selectedGroup,setSelectedGroup]=useState(null);
+  const groups=gsData.groups||[];
+  const students=gsData.users.filter(u=>u.role==='student');
+  const GROUP_COLORS=[C.primary,C.success,C.danger,C.purple,C.cyan,C.orange,C.warning,'#ec4899','#14b8a6'];
+
+  function addGroup(){
+    if(!gName.trim()){Alert.alert('שגיאה','הכנס שם לקבוצה');return;}
+    const g={id:Date.now().toString(),name:gName.trim(),color:gColor,desc:gDesc.trim(),createdAt:Date.now()};
+    setGsData(gd=>({...gd,groups:[...(gd.groups||[]),g]}));
+    setGName('');setGColor(C.primary);setGDesc('');setShowForm(false);
+  }
+  function deleteGroup(id){
+    Alert.alert('מחיקת קבוצה','למחוק? הסטודנטים יוסרו מהקבוצה.',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>{
+      setGsData(gd=>({...gd,groups:(gd.groups||[]).filter(g=>g.id!==id),users:gd.users.map(u=>u.group===id?{...u,group:null}:u)}));
+      if(selectedGroup?.id===id)setSelectedGroup(null);
+    }}]);
+  }
+  function moveToGroup(uid,gid){setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===uid?{...u,group:gid}:u)}));}
+
+  return <View style={{flex:1}}>
+    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
+      <Row style={{justifyContent:'space-between',marginBottom:4}}>
+        <TouchableOpacity style={[S.cntBtn,{paddingHorizontal:14,paddingVertical:8},showForm&&S.cntBtnOn]} onPress={()=>setShowForm(s=>!s)}>
+          <Icon name={showForm?'close':'add-circle-outline'} size={16} color={showForm?'#fff':C.text}/>
+        </TouchableOpacity>
+        <Text style={S.pgTitle}>קבוצות 👥</Text>
+      </Row>
+      {showForm&&<Card style={{marginBottom:12}}>
+        <Text style={{textAlign:'right',fontWeight:'700',fontSize:15,color:C.primary,marginBottom:12}}>קבוצה חדשה</Text>
+        <TextInput style={[S.inp,{marginBottom:8}]} value={gName} onChangeText={setGName} placeholder="שם הקבוצה" placeholderTextColor={C.muted} textAlign="right"/>
+        <TextInput style={[S.inp,{marginBottom:10}]} value={gDesc} onChangeText={setGDesc} placeholder="תיאור (אופציונלי)" placeholderTextColor={C.muted} textAlign="right"/>
+        <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:6}}>צבע</Text>
+        <Row style={{gap:8,marginBottom:14,flexWrap:'wrap'}}>
+          {GROUP_COLORS.map(c=>(
+            <TouchableOpacity key={c} onPress={()=>setGColor(c)}
+              style={{width:34,height:34,borderRadius:17,backgroundColor:c,borderWidth:gColor===c?3:0,borderColor:'#fff',shadowColor:gColor===c?c:'transparent',shadowOpacity:0.6,shadowRadius:4,elevation:gColor===c?4:0}}/>
+          ))}
+        </Row>
+        <Row style={{gap:8}}>
+          <TouchableOpacity style={[S.outBtn,{flex:1,borderColor:C.border}]} onPress={()=>setShowForm(false)}><Text style={{color:C.muted,fontWeight:'700'}}>ביטול</Text></TouchableOpacity>
+          <TouchableOpacity style={[S.btn,{flex:2,marginBottom:0}]} onPress={addGroup}>
+            <Icon name="people-circle-outline" size={16} color="#fff"/>
+            <Text style={[S.btnTxt,{marginRight:6,fontSize:14}]}>צור קבוצה</Text>
+          </TouchableOpacity>
+        </Row>
+      </Card>}
+      {groups.length===0&&!showForm&&<Card style={{alignItems:'center',padding:28}}>
+        <Text style={{fontSize:36,marginBottom:8}}>👥</Text>
+        <Text style={{fontSize:15,fontWeight:'700',color:C.text,marginBottom:4}}>אין קבוצות עדיין</Text>
+        <Text style={{color:C.muted,textAlign:'center',marginBottom:14}}>קבוצות עוזרות לארגן סטודנטים ולמעקב קל</Text>
+        <TouchableOpacity style={[S.btn,{paddingHorizontal:20,marginBottom:0}]} onPress={()=>setShowForm(true)}>
+          <Icon name="add" size={16} color="#fff"/><Text style={[S.btnTxt,{marginRight:6,fontSize:14}]}>קבוצה חדשה</Text>
+        </TouchableOpacity>
+      </Card>}
+      {groups.map(g=>{
+        const members=students.filter(u=>u.group===g.id);
+        const ungrouped=students.filter(u=>!u.group);
+        const avgScore=members.length>0?Math.round(members.reduce((s,u)=>s+pct(u.prog?.totalCorrect||0,u.prog?.totalAnswered||1),0)/members.length):0;
+        const isOpen=selectedGroup?.id===g.id;
+        return <Card key={g.id} style={{marginBottom:10,borderRightWidth:4,borderRightColor:g.color}}>
+          <TouchableOpacity onPress={()=>setSelectedGroup(isOpen?null:g)} activeOpacity={0.8}>
+            <Row style={{justifyContent:'space-between',marginBottom:6}}>
+              <Row style={{flex:0,gap:6}}>
+                <Icon name={isOpen?'chevron-up':'chevron-down'} size={15} color={C.muted}/>
+                <Text style={{fontSize:12,color:C.muted}}>{members.length} חברים</Text>
+                {avgScore>0&&<Pill label={`${avgScore}%`} color={avgScore>=70?C.success:C.warning} small/>}
+              </Row>
+              <Row style={{flex:0,gap:8}}>
+                <View style={{width:32,height:32,borderRadius:16,backgroundColor:g.color+'20',alignItems:'center',justifyContent:'center'}}>
+                  <Text style={{fontSize:16,fontWeight:'900',color:g.color}}>{g.name.charAt(0)}</Text>
+                </View>
+                <Col style={{alignItems:'flex-end'}}>
+                  <Text style={{fontWeight:'800',fontSize:15}}>{g.name}</Text>
+                  {g.desc&&<Text style={{fontSize:11,color:C.muted}}>{g.desc}</Text>}
+                </Col>
+              </Row>
+            </Row>
+            {members.length>0&&<Row style={{gap:4,flexWrap:'wrap'}}>
+              {members.slice(0,6).map(u=>(
+                <View key={u.id} style={{backgroundColor:g.color+'18',borderRadius:8,paddingHorizontal:8,paddingVertical:3}}>
+                  <Text style={{fontSize:11,color:g.color,fontWeight:'600'}}>{u.name}</Text>
+                </View>
+              ))}
+              {members.length>6&&<Text style={{fontSize:11,color:C.muted}}>+{members.length-6}</Text>}
+            </Row>}
+          </TouchableOpacity>
+          {isOpen&&<View style={{marginTop:12,paddingTop:12,borderTopWidth:1,borderTopColor:C.border}}>
+            <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:8}}>חברי הקבוצה</Text>
+            {members.map(u=>(
+              <Row key={u.id} style={{justifyContent:'space-between',marginBottom:8}}>
+                <Row style={{flex:0,gap:6}}>
+                  <TouchableOpacity style={{backgroundColor:C.danger+'15',borderRadius:8,paddingHorizontal:8,paddingVertical:4}} onPress={()=>moveToGroup(u.id,null)}>
+                    <Text style={{fontSize:11,fontWeight:'700',color:C.danger}}>הסר</Text>
+                  </TouchableOpacity>
+                  <Text style={{fontSize:11,color:C.muted}}>{pct(u.prog?.totalCorrect||0,u.prog?.totalAnswered||1)}%</Text>
+                </Row>
+                <Text style={{fontWeight:'600',fontSize:14}}>{u.name}</Text>
+              </Row>
+            ))}
+            {ungrouped.length>0&&<>
+              <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginTop:8,marginBottom:6}}>הוסף לקבוצה</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6}}>
+                {ungrouped.map(u=>(
+                  <TouchableOpacity key={u.id} style={{backgroundColor:g.color+'15',borderRadius:8,paddingHorizontal:10,paddingVertical:5,borderWidth:1,borderColor:g.color+'40'}} onPress={()=>moveToGroup(u.id,g.id)}>
+                    <Text style={{fontSize:12,fontWeight:'600',color:g.color}}>{u.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>}
+            <TouchableOpacity style={[S.outBtn,{borderColor:C.danger+'60',marginTop:12}]} onPress={()=>deleteGroup(g.id)}>
+              <Icon name="trash-outline" size={15} color={C.danger}/>
+              <Text style={{color:C.danger,fontWeight:'700',marginRight:6}}>מחק קבוצה</Text>
+            </TouchableOpacity>
+          </View>}
+        </Card>;
+      })}
+    </ScrollView>
+  </View>;
+}
+
+// ─── ADMIN: REPORTS ───────────────────────────────────────────────────────────
+function AdminReports({gsData}) {
+  const [reportType,setReportType]=useState('overview');
+  const students=gsData.users.filter(u=>u.role==='student');
+  const allHistory=students.flatMap(u=>u.prog?.quizHistory||[]);
+
+  // at-risk students
+  const atRisk=students.filter(u=>(u.prog?.totalAnswered||0)>=10&&pct(u.prog.totalCorrect,u.prog.totalAnswered)<70)
+    .map(u=>({...u,score:pct(u.prog.totalCorrect,u.prog.totalAnswered)}))
+    .sort((a,b)=>a.score-b.score);
+
+  // topic weakness report
+  const topicWeakness=TOPICS.map(t=>{
+    const scores=students.map(u=>{const tp=u.prog?.topicProgress?.[t.id];return tp&&tp.answered>=3?pct(tp.correct,tp.answered):null;}).filter(x=>x!==null);
+    const avg=scores.length>0?Math.round(scores.reduce((s,x)=>s+x,0)/scores.length):0;
+    const struggling=students.filter(u=>{const tp=u.prog?.topicProgress?.[t.id];return tp&&tp.answered>=3&&pct(tp.correct,tp.answered)<70;}).length;
+    return {...t,avg,struggling,tested:scores.length};
+  }).sort((a,b)=>a.avg-b.avg);
+
+  // inactive students (registered but never studied)
+  const inactive=students.filter(u=>!(u.prog?.totalAnswered>0));
+  const active=students.filter(u=>(u.prog?.totalAnswered||0)>0);
+
+  // score distribution
+  const brackets=[{l:'90-100%',min:90,c:C.success},{l:'70-89%',min:70,c:C.cyan},{l:'50-69%',min:50,c:C.warning},{l:'0-49%',min:0,c:C.danger}];
+  const scoreDist=brackets.map(b=>({...b,count:active.filter(u=>{const s=pct(u.prog.totalCorrect,u.prog.totalAnswered);return s>=b.min&&(b.min===90?s<=100:s<(brackets[brackets.indexOf(b)-1]?.min??200));}).length}));
+
+  // weekly activity (4 weeks)
+  const week4=Array.from({length:4},(_,wi)=>{
+    const start=new Date();start.setDate(start.getDate()-(3-wi)*7-start.getDay());
+    const qs=allHistory.filter(h=>{const d=new Date(h.date);const wStart=new Date(start);wStart.setHours(0,0,0,0);const wEnd=new Date(wStart);wEnd.setDate(wEnd.getDate()+7);return d>=wStart&&d<wEnd;}).reduce((s,h)=>s+h.total,0);
+    return {label:`שבוע ${wi+1}`,qs};
+  });
+  const maxW=Math.max(...week4.map(w=>w.qs),1);
+
+  function exportText(title,lines){Alert.alert(title,lines.join('\n'));}
+
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} showsVerticalScrollIndicator={false}>
+    <Text style={S.pgTitle}>דוחות 📋</Text>
+    {/* Report type tabs */}
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:14}}>
+      {[['overview','סקירה'],['atrisk','⚠️ בסיכון'],['topics','נושאים'],['activity','פעילות'],['inactive','לא פעילים']].map(([v,l])=>(
+        <TouchableOpacity key={v} style={[S.cntBtn,reportType===v&&S.cntBtnOn,{paddingHorizontal:14,paddingVertical:8}]} onPress={()=>setReportType(v)}>
+          <Text style={[S.cntTxt,reportType===v&&{color:'#fff'},{fontSize:12}]}>{l}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+
+    {reportType==='overview'&&<>
+      <Card style={{backgroundColor:C.primary,marginBottom:12}}>
+        <Row style={{gap:0}}>
+          {[{v:students.length,l:'סטודנטים'},{v:active.length,l:'פעילים'},{v:inactive.length,l:'לא פעילים'},{v:atRisk.length,l:'בסיכון'}].map((s,i,arr)=>(
+            <View key={s.l} style={[{flex:1,alignItems:'center',paddingVertical:8},i<arr.length-1&&{borderRightWidth:1,borderRightColor:'rgba(255,255,255,0.2)'}]}>
+              <Text style={{fontSize:20,fontWeight:'900',color:'#fff'}}>{s.v}</Text>
+              <Text style={{fontSize:10,color:'#bfdbfe'}}>{s.l}</Text>
+            </View>
+          ))}
+        </Row>
+      </Card>
+      <Sec title="התפלגות ציונים"/>
+      {scoreDist.map(b=>(
+        <Card key={b.l} style={{marginBottom:8}}>
+          <Row style={{justifyContent:'space-between',marginBottom:6}}>
+            <Text style={{fontSize:13,fontWeight:'700',color:b.c}}>{b.count} סטודנטים</Text>
+            <Text style={{fontSize:14,fontWeight:'700'}}>{b.l}</Text>
+          </Row>
+          <Bar value={b.count} total={Math.max(active.length,1)} color={b.c} h={6}/>
+        </Card>
+      ))}
+      <Sec title="פעילות שבועית (4 שבועות)"/>
+      <Card>
+        <Row style={{alignItems:'flex-end',justifyContent:'space-between',height:80}}>
+          {week4.map((w,i)=>(
+            <View key={i} style={{alignItems:'center',flex:1}}>
+              <View style={{flex:1,justifyContent:'flex-end',width:'60%'}}>
+                <View style={{height:`${Math.max(w.qs/maxW*100,w.qs>0?8:3)}%`,backgroundColor:w.qs>0?C.primary:C.fill,borderRadius:4}}/>
+              </View>
+              <Text style={{fontSize:10,color:C.muted,marginTop:4,textAlign:'center'}}>{w.label}</Text>
+              {w.qs>0&&<Text style={{fontSize:9,color:C.primary,fontWeight:'700'}}>{w.qs}</Text>}
+            </View>
+          ))}
+        </Row>
+      </Card>
+      <TouchableOpacity style={[S.outBtn,{marginTop:8,borderColor:C.cyan+'60'}]} onPress={()=>exportText('סיכום מערכת',[
+        `סטודנטים: ${students.length}`,`פעילים: ${active.length}`,`בסיכון: ${atRisk.length}`,`שאלות בבנק: ${QS.length+gsData.customQs.length}`,
+        `ממוצע כללי: ${active.length>0?Math.round(active.reduce((s,u)=>s+pct(u.prog.totalCorrect,u.prog.totalAnswered),0)/active.length):0}%`])}>
+        <Icon name="download-outline" size={15} color={C.cyan}/>
+        <Text style={{color:C.cyan,fontWeight:'700',marginRight:6}}>יצוא סיכום</Text>
+      </TouchableOpacity>
+    </>}
+
+    {reportType==='atrisk'&&<>
+      {atRisk.length===0?<Card style={{alignItems:'center',padding:28}}>
+        <Text style={{fontSize:36,marginBottom:8}}>🎉</Text>
+        <Text style={{fontWeight:'700',fontSize:15,color:C.success}}>אין סטודנטים בסיכון!</Text>
+        <Text style={{color:C.muted,marginTop:4}}>כולם מעל 70% אחרי 10+ שאלות</Text>
+      </Card>:<>
+        <Text style={{textAlign:'right',fontSize:13,color:C.danger,fontWeight:'700',marginBottom:10}}>{atRisk.length} סטודנטים זקוקים לתשומת לב</Text>
+        {atRisk.map(u=>(
+          <Card key={u.id} style={{marginBottom:8,borderRightWidth:3,borderRightColor:C.danger}}>
+            <Row style={{justifyContent:'space-between',marginBottom:6}}>
+              <Row style={{flex:0,gap:6}}>
+                <Pill label={`${u.score}%`} color={C.danger} small/>
+                <Text style={{fontSize:11,color:C.muted}}>{u.prog.totalAnswered} שאלות</Text>
+              </Row>
+              <Text style={{fontWeight:'700',fontSize:14}}>{u.name}</Text>
+            </Row>
+            <Bar value={u.score} total={100} color={C.danger} h={5}/>
+            <Text style={{textAlign:'right',fontSize:11,color:C.muted,marginTop:4}}>חולשות: {TOPICS.filter(t=>{const tp=u.prog.topicProgress?.[t.id];return tp&&tp.answered>=3&&pct(tp.correct,tp.answered)<70;}).map(t=>t.icon+' '+t.name).join(', ')||'טרם זוהה'}</Text>
+          </Card>
+        ))}
+        <TouchableOpacity style={[S.outBtn,{borderColor:C.danger+'60',marginTop:4}]}
+          onPress={()=>exportText('סטודנטים בסיכון',atRisk.map(u=>`${u.name} (@${u.username}): ${u.score}% • ${u.prog.totalAnswered} שאלות`))}>
+          <Icon name="download-outline" size={15} color={C.danger}/>
+          <Text style={{color:C.danger,fontWeight:'700',marginRight:6}}>יצוא רשימה</Text>
+        </TouchableOpacity>
+      </>}
+    </>}
+
+    {reportType==='topics'&&<>
+      <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:10}}>ממוצע ביצועים לפי נושא בין כל הסטודנטים</Text>
+      {topicWeakness.map(t=>(
+        <Card key={t.id} style={{marginBottom:10,borderRightWidth:3,borderRightColor:t.color}}>
+          <Row style={{justifyContent:'space-between',marginBottom:8}}>
+            <Row style={{flex:0,gap:6}}>
+              <Text style={{fontSize:11,color:C.muted}}>{t.tested} נבחנו</Text>
+              {t.struggling>0&&<Pill label={`${t.struggling} מתקשים`} color={C.danger} small/>}
+            </Row>
+            <Row style={{flex:0,gap:6}}>
+              <Text style={{fontWeight:'700',fontSize:14}}>{t.name}</Text>
+              <Text style={{fontSize:20}}>{t.icon}</Text>
+            </Row>
+          </Row>
+          <Row style={{justifyContent:'space-between',marginBottom:6}}>
+            <Text style={{fontSize:13,fontWeight:'700',color:t.avg>=70?C.success:C.warning}}>{t.tested>0?`${t.avg}%`:'אין נתונים'}</Text>
+          </Row>
+          {t.tested>0&&<Bar value={t.avg} total={100} color={t.color} h={7}/>}
+        </Card>
+      ))}
+    </>}
+
+    {reportType==='activity'&&<>
+      <Sec title="פעילות לפי ימי שבוע"/>
+      {(()=>{const days=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+        const dayCounts=days.map((_,i)=>allHistory.filter(h=>new Date(h.date).getDay()===i).reduce((s,h)=>s+h.total,0));
+        const maxD=Math.max(...dayCounts,1);
+        return <Card>
+          <Row style={{alignItems:'flex-end',justifyContent:'space-between',height:90}}>
+            {dayCounts.map((c,i)=>(
+              <View key={i} style={{alignItems:'center',flex:1}}>
+                <View style={{flex:1,justifyContent:'flex-end',width:'65%'}}>
+                  <View style={{height:`${Math.max(c/maxD*100,c>0?8:3)}%`,backgroundColor:c>0?C.primary:C.fill,borderRadius:4}}/>
+                </View>
+                <Text style={{fontSize:9,color:C.muted,marginTop:3}}>{days[i].slice(0,3)}</Text>
+                {c>0&&<Text style={{fontSize:9,color:C.primary,fontWeight:'700'}}>{c}</Text>}
+              </View>
+            ))}
+          </Row>
+        </Card>;
+      })()}
+      <Sec title="שעות פעילות (שאלות לפי שעה)"/>
+      {(()=>{
+        const hourCounts=Array.from({length:24},(_,h)=>allHistory.filter(x=>new Date(x.date).getHours()===h).reduce((s,x)=>s+x.total,0));
+        const peakHour=hourCounts.indexOf(Math.max(...hourCounts));
+        return <Card>
+          <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:10}}>שעת שיא: {peakHour}:00–{peakHour+1}:00</Text>
+          <View style={{flexDirection:'row-reverse',alignItems:'flex-end',height:50,gap:1}}>
+            {hourCounts.map((c,i)=>{const max=Math.max(...hourCounts,1);return(
+              <View key={i} style={{flex:1,height:`${Math.max(c/max*100,c>0?10:4)}%`,backgroundColor:i===peakHour?C.warning:c>0?C.primary+'80':C.fill,borderRadius:2}}/>
+            );})}
+          </View>
+          <Row style={{justifyContent:'space-between',marginTop:4}}>
+            <Text style={{fontSize:10,color:C.muted}}>00:00</Text>
+            <Text style={{fontSize:10,color:C.muted}}>12:00</Text>
+            <Text style={{fontSize:10,color:C.muted}}>23:00</Text>
+          </Row>
+        </Card>;
+      })()}
+    </>}
+
+    {reportType==='inactive'&&<>
+      <Text style={{textAlign:'right',fontSize:13,color:C.muted,fontWeight:'600',marginBottom:10}}>{inactive.length} סטודנטים שנרשמו אך לא למדו</Text>
+      {inactive.length===0?<Card style={{alignItems:'center',padding:24}}>
+        <Text style={{fontSize:32,marginBottom:8}}>🎊</Text>
+        <Text style={{color:C.muted}}>כל הסטודנטים כבר התחילו!</Text>
+      </Card>:inactive.map(u=>(
+        <Card key={u.id} style={{marginBottom:8}}>
+          <Row style={{justifyContent:'space-between'}}>
+            <Text style={{fontSize:11,color:C.muted}}>נרשם: {new Date(u.createdAt).toLocaleDateString('he-IL')}</Text>
+            <Row style={{flex:0,gap:8}}>
+              <View style={{width:32,height:32,borderRadius:16,backgroundColor:C.muted+'20',alignItems:'center',justifyContent:'center'}}>
+                <Text style={{fontSize:14,fontWeight:'900',color:C.muted}}>{u.name.charAt(0)}</Text>
+              </View>
+              <Text style={{fontWeight:'700',fontSize:14}}>{u.name}</Text>
+            </Row>
+          </Row>
+        </Card>
+      ))}
+      {inactive.length>0&&<TouchableOpacity style={[S.outBtn,{borderColor:C.muted+'60',marginTop:4}]}
+        onPress={()=>exportText('סטודנטים לא פעילים',inactive.map(u=>`${u.name} (@${u.username}) — נרשם ${new Date(u.createdAt).toLocaleDateString('he-IL')}`))}>
+        <Icon name="download-outline" size={15} color={C.muted}/>
+        <Text style={{color:C.muted,fontWeight:'700',marginRight:6}}>יצוא רשימה</Text>
+      </TouchableOpacity>}
+    </>}
+  </ScrollView>;
+}
+
 // ─── ADMIN PANEL ──────────────────────────────────────────────────────────────
 function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
   const [adminTab,setAdminTab]=useState('dashboard');
@@ -1837,18 +2550,27 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
     {id:'users',label:'משתמשים',icon:'people-outline',active:'people'},
     {id:'questions',label:'שאלות',icon:'help-circle-outline',active:'help-circle'},
     {id:'analytics',label:'אנליטיקה',icon:'bar-chart-outline',active:'bar-chart'},
+    {id:'groups',label:'קבוצות',icon:'people-circle-outline',active:'people-circle'},
     {id:'announcements',label:'הודעות',icon:'megaphone-outline',active:'megaphone'},
     {id:'leaderboard',label:'מובילים',icon:'trophy-outline',active:'trophy'},
+    {id:'reports',label:'דוחות',icon:'document-text-outline',active:'document-text'},
     {id:'settings',label:'הגדרות',icon:'settings-outline',active:'settings'},
   ];
+  const unread=(gsData.users.filter(u=>u.role==='student'&&(u.prog?.totalAnswered||0)>=10&&pct(u.prog.totalCorrect,u.prog.totalAnswered)<70)).length;
   return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
     <StatusBar barStyle="dark-content"/>
-    <View style={{backgroundColor:C.primary,paddingHorizontal:16,paddingVertical:5}}>
-      <Row style={{justifyContent:'space-between'}}>
-        <Text style={{color:'#bfdbfe',fontSize:11}}>v2.0</Text>
-        <Row style={{flex:0,gap:5}}>
-          <Icon name="shield-checkmark" size={13} color="#fde68a"/>
-          <Text style={{color:'#fde68a',fontSize:12,fontWeight:'700'}}>מצב מנהל</Text>
+    {/* Admin top bar */}
+    <View style={{backgroundColor:C.primary,paddingHorizontal:16,paddingVertical:7}}>
+      <Row style={{justifyContent:'space-between',alignItems:'center'}}>
+        <Row style={{flex:0,gap:8}}>
+          {unread>0&&<View style={{backgroundColor:C.danger,borderRadius:10,paddingHorizontal:7,paddingVertical:2}}>
+            <Text style={{color:'#fff',fontSize:10,fontWeight:'900'}}>{unread} ⚠️</Text>
+          </View>}
+          <Text style={{color:'#bfdbfe',fontSize:11}}>v3.0</Text>
+        </Row>
+        <Row style={{flex:0,gap:6}}>
+          <Icon name="shield-checkmark" size={14} color="#fde68a"/>
+          <Text style={{color:'#fde68a',fontSize:13,fontWeight:'800'}}>מצב מנהל • {currentUser.name}</Text>
         </Row>
       </Row>
     </View>
@@ -1857,20 +2579,28 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
       {adminTab==='users'&&<AdminUsers gsData={gsData} setGsData={setGsData}/>}
       {adminTab==='questions'&&<AdminQuestions gsData={gsData} setGsData={setGsData}/>}
       {adminTab==='analytics'&&<AdminAnalytics gsData={gsData}/>}
+      {adminTab==='groups'&&<AdminGroups gsData={gsData} setGsData={setGsData}/>}
       {adminTab==='announcements'&&<AdminAnnouncements gsData={gsData} setGsData={setGsData}/>}
       {adminTab==='leaderboard'&&<AdminLeaderboard gsData={gsData}/>}
+      {adminTab==='reports'&&<AdminReports gsData={gsData}/>}
       {adminTab==='settings'&&<AdminSettings gsData={gsData} setGsData={setGsData} onLogout={onLogout} adminUser={currentUser}/>}
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false}
-      style={{backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border}}
-      contentContainerStyle={{flexDirection:'row-reverse',paddingBottom:Platform.OS==='ios'?20:6,paddingTop:6}}>
+      style={{backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,flexGrow:0}}
+      contentContainerStyle={{flexDirection:'row-reverse',paddingBottom:isIOS?20:6,paddingTop:6,paddingHorizontal:4}}>
       {adminTabs.map(t=>{
         const on=adminTab===t.id;
-        return <TouchableOpacity key={t.id} onPress={()=>setAdminTab(t.id)}
-          style={{alignItems:'center',paddingHorizontal:12,paddingTop:4,minWidth:60}}>
-          {on&&<View style={{position:'absolute',top:0,left:'15%',right:'15%',height:2.5,backgroundColor:C.primary,borderBottomLeftRadius:2,borderBottomRightRadius:2}}/>}
-          <Icon name={on?t.active:t.icon} size={22} color={on?C.primary:C.muted}/>
-          <Text style={{fontSize:10,color:on?C.primary:C.muted,fontWeight:on?'700':'400',marginTop:2}}>{t.label}</Text>
+        const badge=t.id==='reports'&&unread>0?unread:0;
+        return <TouchableOpacity key={t.id} onPress={()=>setAdminTab(t.id)} activeOpacity={0.7}
+          style={{alignItems:'center',paddingHorizontal:10,paddingTop:4,minWidth:56}}>
+          {on&&<View style={{position:'absolute',top:0,left:'10%',right:'10%',height:2.5,backgroundColor:C.primary,borderBottomLeftRadius:2,borderBottomRightRadius:2}}/>}
+          <View style={{position:'relative'}}>
+            <Icon name={on?t.active:t.icon} size={22} color={on?C.primary:C.muted}/>
+            {badge>0&&<View style={{position:'absolute',top:-4,right:-6,backgroundColor:C.danger,borderRadius:8,minWidth:16,height:16,alignItems:'center',justifyContent:'center',paddingHorizontal:2}}>
+              <Text style={{color:'#fff',fontSize:9,fontWeight:'900'}}>{badge}</Text>
+            </View>}
+          </View>
+          <Text style={{fontSize:9,color:on?C.primary:C.muted,fontWeight:on?'700':'400',marginTop:2,textAlign:'center'}}>{t.label}</Text>
         </TouchableOpacity>;
       })}
     </ScrollView>
@@ -1883,7 +2613,7 @@ export default function App() {
   const [loaded,setLoaded]=useState(false);
   const [gsData,setGsData]=useState({
     users:[{id:'admin',username:'admin',password:'admin123',role:'admin',name:'מנהל',blocked:false,createdAt:Date.now()}],
-    announcements:[],customQs:[],settings:{passGrade:70,regEnabled:true},
+    announcements:[],customQs:[],groups:[],settings:{passGrade:70,regEnabled:true},
   });
   const [prog,dispatch]=useReducer(reducer,INIT_PROG);
   const [tab,setTab]=useState('home');
@@ -1894,7 +2624,7 @@ export default function App() {
     Store.get('amirnet_v4').then(raw=>{
       if(raw){try{
         const saved=JSON.parse(raw);
-        if(saved.gsData)setGsData(saved.gsData);
+        if(saved.gsData)setGsData(gd=>({...gd,...saved.gsData,groups:saved.gsData.groups||[]}));
         if(saved.currentUserId&&saved.gsData){
           const user=saved.gsData.users?.find(u=>u.id===saved.currentUserId);
           if(user&&!user.blocked){setCurrentUser(user);if(user.prog)dispatch({type:'LOAD',payload:user.prog});}
