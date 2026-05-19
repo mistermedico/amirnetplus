@@ -10,8 +10,19 @@ const isSmall = H < 700; // compact screens (SE, older Android)
 // Bottom padding constants — accounts for tab bars + home indicator
 const USER_PB  = isIOS ? 110 : 88;  // user-facing screens (has user TabBar)
 const ADMIN_PB = isIOS ? 96  : 74;  // admin screens (inside AdminPanel tab bar)
-const _mem = {};
-const Store = { get: k => Promise.resolve(_mem[k] ?? null), set: (k,v) => { _mem[k]=v; } };
+// Persistent storage — uses localStorage (web) with AsyncStorage fallback (native)
+let _AS = null;
+try { _AS = require('@react-native-async-storage/async-storage').default; } catch(_) {}
+const Store = {
+  get: k => {
+    if (_AS) return _AS.getItem(k);
+    try { return Promise.resolve(typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null); } catch(_) { return Promise.resolve(null); }
+  },
+  set: (k, v) => {
+    if (_AS) return _AS.setItem(k, v);
+    try { if (typeof localStorage !== 'undefined') localStorage.setItem(k, v); } catch(_) {}
+  },
+};
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const C = { primary:'#1e40af', primaryLight:'#3b82f6', primaryDark:'#1e3a8a',
@@ -3673,7 +3684,7 @@ export default function App() {
   const [loaded,setLoaded]=useState(false);
   const [gsData,setGsData]=useState({
     users:[{id:'admin',username:'admin',password:'admin123',role:'admin',name:'מנהל',blocked:false,createdAt:Date.now()}],
-    announcements:[],customQs:[],groups:[],activityLog:[],settings:{passGrade:70,regEnabled:true,aiApiKey:''},
+    announcements:[],customQs:[],groups:[],activityLog:[],exams:[],settings:{passGrade:70,regEnabled:true,aiApiKey:''},
   });
   const [prog,dispatch]=useReducer(reducer,INIT_PROG);
   const [tab,setTab]=useState('home');
@@ -3684,7 +3695,7 @@ export default function App() {
     Store.get('amirnet_v4').then(raw=>{
       if(raw){try{
         const saved=JSON.parse(raw);
-        if(saved.gsData)setGsData(gd=>({...gd,...saved.gsData,groups:saved.gsData.groups||[]}));
+        if(saved.gsData)setGsData(gd=>({...gd,...saved.gsData,groups:saved.gsData.groups||[],exams:saved.gsData.exams||[]}));
         if(saved.currentUserId&&saved.gsData){
           const user=saved.gsData.users?.find(u=>u.id===saved.currentUserId);
           if(user&&!user.blocked){setCurrentUser(user);if(user.prog)dispatch({type:'LOAD',payload:user.prog});}
