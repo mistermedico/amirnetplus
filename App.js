@@ -349,6 +349,13 @@ function getPool(tid,count,allQs=QS) { return shuffle(tid?allQs.filter(q=>q.topi
 function KAV({children,style}) {
   return <KeyboardAvoidingView behavior={isIOS?'padding':'height'} style={[{flex:1},style]} keyboardVerticalOffset={isIOS?0:0}>{children}</KeyboardAvoidingView>;
 }
+function fmtIL(ts) {
+  return new Date(ts).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem',hour12:false,day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+function addLog(setGsData,type,user,detail){
+  const entry={id:`log_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,ts:Date.now(),type,user,detail};
+  setGsData(gd=>({...gd,activityLog:[...(gd.activityLog||[]),entry].slice(-500)}));
+}
 function Row({children,style}) { return <View style={[{flexDirection:'row-reverse',alignItems:'center'},style]}>{children}</View>; }
 function Col({children,style}) { return <View style={[{alignItems:'flex-end'},style]}>{children}</View>; }
 function Card({children,style,onPress}) {
@@ -426,8 +433,10 @@ function PassageCard({passage}) {
 // Timer
 function ExamTimer({totalSeconds,onTimeUp}) {
   const [rem,setRem] = useState(totalSeconds);
+  const onTimeUpRef=useRef(onTimeUp);
+  useEffect(()=>{onTimeUpRef.current=onTimeUp;},[onTimeUp]);
   useEffect(()=>{
-    const iv = setInterval(()=>setRem(r=>{ if(r<=1){clearInterval(iv);onTimeUp();return 0;} return r-1; }),1000);
+    const iv = setInterval(()=>setRem(r=>{ if(r<=1){clearInterval(iv);onTimeUpRef.current();return 0;} return r-1; }),1000);
     return ()=>clearInterval(iv);
   },[]);
   const warn=rem<120;
@@ -854,7 +863,7 @@ function QuizScreen({config,dispatch,onFinish,allQs=QS,passGrade=70}) {
       </Row>
     </View>}
 
-    <ScrollView contentContainerStyle={{padding:16,paddingBottom:isIOS?130:120}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={{padding:16,paddingBottom:USER_PB+20}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <Animated.View style={{opacity:fadeAnim}}>
         {q.type==='reading'&&<PassageCard passage={q.passage}/>}
         {/* Question Card */}
@@ -907,7 +916,7 @@ function ResultsScreen({questions,answers,result,theta,onDismiss}) {
       </TouchableOpacity>
       <Text style={{fontWeight:'900',fontSize:17,color:C.text}}>תוצאות הבחינה</Text>
     </View>
-    <ScrollView contentContainerStyle={{padding:16,paddingBottom:isIOS?130:110}} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={{padding:16,paddingBottom:USER_PB+20}} showsVerticalScrollIndicator={false}>
       {/* Score Hero */}
       <View style={{backgroundColor:gradeColor,borderRadius:24,padding:24,alignItems:'center',marginBottom:14,...shadow(1.5)}}>
         <View style={{width:120,height:120,borderRadius:60,backgroundColor:'rgba(255,255,255,0.2)',borderWidth:6,borderColor:'rgba(255,255,255,0.4)',alignItems:'center',justifyContent:'center',marginBottom:12}}>
@@ -1459,7 +1468,11 @@ function AdminUsers({gsData,setGsData}) {
       return a.name.localeCompare(b.name,'he');
     });
 
-  function toggleBlock(id){setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===id?{...u,blocked:!u.blocked}:u)}));}
+  function toggleBlock(id){
+    const u=gsData.users.find(x=>x.id===id);
+    const willBlock=!u?.blocked;
+    setGsData(gd=>({...gd,users:gd.users.map(x=>x.id===id?{...x,blocked:!x.blocked}:x),activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:willBlock?'user_block':'user_unblock',user:'admin',detail:`${willBlock?'חסימה':'שחרור'}: @${u?.username||id}`}].slice(-500)}));
+  }
   function resetProg(id){Alert.alert('איפוס','למחוק את כל ההתקדמות?',[{text:'ביטול',style:'cancel'},{text:'איפוס',style:'destructive',onPress:()=>setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===id?{...u,prog:INIT_PROG}:u)}))}]);}
   function deleteUser(id){Alert.alert('מחיקה','למחוק משתמש לצמיתות?',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>{setGsData(gd=>({...gd,users:gd.users.filter(u=>u.id!==id)}));if(selected?.id===id)setSelected(null);}}]);}
   function saveNote(id,note){setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===id?{...u,note}:u)}));}
@@ -1479,6 +1492,7 @@ function AdminUsers({gsData,setGsData}) {
     if(gsData.users.find(u=>u.username===newUser.trim())){Alert.alert('שגיאה','שם משתמש קיים');return;}
     const u={id:Date.now().toString(),username:newUser.trim(),password:newPwd,name:newName.trim(),role:'student',blocked:false,createdAt:Date.now(),prog:INIT_PROG,group:newGroup||null};
     setGsData(gd=>({...gd,users:[...gd.users,u]}));
+    addLog(setGsData,'user_create','admin',`הוסף סטודנט: ${newName.trim()} (@${newUser.trim()})`);
     setNewName('');setNewUser('');setNewPwd('');setNewGroup('');setAddMode(false);
     Alert.alert('✓',`סטודנט ${u.name} נוסף`);
   }
@@ -1894,19 +1908,21 @@ function AdminQuestions({gsData,setGsData}) {
 
   function saveQ(){
     if(!form.q.trim()||form.opts.some(o=>!o.trim())){Alert.alert('שגיאה','מלא את כל השדות');return;}
-    // Auto-assign topic/difficulty if using detected values
     const finalTopic=form.topic||(detectTopic(form.q+' '+form.opts.join(' '))||'networking');
     const finalDiff=form.diff||detectDifficulty(form.q,form.opts);
     const finalForm={...form,topic:finalTopic,diff:finalDiff};
     if(editingId){
-      setGsData(gd=>({...gd,customQs:gd.customQs.map(q=>q.id===editingId?{...q,...finalForm}:q)}));
+      setGsData(gd=>({...gd,customQs:gd.customQs.map(q=>q.id===editingId?{...q,...finalForm}:q),activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'q_edit',user:'admin',detail:`עריכת שאלה: ${finalForm.q.slice(0,40)}`}].slice(-500)}));
       setEditingId(null);
     } else {
-      setGsData(gd=>({...gd,customQs:[...gd.customQs,{...finalForm,id:`cq_${Date.now()}`,custom:true,vs:0.5}]}));
+      setGsData(gd=>({...gd,customQs:[...gd.customQs,{...finalForm,id:`cq_${Date.now()}`,custom:true,vs:0.5}],activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'q_create',user:'admin',detail:`שאלה חדשה: ${finalForm.q.slice(0,40)}`}].slice(-500)}));
     }
     setForm(EMPTY);setTab('custom');
   }
-  function delQ(id){Alert.alert('מחיקה','למחוק שאלה זו?',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>setGsData(gd=>({...gd,customQs:gd.customQs.filter(q=>q.id!==id)}))}]);}
+  function delQ(id){
+    const q=gsData.customQs.find(x=>x.id===id);
+    Alert.alert('מחיקה','למחוק שאלה זו?',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>setGsData(gd=>({...gd,customQs:gd.customQs.filter(x=>x.id!==id),activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'q_delete',user:'admin',detail:`מחיקת שאלה: ${(q?.q||'').slice(0,40)}`}].slice(-500)}))}]);
+  }
   function editQ(q){setForm({topic:q.topic,diff:q.diff,type:q.type||'mc',q:q.q,opts:[...q.opts],a:q.a,exp:q.exp||'',passage:q.passage||''});setEditingId(q.id);setTab('add');}
   function dupQ(q){setForm({topic:q.topic,diff:q.diff,type:q.type||'mc',q:q.q+' (עותק)',opts:[...q.opts],a:q.a,exp:q.exp||'',passage:q.passage||''});setEditingId(null);setTab('add');}
 
@@ -2698,7 +2714,7 @@ function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
   function saveSettings(){
     const pg=parseInt(passGrade);
     if(pg<50||pg>95){Alert.alert('שגיאה','ציון עובר חייב להיות 50–95');return;}
-    setGsData(gd=>({...gd,settings:{...gd.settings,passGrade:pg,regEnabled,aiApiKey:aiKey.trim()}}));
+    setGsData(gd=>({...gd,settings:{...gd.settings,passGrade:pg,regEnabled,aiApiKey:aiKey.trim()},activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'settings',user:'admin',detail:`שמירת הגדרות — ציון עובר: ${pg}%, הרשמה: ${regEnabled?'פתוחה':'סגורה'}`}].slice(-500)}));
     Alert.alert('✓','הגדרות נשמרו');
   }
   function changePwd(){
@@ -3570,7 +3586,7 @@ export default function App() {
   const [loaded,setLoaded]=useState(false);
   const [gsData,setGsData]=useState({
     users:[{id:'admin',username:'admin',password:'admin123',role:'admin',name:'מנהל',blocked:false,createdAt:Date.now()}],
-    announcements:[],customQs:[],groups:[],settings:{passGrade:70,regEnabled:true,aiApiKey:''},
+    announcements:[],customQs:[],groups:[],activityLog:[],settings:{passGrade:70,regEnabled:true,aiApiKey:''},
   });
   const [prog,dispatch]=useReducer(reducer,INIT_PROG);
   const [tab,setTab]=useState('home');
@@ -3601,6 +3617,7 @@ export default function App() {
     const user=gsData.users.find(u=>u.username===username&&u.password===password);
     if(!user){Alert.alert('שגיאה','שם משתמש או סיסמה שגויים');return;}
     if(user.blocked){Alert.alert('חסום','החשבון שלך חסום. צור קשר עם המנהל.');return;}
+    addLog(setGsData,'login',user.username,`התחברות — ${user.role==='admin'?'מנהל':'סטודנט'}`);
     setCurrentUser(user);
     if(user.prog)dispatch({type:'LOAD',payload:user.prog});else dispatch({type:'RESET'});
   }
@@ -3610,11 +3627,14 @@ export default function App() {
     if(password.length<4){Alert.alert('שגיאה','סיסמה קצרה מדי (מינימום 4 תווים)');return;}
     if(gsData.users.find(u=>u.username===username)){Alert.alert('שגיאה','שם משתמש כבר קיים');return;}
     const newUser={id:Date.now().toString(),username,password,name,role:'student',blocked:false,createdAt:Date.now(),prog:INIT_PROG,onboarded:false};
-    setGsData(gd=>({...gd,users:[...gd.users,newUser]}));
+    setGsData(gd=>({...gd,users:[...gd.users,newUser],activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'user_reg',user:username,detail:`הרשמה חדשה — ${name}`}].slice(-500)}));
     setCurrentUser(newUser);dispatch({type:'RESET'});
   }
   function handleLogout(){
-    if(currentUser)setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===currentUser.id?{...u,prog}:u)}));
+    if(currentUser){
+      const uname=currentUser.username;
+      setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===currentUser.id?{...u,prog}:u),activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'logout',user:uname,detail:'התנתקות מהמערכת'}].slice(-500)}));
+    }
     setCurrentUser(null);dispatch({type:'RESET'});setTab('home');setQuiz(null);
   }
 
