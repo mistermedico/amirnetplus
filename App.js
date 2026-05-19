@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useReducer, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
   Dimensions, Platform, Alert, Switch, TextInput, StatusBar, Animated,
-  KeyboardAvoidingView, Pressable } from 'react-native';
+  KeyboardAvoidingView, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width: W } = Dimensions.get('window');
@@ -1724,6 +1724,111 @@ function AdminUsers({gsData,setGsData}) {
 }
 
 // ─── ADMIN: QUESTIONS ─────────────────────────────────────────────────────────
+// ─── AI HELPERS ───────────────────────────────────────────────────────────────
+const AI_AGENTS = [
+  { id:'curriculum', icon:'📚', name:'מומחה תכנית לימודים', color:'#1e40af',
+    desc:'שאלות מקיפות המכסות מושגי יסוד',
+    sysPrompt:'אתה מומחה לתכנית הלימודים של בחינת אמירנט IT. צור שאלות שמכסות את המושגים החשובים ביותר בצורה ברורה ומדויקת. הדגש הבנת מושגים, לא שינון.' },
+  { id:'examwriter', icon:'📝', name:'כותב בחינות', color:'#7c3aed',
+    desc:'שאלות בחינה עם הסחות דעת מציאותיות',
+    sysPrompt:'אתה כותב בחינות מקצועי לבחינת הסמכה IT. צור שאלות מאתגרות עם אפשרויות שגיאה מציאותיות ("הסחות דעת") שבוחנות הבנה אמיתית ולא ניחוש. הסחות הדעת חייבות להיות הגיוניות אבל שגויות.' },
+  { id:'scenario', icon:'🏗️', name:'בונה תרחישים', color:'#0891b2',
+    desc:'שאלות מבוססות תרחישים ומקרי מבחן',
+    sysPrompt:'אתה מומחה לשאלות מבוססות תרחישים. צור שאלות שמציגות סיטואציה מציאותית מעולם ה-IT ושואלות מה צריך לעשות. השאלות צריכות להיות פרקטיות ורלוונטיות לעבודה אמיתית.' },
+  { id:'difficulty', icon:'🎯', name:'מכייל קושי', color:'#16a34a',
+    desc:'שאלות מכוילות במדויק לרמת קושי',
+    sysPrompt:'אתה מומחה לכיול קושי בבחינות IT. צור שאלות שמתאימות בדיוק לרמת הקושי המבוקשת: קל=מושגים בסיסיים, בינוני=יישום, מתקדם=אנליזה, מומחה=סינתזה ופתרון בעיות מורכבות.' },
+];
+
+async function callAnthropicAPI(apiKey, messages, maxTokens=3000) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'x-api-key':apiKey,'anthropic-version':'2023-06-01','content-type':'application/json'},
+    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:maxTokens,messages}),
+  });
+  if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${resp.status}`);}
+  const data=await resp.json();
+  return data.content?.[0]?.text||'';
+}
+
+function parseAIQuestions(text, topic, diff) {
+  // Try to extract JSON array from the response
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if(!jsonMatch) return [];
+  try {
+    const arr = JSON.parse(jsonMatch[0]);
+    return arr.filter(q=>q.q&&Array.isArray(q.opts)&&q.opts.length>=4&&typeof q.a==='number').map((q,i)=>({
+      id:`ai_${Date.now()}_${i}`,
+      q:q.q.trim(), opts:q.opts.slice(0,4).map(o=>String(o).trim()),
+      a:Math.min(q.a,3), exp:q.exp||'', diff:q.diff||diff, topic:q.topic||topic,
+      type:q.type||'mc', custom:true, vs:0.5, aiGenerated:true,
+    }));
+  } catch { return []; }
+}
+
+function buildGeneratePrompt(agent, topic, diff, count, instructions) {
+  const t = TOPICS.find(x=>x.id===topic);
+  const diffHe = {beginner:'קל',intermediate:'בינוני',advanced:'מתקדם',expert:'מומחה'};
+  return `${agent.sysPrompt}
+
+צור בדיוק ${count} שאלות רב-ברירה (Multiple Choice) בעברית לנושא: ${t?.name||topic}.
+רמת קושי: ${diffHe[diff]}.
+${instructions?`הוראות נוספות: ${instructions}`:''}
+
+החזר תשובה בפורמט JSON בלבד — מערך של אובייקטים. ללא שום טקסט לפני או אחרי ה-JSON.
+
+פורמט מדויק:
+[
+  {
+    "q": "מה הוא... ?",
+    "opts": ["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
+    "a": 0,
+    "exp": "הסבר קצר לתשובה הנכונה",
+    "diff": "${diff}",
+    "topic": "${topic}"
+  }
+]
+
+חשוב: "a" הוא אינדקס התשובה הנכונה (0-3). השאלות חייבות להיות בעברית. ההסבר חייב להיות בעברית.`;
+}
+
+function parseImportText(raw) {
+  raw = raw.trim();
+  // Try JSON first
+  if(raw.startsWith('[')) {
+    try {
+      const arr = JSON.parse(raw);
+      return {ok:true, questions:arr.filter(q=>q.q&&Array.isArray(q.opts)).map((q,i)=>({
+        id:`imp_${Date.now()}_${i}`, q:q.q, opts:q.opts.slice(0,4),
+        a:Math.min(q.a||0,3), exp:q.exp||'', diff:q.diff||'intermediate',
+        topic:q.topic||'networking', type:q.type||'mc', custom:true, vs:0.5,
+      })), errors:[]};
+    } catch(e) { return {ok:false,questions:[],errors:[`JSON שגוי: ${e.message}`]}; }
+  }
+  // Try text format: each question block separated by --- or blank lines
+  const blocks = raw.split(/\n---\n|\n\n\n/).map(b=>b.trim()).filter(Boolean);
+  const questions=[], errors=[];
+  blocks.forEach((block,bi)=>{
+    const lines=block.split('\n').map(l=>l.trim()).filter(Boolean);
+    const get=(prefix)=>{const l=lines.find(x=>x.startsWith(prefix));return l?l.slice(prefix.length).trim():null;};
+    const q=get('שאלה:')||get('Q:');
+    const opts=[get('א:')||get('A:'),get('ב:')||get('B:'),get('ג:')||get('C:'),get('ד:')||get('D:')];
+    const ansStr=get('תשובה:')||get('Answer:');
+    const exp=get('הסבר:')||get('Exp:')||'';
+    const topic=get('נושא:')||get('Topic:')||'networking';
+    const diff=get('קושי:')||get('Diff:')||'intermediate';
+    if(!q){errors.push(`בלוק ${bi+1}: חסרה שאלה`);return;}
+    if(opts.some(o=>!o)){errors.push(`בלוק ${bi+1}: חסרות תשובות`);return;}
+    const ansMap={א:0,ב:1,ג:2,ד:3,A:0,B:1,C:2,D:3,'0':0,'1':1,'2':2,'3':3};
+    const a=ansStr?ansMap[ansStr.charAt(0)]??0:0;
+    const topicId=TOPICS.find(t=>t.name===topic||t.id===topic)?.id||'networking';
+    const diffId=['beginner','intermediate','advanced','expert'].includes(diff)?diff:'intermediate';
+    questions.push({id:`imp_${Date.now()}_${bi}`,q,opts,a,exp,topic:topicId,diff:diffId,type:'mc',custom:true,vs:0.5});
+  });
+  return {ok:true,questions,errors};
+}
+
+// ─── ADMIN: QUESTIONS ─────────────────────────────────────────────────────────
 function AdminQuestions({gsData,setGsData}) {
   const [tab,setTab]=useState('base');
   const [filterTopic,setFilterTopic]=useState(null);
@@ -1734,6 +1839,23 @@ function AdminQuestions({gsData,setGsData}) {
   const [search,setSearch]=useState('');
   const EMPTY={topic:'networking',diff:'intermediate',type:'mc',q:'',opts:['','','',''],a:0,exp:''};
   const [form,setForm]=useState(EMPTY);
+
+  // AI state
+  const [aiAgent,setAiAgent]=useState(AI_AGENTS[0]);
+  const [aiTopic,setAiTopic]=useState('networking');
+  const [aiDiff,setAiDiff]=useState('intermediate');
+  const [aiCount,setAiCount]=useState(5);
+  const [aiInstructions,setAiInstructions]=useState('');
+  const [aiLoading,setAiLoading]=useState(false);
+  const [aiGenerated,setAiGenerated]=useState([]);
+  const [aiApproved,setAiApproved]=useState(new Set());
+  const [aiError,setAiError]=useState('');
+
+  // Import state
+  const [importText,setImportText]=useState('');
+  const [importFormat,setImportFormat]=useState('json');
+  const [importParsed,setImportParsed]=useState(null);
+  const [importSelected,setImportSelected]=useState(new Set());
 
   function saveQ(){
     if(!form.q.trim()||form.opts.some(o=>!o.trim())){Alert.alert('שגיאה','מלא את כל השדות');return;}
@@ -1748,6 +1870,47 @@ function AdminQuestions({gsData,setGsData}) {
   function delQ(id){Alert.alert('מחיקה','למחוק שאלה זו?',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>setGsData(gd=>({...gd,customQs:gd.customQs.filter(q=>q.id!==id)}))}]);}
   function editQ(q){setForm({topic:q.topic,diff:q.diff,type:q.type||'mc',q:q.q,opts:[...q.opts],a:q.a,exp:q.exp});setEditingId(q.id);setTab('add');}
   function dupQ(q){setForm({topic:q.topic,diff:q.diff,type:q.type||'mc',q:q.q+' (עותק)',opts:[...q.opts],a:q.a,exp:q.exp});setEditingId(null);setTab('add');}
+
+  // ── AI generation ──
+  async function generateAI(){
+    const apiKey=gsData.settings.aiApiKey;
+    if(!apiKey){Alert.alert('מפתח API חסר','הגדר מפתח Anthropic API בהגדרות המנהל');return;}
+    setAiLoading(true);setAiError('');setAiGenerated([]);setAiApproved(new Set());
+    try {
+      const prompt=buildGeneratePrompt(aiAgent,aiTopic,aiDiff,aiCount,aiInstructions);
+      const text=await callAnthropicAPI(apiKey,[{role:'user',content:prompt}]);
+      const qs=parseAIQuestions(text,aiTopic,aiDiff);
+      if(qs.length===0){setAiError('לא הצלחתי לפרסר את התשובה. נסה שוב.');return;}
+      setAiGenerated(qs);
+      setAiApproved(new Set(qs.map(q=>q.id)));
+    } catch(e){setAiError(`שגיאה: ${e.message}`);}
+    finally{setAiLoading(false);}
+  }
+  function importApproved(){
+    const toAdd=aiGenerated.filter(q=>aiApproved.has(q.id));
+    if(!toAdd.length){Alert.alert('לא נבחרו שאלות','בחר לפחות שאלה אחת');return;}
+    setGsData(gd=>({...gd,customQs:[...gd.customQs,...toAdd]}));
+    Alert.alert('✓',`${toAdd.length} שאלות נוספו לבנק השאלות`);
+    setAiGenerated([]);setAiApproved(new Set());setTab('custom');
+  }
+  function toggleAIApprove(id){setAiApproved(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
+
+  // ── Import ──
+  function parseImport(){
+    if(!importText.trim()){Alert.alert('שגיאה','הדבק תוכן לייבוא');return;}
+    const result=parseImportText(importText);
+    setImportParsed(result);
+    setImportSelected(new Set(result.questions.map(q=>q.id)));
+  }
+  function doImport(){
+    if(!importParsed?.questions.length){return;}
+    const toAdd=importParsed.questions.filter(q=>importSelected.has(q.id));
+    if(!toAdd.length){Alert.alert('לא נבחרו שאלות','בחר לפחות שאלה אחת');return;}
+    setGsData(gd=>({...gd,customQs:[...gd.customQs,...toAdd]}));
+    Alert.alert('✓',`${toAdd.length} שאלות יובאו`);
+    setImportText('');setImportParsed(null);setImportSelected(new Set());setTab('custom');
+  }
+  function toggleImportSelect(id){setImportSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
 
   function applyFilters(list){
     return list.filter(q=>{
@@ -1777,13 +1940,13 @@ function AdminQuestions({gsData,setGsData}) {
           </Card>))}
       </Row>
       {/* Tabs */}
-      <Row style={{gap:8,marginBottom:10}}>
-        {[['base',`בסיס (${QS.length})`],['custom',`מותאמות (${gsData.customQs.length})`],['add',editingId?'✏️ עריכה':'➕ הוסף']].map(([v,l])=>(
-          <TouchableOpacity key={v} style={[S.cntBtn,tab===v&&S.cntBtnOn,{flex:1,paddingHorizontal:4}]} onPress={()=>setTab(v)}>
-            <Text style={[{fontSize:11,fontWeight:'700',color:C.text,textAlign:'center'},tab===v&&{color:'#fff'}]}>{l}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:7,marginBottom:10,paddingHorizontal:1}}>
+        {[['base',`📦 בסיס`,QS.length],['custom',`⚙️ מותאמות`,gsData.customQs.length],['add',editingId?'✏️ עריכה':'➕ הוסף',null],['ai','🤖 AI',null],['import','📥 ייבוא',null]].map(([v,l,cnt])=>(
+          <TouchableOpacity key={v} style={[S.cntBtn,tab===v&&S.cntBtnOn,{paddingHorizontal:12,paddingVertical:8}]} onPress={()=>setTab(v)}>
+            <Text style={[{fontSize:12,fontWeight:'700',color:C.text},tab===v&&{color:'#fff'}]}>{l}{cnt!==null?` (${cnt})`:''}</Text>
           </TouchableOpacity>
         ))}
-      </Row>
+      </ScrollView>
       {tab!=='add'&&<>
         <TextInput style={[S.inp,{marginBottom:8}]} value={search} onChangeText={setSearch}
           placeholder="🔍 חיפוש בשאלות..." placeholderTextColor={C.muted} textAlign="right"/>
@@ -1958,6 +2121,191 @@ function AdminQuestions({gsData,setGsData}) {
           </TouchableOpacity>
         </Row>
       </Card>}
+      {/* ── AI Generation Tab ── */}
+      {tab==='ai'&&<View>
+        {!gsData.settings.aiApiKey&&<View style={{backgroundColor:C.warningLight,borderRadius:14,padding:14,marginBottom:12,borderWidth:1,borderColor:C.warning+'40',flexDirection:'row-reverse',gap:10,alignItems:'flex-start'}}>
+          <Icon name="warning-outline" size={18} color={C.warning}/>
+          <Text style={{flex:1,textAlign:'right',fontSize:13,color:C.warning,fontWeight:'700',lineHeight:20}}>יש להגדיר מפתח Anthropic API בלשונית ״הגדרות״ לפני שימוש בתכונה זו</Text>
+        </View>}
+
+        {/* Agent selector */}
+        <Text style={S.inpLabel}>בחר סוכן AI</Text>
+        <View style={{gap:8,marginBottom:14}}>
+          {AI_AGENTS.map(ag=>(
+            <TouchableOpacity key={ag.id} onPress={()=>setAiAgent(ag)} activeOpacity={0.8}
+              style={{backgroundColor:aiAgent.id===ag.id?ag.color+'12':C.card,borderRadius:14,padding:12,borderWidth:2,borderColor:aiAgent.id===ag.id?ag.color:C.border,flexDirection:'row-reverse',alignItems:'center',gap:12,...shadow(0.5)}}>
+              <View style={{width:44,height:44,borderRadius:22,backgroundColor:ag.color,alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <Text style={{fontSize:22}}>{ag.icon}</Text>
+              </View>
+              <View style={{flex:1,alignItems:'flex-end'}}>
+                <Text style={{fontWeight:'800',fontSize:14,color:aiAgent.id===ag.id?ag.color:C.text}}>{ag.name}</Text>
+                <Text style={{fontSize:11,color:C.muted,marginTop:2,textAlign:'right'}}>{ag.desc}</Text>
+              </View>
+              {aiAgent.id===ag.id&&<Icon name="checkmark-circle" size={20} color={ag.color}/>}
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Topic + Diff + Count */}
+        <Text style={S.inpLabel}>נושא</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:12}}>
+          {TOPICS.map(t=>(
+            <TouchableOpacity key={t.id} onPress={()=>setAiTopic(t.id)}
+              style={{backgroundColor:aiTopic===t.id?t.color:C.fill,borderRadius:20,paddingHorizontal:12,paddingVertical:6,borderWidth:1.5,borderColor:aiTopic===t.id?t.color:C.border}}>
+              <Text style={{fontSize:12,fontWeight:'700',color:aiTopic===t.id?'#fff':C.text}}>{t.icon} {t.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <Row style={{gap:10,marginBottom:12}}>
+          <View style={{flex:1}}>
+            <Text style={[S.inpLabel,{marginBottom:6}]}>רמת קושי</Text>
+            <Row style={{gap:5}}>
+              {['beginner','intermediate','advanced','expert'].map(d=>(
+                <TouchableOpacity key={d} onPress={()=>setAiDiff(d)} style={{flex:1,backgroundColor:aiDiff===d?DIFF_COLOR[d]:C.fill,borderRadius:10,paddingVertical:7,alignItems:'center',borderWidth:1.5,borderColor:aiDiff===d?DIFF_COLOR[d]:C.border}}>
+                  <Text style={{fontSize:9,fontWeight:'800',color:aiDiff===d?'#fff':C.text}}>{DIFF_LABEL[d]}</Text>
+                </TouchableOpacity>
+              ))}
+            </Row>
+          </View>
+        </Row>
+
+        <Text style={S.inpLabel}>כמות שאלות</Text>
+        <Row style={{gap:8,marginBottom:12}}>
+          {[3,5,8,10].map(n=>(
+            <TouchableOpacity key={n} style={[S.cntBtn,aiCount===n&&S.cntBtnOn,{flex:1}]} onPress={()=>setAiCount(n)}>
+              <Text style={[S.cntTxt,aiCount===n&&{color:'#fff'}]}>{n}</Text>
+            </TouchableOpacity>
+          ))}
+        </Row>
+
+        <Text style={S.inpLabel}>הוראות נוספות (אופציונלי)</Text>
+        <TextInput style={[S.inp,{height:72,textAlignVertical:'top',marginBottom:14}]}
+          value={aiInstructions} onChangeText={setAiInstructions}
+          placeholder="לדוגמה: התמקד ב-subnetting, כלול שאלות על IPv6..." placeholderTextColor={C.muted} textAlign="right" multiline/>
+
+        <TouchableOpacity style={[S.btn,aiLoading&&{opacity:0.7},shadow(1)]} onPress={generateAI} disabled={aiLoading}>
+          {aiLoading
+            ? <><ActivityIndicator color="#fff" size="small"/><Text style={[S.btnTxt,{marginRight:10}]}>יוצר שאלות...</Text></>
+            : <><Icon name="sparkles" size={18} color="#fff"/><Text style={[S.btnTxt,{marginRight:10}]}>צור שאלות עם AI</Text></>}
+        </TouchableOpacity>
+
+        {aiError!==''&&<View style={{backgroundColor:C.dangerLight,borderRadius:12,padding:12,marginTop:10,borderWidth:1,borderColor:C.danger+'40'}}>
+          <Text style={{textAlign:'right',fontSize:13,color:C.danger,fontWeight:'700'}}>{aiError}</Text>
+        </View>}
+
+        {/* Generated questions preview */}
+        {aiGenerated.length>0&&<>
+          <View style={{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',marginTop:16,marginBottom:10}}>
+            <TouchableOpacity onPress={()=>setAiApproved(aiApproved.size===aiGenerated.length?new Set():new Set(aiGenerated.map(q=>q.id)))}
+              style={{backgroundColor:C.primary+'15',borderRadius:20,paddingHorizontal:12,paddingVertical:5}}>
+              <Text style={{fontSize:12,fontWeight:'700',color:C.primary}}>{aiApproved.size===aiGenerated.length?'בטל הכל':'בחר הכל'}</Text>
+            </TouchableOpacity>
+            <Text style={{fontWeight:'800',fontSize:15,color:C.text}}>שאלות שנוצרו ({aiGenerated.length})</Text>
+          </View>
+          {aiGenerated.map((q,i)=>{
+            const approved=aiApproved.has(q.id);
+            const t=topicById(q.topic);
+            return <TouchableOpacity key={q.id} onPress={()=>toggleAIApprove(q.id)} activeOpacity={0.85}
+              style={{backgroundColor:approved?C.successLight:C.fill,borderRadius:14,padding:12,marginBottom:10,borderWidth:2,borderColor:approved?C.success:C.border,...shadow(0.5)}}>
+              <Row style={{justifyContent:'space-between',marginBottom:6}}>
+                <Row style={{flex:0,gap:6}}>
+                  <View style={{width:28,height:28,borderRadius:14,backgroundColor:approved?C.success:C.border,alignItems:'center',justifyContent:'center'}}>
+                    <Icon name={approved?'checkmark':'add'} size={16} color={approved?'#fff':C.muted}/>
+                  </View>
+                  <Pill label={DIFF_LABEL[q.diff]} color={DIFF_COLOR[q.diff]} small/>
+                </Row>
+                <Row style={{flex:0,gap:4}}>
+                  <Text style={{fontSize:11,color:C.muted}}>{t?.name}</Text>
+                  <Text style={{fontSize:16}}>{t?.icon}</Text>
+                </Row>
+              </Row>
+              <Text style={{textAlign:'right',fontSize:13,fontWeight:'600',color:C.text,marginBottom:4}}>{q.q}</Text>
+              <Text style={{textAlign:'right',fontSize:11,color:C.success}}>✓ {q.opts[q.a]}</Text>
+              {q.exp?<Text style={{textAlign:'right',fontSize:11,color:C.muted,marginTop:3}}>{q.exp}</Text>:null}
+            </TouchableOpacity>;
+          })}
+          <TouchableOpacity style={[S.btn,shadow(1)]} onPress={importApproved}>
+            <Icon name="download-outline" size={18} color="#fff"/>
+            <Text style={[S.btnTxt,{marginRight:10}]}>ייבא {aiApproved.size} שאלות נבחרות</Text>
+          </TouchableOpacity>
+        </>}
+      </View>}
+
+      {/* ── Import Tab ── */}
+      {tab==='import'&&<View>
+        {/* Format selector */}
+        <Text style={S.inpLabel}>פורמט ייבוא</Text>
+        <Row style={{gap:8,marginBottom:12}}>
+          <TouchableOpacity style={[S.cntBtn,importFormat==='json'&&S.cntBtnOn,{flex:1}]} onPress={()=>{setImportFormat('json');setImportParsed(null);}}>
+            <Text style={[S.cntTxt,importFormat==='json'&&{color:'#fff'}]}>📄 JSON</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[S.cntBtn,importFormat==='text'&&S.cntBtnOn,{flex:1}]} onPress={()=>{setImportFormat('text');setImportParsed(null);}}>
+            <Text style={[S.cntTxt,importFormat==='text'&&{color:'#fff'}]}>📝 טקסט</Text>
+          </TouchableOpacity>
+        </Row>
+
+        {/* Format guide */}
+        <Card style={{backgroundColor:C.primary+'08',borderWidth:1,borderColor:C.primary+'30',marginBottom:12}}>
+          <Text style={{textAlign:'right',fontWeight:'700',fontSize:13,color:C.primary,marginBottom:6}}>פורמט {importFormat==='json'?'JSON':'טקסט'}</Text>
+          <Text style={{textAlign:'left',fontSize:11,color:C.muted,fontFamily:'monospace',lineHeight:17}}>
+            {importFormat==='json'
+              ? `[\n  {\n    "q": "מה הוא VLAN?",\n    "opts": ["תשובה א","תשובה ב","תשובה ג","תשובה ד"],\n    "a": 0,\n    "exp": "הסבר",\n    "topic": "networking",\n    "diff": "intermediate"\n  }\n]`
+              : `שאלה: מה הוא VLAN?\nא: תשובה א\nב: תשובה ב\nג: תשובה ג\nד: תשובה ד\nתשובה: א\nהסבר: הסבר קצר\nנושא: networking\nקושי: intermediate\n---\nשאלה: שאלה נוספת...`}
+          </Text>
+        </Card>
+
+        <TextInput style={[S.inp,{height:160,textAlignVertical:'top',marginBottom:10,fontFamily:isIOS?'Courier':'monospace'}]}
+          value={importText} onChangeText={v=>{setImportText(v);setImportParsed(null);}}
+          placeholder={importFormat==='json'?'[ { "q": "...", "opts": [...], "a": 0 } ]':'שאלה: ...\nא: ...\nב: ...\nג: ...\nד: ...\nתשובה: א\n---'}
+          placeholderTextColor={C.muted} textAlign="left" multiline autoCapitalize="none" autoCorrect={false}/>
+
+        <TouchableOpacity style={[S.outBtn,{borderColor:C.primary+'60',marginBottom:12}]} onPress={parseImport}>
+          <Icon name="search-outline" size={16} color={C.primary}/>
+          <Text style={{color:C.primary,fontWeight:'700',marginRight:6}}>נתח ובדוק</Text>
+        </TouchableOpacity>
+
+        {importParsed&&<>
+          {importParsed.errors.length>0&&<Card style={{backgroundColor:C.dangerLight,borderWidth:1,borderColor:C.danger+'40',marginBottom:10}}>
+            {importParsed.errors.map((e,i)=><Text key={i} style={{textAlign:'right',fontSize:12,color:C.danger}}>⚠️ {e}</Text>)}
+          </Card>}
+
+          {importParsed.questions.length>0&&<>
+            <View style={{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <TouchableOpacity onPress={()=>setImportSelected(importSelected.size===importParsed.questions.length?new Set():new Set(importParsed.questions.map(q=>q.id)))}
+                style={{backgroundColor:C.primary+'15',borderRadius:20,paddingHorizontal:12,paddingVertical:5}}>
+                <Text style={{fontSize:12,fontWeight:'700',color:C.primary}}>{importSelected.size===importParsed.questions.length?'בטל הכל':'בחר הכל'}</Text>
+              </TouchableOpacity>
+              <Text style={{fontWeight:'800',fontSize:14,color:C.text}}>נמצאו {importParsed.questions.length} שאלות</Text>
+            </View>
+            {importParsed.questions.map((q,i)=>{
+              const sel=importSelected.has(q.id);
+              return <TouchableOpacity key={q.id} onPress={()=>toggleImportSelect(q.id)} activeOpacity={0.85}
+                style={{backgroundColor:sel?C.successLight:C.fill,borderRadius:12,padding:11,marginBottom:8,borderWidth:1.5,borderColor:sel?C.success:C.border}}>
+                <Row style={{justifyContent:'space-between',marginBottom:4}}>
+                  <View style={{width:24,height:24,borderRadius:12,backgroundColor:sel?C.success:C.border,alignItems:'center',justifyContent:'center'}}>
+                    <Icon name={sel?'checkmark':'add'} size={14} color={sel?'#fff':C.muted}/>
+                  </View>
+                  <Row style={{flex:0,gap:5}}>
+                    <Pill label={DIFF_LABEL[q.diff]||q.diff} color={DIFF_COLOR[q.diff]||C.muted} small/>
+                    <Text style={{fontSize:11,color:C.muted}}>{topicById(q.topic)?.icon} {topicById(q.topic)?.name||q.topic}</Text>
+                  </Row>
+                </Row>
+                <Text style={{textAlign:'right',fontSize:12,fontWeight:'600',color:C.text}} numberOfLines={2}>{q.q}</Text>
+                <Text style={{textAlign:'right',fontSize:11,color:C.success,marginTop:3}}>✓ {q.opts[q.a]}</Text>
+              </TouchableOpacity>;
+            })}
+            <TouchableOpacity style={[S.btn,shadow(1)]} onPress={doImport}>
+              <Icon name="download-outline" size={18} color="#fff"/>
+              <Text style={[S.btnTxt,{marginRight:10}]}>ייבא {importSelected.size} שאלות</Text>
+            </TouchableOpacity>
+          </>}
+          {importParsed.questions.length===0&&importParsed.errors.length===0&&<Card style={{alignItems:'center',padding:20}}>
+            <Text style={{fontSize:28,marginBottom:6}}>🤷</Text>
+            <Text style={{color:C.muted,textAlign:'center'}}>לא נמצאו שאלות תקינות בפורמט שצוין</Text>
+          </Card>}
+        </>}
+      </View>}
     </ScrollView>
     {/* Preview modal */}
     {previewQ&&<View style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'rgba(0,0,0,0.55)',justifyContent:'flex-end'}}>
@@ -2214,11 +2562,13 @@ function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
   const [oldPwd,setOldPwd]=useState('');
   const [newPwd,setNewPwd]=useState('');
   const [confPwd,setConfPwd]=useState('');
+  const [aiKey,setAiKey]=useState(gsData.settings.aiApiKey||'');
+  const [showKey,setShowKey]=useState(false);
 
   function saveSettings(){
     const pg=parseInt(passGrade);
     if(pg<50||pg>95){Alert.alert('שגיאה','ציון עובר חייב להיות 50–95');return;}
-    setGsData(gd=>({...gd,settings:{...gd.settings,passGrade:pg,regEnabled}}));
+    setGsData(gd=>({...gd,settings:{...gd.settings,passGrade:pg,regEnabled,aiApiKey:aiKey.trim()}}));
     Alert.alert('✓','הגדרות נשמרו');
   }
   function changePwd(){
@@ -2276,6 +2626,27 @@ function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
         <Icon name="save-outline" size={16} color="#fff"/>
         <Text style={[S.btnTxt,{marginRight:8}]}>שמור הגדרות</Text>
       </TouchableOpacity>
+    </Card>
+    <Sec title="🤖 AI — מפתח Anthropic API"/>
+    <Card>
+      <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:8,lineHeight:18}}>נדרש מפתח API של Anthropic ליצירת שאלות אוטומטית עם AI. קבל מפתח בכתובת console.anthropic.com</Text>
+      <View style={{marginBottom:10}}>
+        <TextInput style={S.inp} value={aiKey} onChangeText={setAiKey}
+          placeholder="sk-ant-api03-..." placeholderTextColor={C.muted} textAlign="left"
+          secureTextEntry={!showKey} autoCapitalize="none" autoCorrect={false}/>
+        <TouchableOpacity onPress={()=>setShowKey(s=>!s)} style={{position:'absolute',left:14,top:14}}>
+          <Icon name={showKey?'eye-off-outline':'eye-outline'} size={18} color={C.muted}/>
+        </TouchableOpacity>
+      </View>
+      <Row style={{gap:8}}>
+        <TouchableOpacity style={[S.btn,{flex:1,marginBottom:0}]} onPress={saveSettings}>
+          <Icon name="save-outline" size={15} color="#fff"/>
+          <Text style={[S.btnTxt,{marginRight:6,fontSize:14}]}>שמור מפתח</Text>
+        </TouchableOpacity>
+        {gsData.settings.aiApiKey&&<View style={{backgroundColor:C.successLight,borderRadius:12,paddingHorizontal:12,paddingVertical:8,justifyContent:'center',borderWidth:1,borderColor:C.success+'40'}}>
+          <Icon name="checkmark-circle" size={18} color={C.success}/>
+        </View>}
+      </Row>
     </Card>
     <Sec title="שינוי סיסמת מנהל"/>
     <Card>
@@ -2643,6 +3014,353 @@ function AdminReports({gsData}) {
   </ScrollView>;
 }
 
+// ─── ADMIN: AI TOOLS ──────────────────────────────────────────────────────────
+function AdminAITools({gsData,setGsData}) {
+  const [agent,setAgent]=useState(AI_AGENTS[0]);
+  const [topic,setTopic]=useState('networking');
+  const [diff,setDiff]=useState('intermediate');
+  const [count,setCount]=useState(5);
+  const [instructions,setInstructions]=useState('');
+  const [loading,setLoading]=useState(false);
+  const [generated,setGenerated]=useState([]);
+  const [approved,setApproved]=useState(new Set());
+  const [error,setError]=useState('');
+  const [importText,setImportText]=useState('');
+  const [importFormat,setImportFormat]=useState('json');
+  const [importParsed,setImportParsed]=useState(null);
+  const [importSelected,setImportSelected]=useState(new Set());
+  const [subTab,setSubTab]=useState('generate');
+
+  async function generate(){
+    const apiKey=gsData.settings.aiApiKey;
+    if(!apiKey){Alert.alert('מפתח API חסר','הגדר מפתח Anthropic API בהגדרות');return;}
+    setLoading(true);setError('');setGenerated([]);setApproved(new Set());
+    try {
+      const prompt=buildGeneratePrompt(agent,topic,diff,count,instructions);
+      const text=await callAnthropicAPI(apiKey,[{role:'user',content:prompt}]);
+      const qs=parseAIQuestions(text,topic,diff);
+      if(!qs.length){setError('לא הצלחתי לפרסר. נסה שוב.');return;}
+      setGenerated(qs);setApproved(new Set(qs.map(q=>q.id)));
+    } catch(e){setError(`שגיאה: ${e.message}`);}
+    finally{setLoading(false);}
+  }
+
+  function importApproved(){
+    const toAdd=generated.filter(q=>approved.has(q.id));
+    if(!toAdd.length){Alert.alert('שגיאה','בחר שאלות לייבוא');return;}
+    setGsData(gd=>({...gd,customQs:[...gd.customQs,...toAdd]}));
+    Alert.alert('✓',`${toAdd.length} שאלות נוספו!`);
+    setGenerated([]);setApproved(new Set());
+  }
+
+  function parseImport(){
+    if(!importText.trim()){Alert.alert('שגיאה','הדבק תוכן');return;}
+    const r=parseImportText(importText);
+    setImportParsed(r);setImportSelected(new Set(r.questions.map(q=>q.id)));
+  }
+  function doImport(){
+    const toAdd=(importParsed?.questions||[]).filter(q=>importSelected.has(q.id));
+    if(!toAdd.length){Alert.alert('שגיאה','בחר שאלות');return;}
+    setGsData(gd=>({...gd,customQs:[...gd.customQs,...toAdd]}));
+    Alert.alert('✓',`${toAdd.length} שאלות יובאו`);
+    setImportText('');setImportParsed(null);setImportSelected(new Set());
+  }
+
+  async function generateVariations(q){
+    const apiKey=gsData.settings.aiApiKey;
+    if(!apiKey){Alert.alert('מפתח API חסר','הגדר מפתח בהגדרות');return;}
+    setLoading(true);setError('');
+    try {
+      const prompt=`צור 3 וריאציות של השאלה הבאה בעברית, שומר על אותו נושא ורמת קושי אבל שינוי בניסוח ובתשובות.
+שאלה מקורית: ${q.q}
+נושא: ${q.topic}, קושי: ${q.diff}
+החזר JSON בלבד — מערך של 3 אובייקטים עם אותו פורמט של השאלה המקורית.`;
+      const text=await callAnthropicAPI(apiKey,[{role:'user',content:prompt}]);
+      const qs=parseAIQuestions(text,q.topic,q.diff);
+      if(!qs.length){setError('לא הצלחתי ליצור וריאציות');return;}
+      setGenerated(qs);setApproved(new Set(qs.map(x=>x.id)));setSubTab('generate');
+      Alert.alert('✓',`3 וריאציות נוצרו - עיין וייבא`);
+    } catch(e){setError(`שגיאה: ${e.message}`);}
+    finally{setLoading(false);}
+  }
+
+  const [improveFeedback,setImproveFeedback]=useState('');
+  const [improveTarget,setImproveTarget]=useState(null);
+
+  async function improveQuestion(q){
+    const apiKey=gsData.settings.aiApiKey;
+    if(!apiKey){Alert.alert('מפתח API חסר','הגדר מפתח בהגדרות');return;}
+    setImproveTarget(q);setImproveFeedback('');
+  }
+  async function runImprove(){
+    if(!improveFeedback.trim()||!improveTarget)return;
+    const apiKey=gsData.settings.aiApiKey;
+    setLoading(true);setError('');setImproveTarget(null);
+    try {
+      const q=improveTarget;
+      const prompt=`שפר את השאלה הבאה בעברית לפי הבקשה.
+שאלה: ${q.q}
+תשובות: ${q.opts.join(' | ')}
+תשובה נכונה: ${q.opts[q.a]}
+הסבר: ${q.exp}
+בקשה לשיפור: ${improveFeedback}
+החזר JSON בלבד — מערך עם אובייקט אחד משופר בפורמט: [{"q":"...","opts":[...],"a":0,"exp":"...","diff":"${q.diff}","topic":"${q.topic}"}]`;
+      const text=await callAnthropicAPI(apiKey,[{role:'user',content:prompt}]);
+      const qs=parseAIQuestions(text,q.topic,q.diff);
+      if(!qs.length){setError('לא הצלחתי לשפר. נסה שוב.');return;}
+      setGenerated(qs);setApproved(new Set(qs.map(x=>x.id)));setSubTab('generate');
+    } catch(e){setError(`שגיאה: ${e.message}`);}
+    finally{setLoading(false);setImproveFeedback('');}
+  }
+
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:40}} keyboardShouldPersistTaps="handled">
+    <Text style={S.pgTitle}>כלי AI 🤖</Text>
+    {!gsData.settings.aiApiKey&&<View style={{backgroundColor:C.warningLight,borderRadius:14,padding:14,marginBottom:14,borderWidth:1,borderColor:C.warning+'40'}}>
+      <Row style={{justifyContent:'flex-end',gap:6,marginBottom:4}}>
+        <Text style={{fontWeight:'800',fontSize:13,color:C.warning}}>נדרש מפתח API</Text>
+        <Icon name="warning-outline" size={16} color={C.warning}/>
+      </Row>
+      <Text style={{textAlign:'right',fontSize:12,color:C.warning}}>הגדר מפתח Anthropic API בלשונית הגדרות</Text>
+    </View>}
+
+    {/* Sub-tab switcher */}
+    <Row style={{gap:8,marginBottom:14}}>
+      {[['generate','🤖 יצירה'],['import','📥 ייבוא'],['workshop','🔧 סדנה']].map(([v,l])=>(
+        <TouchableOpacity key={v} style={[S.cntBtn,subTab===v&&S.cntBtnOn,{flex:1}]} onPress={()=>setSubTab(v)}>
+          <Text style={[{fontSize:12,fontWeight:'700',color:C.text,textAlign:'center'},subTab===v&&{color:'#fff'}]}>{l}</Text>
+        </TouchableOpacity>
+      ))}
+    </Row>
+
+    {/* ── Generate sub-tab ── */}
+    {subTab==='generate'&&<>
+      <Sec title="בחר סוכן AI"/>
+      {AI_AGENTS.map(ag=>(
+        <TouchableOpacity key={ag.id} onPress={()=>setAgent(ag)} activeOpacity={0.82}
+          style={{backgroundColor:agent.id===ag.id?ag.color+'12':C.card,borderRadius:16,padding:14,marginBottom:10,borderWidth:2,borderColor:agent.id===ag.id?ag.color:C.border,...shadow(0.6),flexDirection:'row-reverse',alignItems:'center',gap:12}}>
+          <View style={{width:52,height:52,borderRadius:26,backgroundColor:agent.id===ag.id?ag.color:C.fill,alignItems:'center',justifyContent:'center',flexShrink:0,...shadow(0.5)}}>
+            <Text style={{fontSize:26}}>{ag.icon}</Text>
+          </View>
+          <View style={{flex:1,alignItems:'flex-end'}}>
+            <Text style={{fontWeight:'900',fontSize:15,color:agent.id===ag.id?ag.color:C.text}}>{ag.name}</Text>
+            <Text style={{fontSize:12,color:C.muted,marginTop:3,textAlign:'right'}}>{ag.desc}</Text>
+          </View>
+          <Icon name={agent.id===ag.id?'radio-button-on':'radio-button-off'} size={22} color={agent.id===ag.id?ag.color:C.muted}/>
+        </TouchableOpacity>
+      ))}
+
+      <Sec title="הגדרות יצירה"/>
+      <Card>
+        <Text style={S.inpLabel}>נושא</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:14}}>
+          {TOPICS.map(t=>(
+            <TouchableOpacity key={t.id} onPress={()=>setTopic(t.id)}
+              style={{backgroundColor:topic===t.id?t.color:C.fill,borderRadius:20,paddingHorizontal:12,paddingVertical:7,borderWidth:1.5,borderColor:topic===t.id?t.color:C.border}}>
+              <Text style={{fontSize:12,fontWeight:'700',color:topic===t.id?'#fff':C.text}}>{t.icon} {t.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <Text style={S.inpLabel}>רמת קושי</Text>
+        <Row style={{gap:7,marginBottom:14}}>
+          {['beginner','intermediate','advanced','expert'].map(d=>(
+            <TouchableOpacity key={d} style={{flex:1,backgroundColor:diff===d?DIFF_COLOR[d]:C.fill,borderRadius:12,paddingVertical:10,alignItems:'center',borderWidth:1.5,borderColor:diff===d?DIFF_COLOR[d]:C.border}} onPress={()=>setDiff(d)}>
+              <Text style={{fontSize:10,fontWeight:'800',color:diff===d?'#fff':C.text}}>{DIFF_LABEL[d]}</Text>
+            </TouchableOpacity>
+          ))}
+        </Row>
+        <Text style={S.inpLabel}>כמות שאלות</Text>
+        <Row style={{gap:8,marginBottom:14}}>
+          {[3,5,8,10,15].map(n=>(
+            <TouchableOpacity key={n} style={[S.cntBtn,count===n&&S.cntBtnOn,{flex:1}]} onPress={()=>setCount(n)}>
+              <Text style={[S.cntTxt,count===n&&{color:'#fff'}]}>{n}</Text>
+            </TouchableOpacity>
+          ))}
+        </Row>
+        <Text style={S.inpLabel}>הוראות מותאמות (אופציונלי)</Text>
+        <TextInput style={[S.inp,{height:76,textAlignVertical:'top',marginBottom:14}]}
+          value={instructions} onChangeText={setInstructions}
+          placeholder="לדוגמה: שאלות על IPv6 בלבד, כלול מקרי קצה, שפה טכנית גבוהה..." placeholderTextColor={C.muted} textAlign="right" multiline/>
+        <TouchableOpacity style={[S.btn,loading&&{opacity:0.7},shadow(1)]} onPress={generate} disabled={loading}>
+          {loading?<><ActivityIndicator color="#fff" size="small"/><Text style={[S.btnTxt,{marginRight:10}]}>יוצר עם AI...</Text></>
+            :<><Icon name="sparkles" size={19} color="#fff"/><Text style={[S.btnTxt,{marginRight:10}]}>יצור {count} שאלות</Text></>}
+        </TouchableOpacity>
+      </Card>
+
+      {error!==''&&<Card style={{backgroundColor:C.dangerLight,borderWidth:1,borderColor:C.danger+'40'}}>
+        <Text style={{textAlign:'right',color:C.danger,fontWeight:'700'}}>{error}</Text>
+      </Card>}
+
+      {generated.length>0&&<>
+        <Row style={{justifyContent:'space-between',alignItems:'center',marginTop:16,marginBottom:10}}>
+          <Row style={{flex:0,gap:8}}>
+            <TouchableOpacity onPress={()=>setApproved(approved.size===generated.length?new Set():new Set(generated.map(q=>q.id)))}
+              style={{backgroundColor:C.primary+'15',borderRadius:20,paddingHorizontal:12,paddingVertical:5}}>
+              <Text style={{fontSize:12,fontWeight:'700',color:C.primary}}>{approved.size===generated.length?'בטל הכל':'בחר הכל'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={generate} style={{backgroundColor:C.purple+'15',borderRadius:20,paddingHorizontal:12,paddingVertical:5}}>
+              <Text style={{fontSize:12,fontWeight:'700',color:C.purple}}>רענן</Text>
+            </TouchableOpacity>
+          </Row>
+          <Text style={{fontWeight:'900',fontSize:16,color:C.text}}>תוצאות ({generated.length})</Text>
+        </Row>
+        {generated.map(q=>{
+          const ok=approved.has(q.id);const t=topicById(q.topic);
+          return <Card key={q.id} style={{marginBottom:10,borderWidth:2,borderColor:ok?C.success:C.border,backgroundColor:ok?C.successLight:C.card,...shadow(0.6)}}>
+            <Row style={{justifyContent:'space-between',marginBottom:8}}>
+              <Row style={{flex:0,gap:6}}>
+                <TouchableOpacity onPress={()=>setApproved(s=>{const n=new Set(s);n.has(q.id)?n.delete(q.id):n.add(q.id);return n;})}
+                  style={{width:30,height:30,borderRadius:15,backgroundColor:ok?C.success:C.fill,alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:ok?C.success:C.border}}>
+                  <Icon name={ok?'checkmark':'add'} size={16} color={ok?'#fff':C.muted}/>
+                </TouchableOpacity>
+                <Pill label={DIFF_LABEL[q.diff]} color={DIFF_COLOR[q.diff]} small/>
+                {q.aiGenerated&&<Pill label="AI" color={C.purple} small/>}
+              </Row>
+              <Row style={{flex:0,gap:4}}>
+                <Text style={{fontSize:11,color:C.muted}}>{t?.name}</Text>
+                <Text style={{fontSize:16}}>{t?.icon}</Text>
+              </Row>
+            </Row>
+            <Text style={{textAlign:'right',fontSize:14,fontWeight:'700',color:C.text,marginBottom:6}}>{q.q}</Text>
+            {q.opts.map((o,i)=><View key={i} style={{flexDirection:'row-reverse',alignItems:'center',gap:6,marginBottom:4,backgroundColor:q.a===i?C.success+'15':C.fill,borderRadius:8,padding:6}}>
+              <View style={{width:20,height:20,borderRadius:10,backgroundColor:q.a===i?C.success:C.border,alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <Text style={{fontSize:9,fontWeight:'900',color:q.a===i?'#fff':C.muted}}>{'אבגד'[i]}</Text>
+              </View>
+              <Text style={{flex:1,textAlign:'right',fontSize:12,color:q.a===i?C.success:C.text,fontWeight:q.a===i?'700':'400'}}>{o}</Text>
+            </View>)}
+            {q.exp?<Text style={{textAlign:'right',fontSize:11,color:C.muted,marginTop:4,lineHeight:17}}>💡 {q.exp}</Text>:null}
+          </Card>;
+        })}
+        <TouchableOpacity style={[S.btn,{marginTop:4},shadow(1)]} onPress={importApproved}>
+          <Icon name="download-outline" size={19} color="#fff"/>
+          <Text style={[S.btnTxt,{marginRight:10}]}>ייבא {approved.size} שאלות נבחרות</Text>
+        </TouchableOpacity>
+      </>}
+    </>}
+
+    {/* ── Import sub-tab ── */}
+    {subTab==='import'&&<>
+      <Sec title="ייבוא שאלות"/>
+      <Row style={{gap:8,marginBottom:12}}>
+        {[['json','📄 JSON'],['text','📝 טקסט מובנה']].map(([v,l])=>(
+          <TouchableOpacity key={v} style={[S.cntBtn,importFormat===v&&S.cntBtnOn,{flex:1}]} onPress={()=>{setImportFormat(v);setImportParsed(null);}}>
+            <Text style={[S.cntTxt,importFormat===v&&{color:'#fff'},{fontSize:12}]}>{l}</Text>
+          </TouchableOpacity>
+        ))}
+      </Row>
+      <Card style={{backgroundColor:C.primary+'08',borderWidth:1,borderColor:C.primary+'30',marginBottom:12}}>
+        <Text style={{textAlign:'right',fontWeight:'800',fontSize:13,color:C.primary,marginBottom:8}}>פורמט {importFormat==='json'?'JSON':'טקסט'}</Text>
+        <Text style={{textAlign:'left',fontSize:10,color:C.muted,lineHeight:16}}>
+          {importFormat==='json'
+            ? `[\n  { "q":"שאלה", "opts":["א","ב","ג","ד"],\n    "a":0, "exp":"הסבר",\n    "topic":"networking", "diff":"intermediate" }\n]`
+            : `שאלה: מה הוא ...\nא: ...\nב: ...\nג: ...\nד: ...\nתשובה: א\nהסבר: ...\nנושא: networking\nקושי: intermediate\n---\nשאלה: שאלה נוספת...`}
+        </Text>
+      </Card>
+      <TextInput style={[S.inp,{height:180,textAlignVertical:'top',marginBottom:10}]}
+        value={importText} onChangeText={v=>{setImportText(v);setImportParsed(null);}}
+        placeholder="הדבק כאן את השאלות לייבוא..." placeholderTextColor={C.muted}
+        textAlign="left" multiline autoCapitalize="none" autoCorrect={false}/>
+      <TouchableOpacity style={[S.outBtn,{borderColor:C.primary+'60',marginBottom:12}]} onPress={parseImport}>
+        <Icon name="search-outline" size={16} color={C.primary}/>
+        <Text style={{color:C.primary,fontWeight:'700',marginRight:6}}>נתח ובדוק</Text>
+      </TouchableOpacity>
+      {importParsed&&<>
+        {importParsed.errors.map((e,i)=><Text key={i} style={{textAlign:'right',fontSize:12,color:C.danger,marginBottom:4}}>⚠️ {e}</Text>)}
+        {importParsed.questions.length>0&&<>
+          <Row style={{justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <TouchableOpacity onPress={()=>setImportSelected(importSelected.size===importParsed.questions.length?new Set():new Set(importParsed.questions.map(q=>q.id)))}
+              style={{backgroundColor:C.primary+'15',borderRadius:20,paddingHorizontal:12,paddingVertical:5}}>
+              <Text style={{fontSize:12,fontWeight:'700',color:C.primary}}>{importSelected.size===importParsed.questions.length?'בטל הכל':'בחר הכל'}</Text>
+            </TouchableOpacity>
+            <Text style={{fontWeight:'800',fontSize:14}}>נמצאו {importParsed.questions.length} שאלות</Text>
+          </Row>
+          {importParsed.questions.map(q=>{
+            const sel=importSelected.has(q.id);
+            return <TouchableOpacity key={q.id} onPress={()=>setImportSelected(s=>{const n=new Set(s);n.has(q.id)?n.delete(q.id):n.add(q.id);return n;})}
+              style={{backgroundColor:sel?C.successLight:C.fill,borderRadius:12,padding:11,marginBottom:8,borderWidth:1.5,borderColor:sel?C.success:C.border}}>
+              <Row style={{justifyContent:'space-between',marginBottom:4}}>
+                <Icon name={sel?'checkmark-circle':'add-circle-outline'} size={20} color={sel?C.success:C.muted}/>
+                <Row style={{flex:0,gap:5}}>
+                  <Pill label={DIFF_LABEL[q.diff]||q.diff} color={DIFF_COLOR[q.diff]||C.muted} small/>
+                  <Text style={{fontSize:11,color:C.muted}}>{topicById(q.topic)?.icon}</Text>
+                </Row>
+              </Row>
+              <Text style={{textAlign:'right',fontSize:12,fontWeight:'600'}} numberOfLines={2}>{q.q}</Text>
+              <Text style={{textAlign:'right',fontSize:11,color:C.success,marginTop:2}}>✓ {q.opts[q.a]}</Text>
+            </TouchableOpacity>;
+          })}
+          <TouchableOpacity style={[S.btn,shadow(1)]} onPress={doImport}>
+            <Icon name="download-outline" size={18} color="#fff"/>
+            <Text style={[S.btnTxt,{marginRight:10}]}>ייבא {importSelected.size} שאלות</Text>
+          </TouchableOpacity>
+        </>}
+      </>}
+    </>}
+
+    {/* ── Workshop sub-tab ── */}
+    {subTab==='workshop'&&<>
+      <Sec title="סדנת AI — עבוד על שאלות קיימות"/>
+      <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:12,lineHeight:20}}>בחר שאלה מותאמת ובקש מה-AI לשפר אותה, ליצור וריאציות, או לכתוב שאלה קשורה</Text>
+      {gsData.customQs.length===0?<Card style={{alignItems:'center',padding:24}}>
+        <Text style={{fontSize:32,marginBottom:8}}>📝</Text>
+        <Text style={{color:C.muted,textAlign:'center'}}>אין שאלות מותאמות עדיין. צור שאלות עם AI תחילה</Text>
+      </Card>:gsData.customQs.map(q=>{
+        const t=topicById(q.topic);
+        return <Card key={q.id} style={{marginBottom:10,...shadow(0.5)}}>
+          <Row style={{justifyContent:'space-between',marginBottom:8}}>
+            <Row style={{flex:0,gap:5}}>
+              <Pill label={DIFF_LABEL[q.diff]} color={DIFF_COLOR[q.diff]} small/>
+              {q.aiGenerated&&<Pill label="AI" color={C.purple} small/>}
+            </Row>
+            <Row style={{flex:0,gap:4}}>
+              <Text style={{fontSize:11,color:C.muted}}>{t?.name}</Text>
+              <Text style={{fontSize:16}}>{t?.icon}</Text>
+            </Row>
+          </Row>
+          <Text style={{textAlign:'right',fontSize:13,fontWeight:'600',marginBottom:10}} numberOfLines={2}>{q.q}</Text>
+          <Row style={{gap:8}}>
+            <TouchableOpacity style={{flex:1,backgroundColor:C.purple+'12',borderRadius:10,paddingVertical:8,alignItems:'center',flexDirection:'row-reverse',justifyContent:'center',gap:5}} onPress={()=>generateVariations(q)} disabled={loading}>
+              <Icon name="copy-outline" size={13} color={C.purple}/>
+              <Text style={{fontSize:11,fontWeight:'700',color:C.purple}}>וריאציות</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={{flex:1,backgroundColor:C.cyan+'12',borderRadius:10,paddingVertical:8,alignItems:'center',flexDirection:'row-reverse',justifyContent:'center',gap:5}} onPress={()=>improveQuestion(q)} disabled={loading}>
+              <Icon name="sparkles-outline" size={13} color={C.cyan}/>
+              <Text style={{fontSize:11,fontWeight:'700',color:C.cyan}}>שפר</Text>
+            </TouchableOpacity>
+          </Row>
+        </Card>;
+      })}
+      {loading&&<Card style={{alignItems:'center',padding:20}}>
+        <ActivityIndicator color={C.purple} size="large"/>
+        <Text style={{color:C.purple,fontWeight:'700',marginTop:10}}>AI עובד...</Text>
+      </Card>}
+      {error!==''&&<Card style={{backgroundColor:C.dangerLight,borderWidth:1,borderColor:C.danger+'40'}}>
+        <Text style={{textAlign:'right',color:C.danger,fontWeight:'700'}}>{error}</Text>
+      </Card>}
+    </>}
+
+    {/* Improve modal */}
+    {improveTarget&&<View style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'rgba(0,0,0,0.55)',justifyContent:'flex-end'}}>
+      <View style={{backgroundColor:C.bg,borderTopLeftRadius:24,borderTopRightRadius:24,padding:20}}>
+        <Row style={{justifyContent:'space-between',marginBottom:14}}>
+          <TouchableOpacity onPress={()=>setImproveTarget(null)}><Icon name="close" size={22} color={C.muted}/></TouchableOpacity>
+          <Text style={{fontWeight:'900',fontSize:16}}>שפר שאלה ✨</Text>
+        </Row>
+        <Card style={{backgroundColor:C.primary+'08',borderWidth:1,borderColor:C.primary+'30',marginBottom:12}}>
+          <Text style={{textAlign:'right',fontSize:13,fontWeight:'600',color:C.text}} numberOfLines={2}>{improveTarget.q}</Text>
+        </Card>
+        <Text style={S.inpLabel}>מה לשפר?</Text>
+        <TextInput style={[S.inp,{height:80,textAlignVertical:'top',marginBottom:12}]}
+          value={improveFeedback} onChangeText={setImproveFeedback}
+          placeholder="לדוגמה: שפר את הניסוח, הוסף הסחות דעת מציאותיות, קצר את ההסבר..." placeholderTextColor={C.muted} textAlign="right" multiline autoFocus/>
+        <TouchableOpacity style={[S.btn,shadow(1)]} onPress={runImprove}>
+          <Icon name="sparkles" size={18} color="#fff"/>
+          <Text style={[S.btnTxt,{marginRight:8}]}>שפר עם AI</Text>
+        </TouchableOpacity>
+      </View>
+    </View>}
+  </ScrollView>;
+}
+
 // ─── ADMIN PANEL ──────────────────────────────────────────────────────────────
 function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
   const [adminTab,setAdminTab]=useState('dashboard');
@@ -2656,6 +3374,7 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
     {id:'leaderboard',label:'מובילים',icon:'trophy-outline',active:'trophy'},
     {id:'reports',label:'דוחות',icon:'document-text-outline',active:'document-text'},
     {id:'settings',label:'הגדרות',icon:'settings-outline',active:'settings'},
+    {id:'aitools',label:'AI כלים',icon:'sparkles-outline',active:'sparkles'},
   ];
   const unread=(gsData.users.filter(u=>u.role==='student'&&(u.prog?.totalAnswered||0)>=10&&pct(u.prog.totalCorrect,u.prog.totalAnswered)<70)).length;
   return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
@@ -2690,6 +3409,7 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
       {adminTab==='leaderboard'&&<AdminLeaderboard gsData={gsData}/>}
       {adminTab==='reports'&&<AdminReports gsData={gsData}/>}
       {adminTab==='settings'&&<AdminSettings gsData={gsData} setGsData={setGsData} onLogout={onLogout} adminUser={currentUser}/>}
+      {adminTab==='aitools'&&<AdminAITools gsData={gsData} setGsData={setGsData}/>}
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false}
       style={{backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,flexGrow:0}}
@@ -2720,7 +3440,7 @@ export default function App() {
   const [loaded,setLoaded]=useState(false);
   const [gsData,setGsData]=useState({
     users:[{id:'admin',username:'admin',password:'admin123',role:'admin',name:'מנהל',blocked:false,createdAt:Date.now()}],
-    announcements:[],customQs:[],groups:[],settings:{passGrade:70,regEnabled:true},
+    announcements:[],customQs:[],groups:[],settings:{passGrade:70,regEnabled:true,aiApiKey:''},
   });
   const [prog,dispatch]=useReducer(reducer,INIT_PROG);
   const [tab,setTab]=useState('home');
