@@ -4,8 +4,12 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
   KeyboardAvoidingView, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width: W } = Dimensions.get('window');
+const { width: W, height: H } = Dimensions.get('window');
 const isIOS = Platform.OS === 'ios';
+const isSmall = H < 700; // compact screens (SE, older Android)
+// Bottom padding constants — accounts for tab bars + home indicator
+const USER_PB  = isIOS ? 110 : 88;  // user-facing screens (has user TabBar)
+const ADMIN_PB = isIOS ? 96  : 74;  // admin screens (inside AdminPanel tab bar)
 const _mem = {};
 const Store = { get: k => Promise.resolve(_mem[k] ?? null), set: (k,v) => { _mem[k]=v; } };
 
@@ -544,7 +548,7 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout}) {
   const lastH = prog.quizHistory?.[0];
   const lastTopic = lastH?.topic?topicById(lastH.topic):null;
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:110}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:USER_PB}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     {/* Header */}
     <View style={{backgroundColor:C.primary,borderRadius:24,padding:18,marginBottom:14,...shadow(1.5)}}>
       <Row style={{justifyContent:'space-between',marginBottom:12}}>
@@ -677,7 +681,7 @@ function QuizSetupScreen({onStart}) {
   const [mode,setMode]=useState('exam');
   const [timerMin,setTimerMin]=useState(0);
   const [adaptive,setAdaptive]=useState(false);
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:110}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:USER_PB}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>הגדרות בחינה</Text>
     <View style={{backgroundColor:C.primary,borderRadius:22,padding:18,marginBottom:16,...shadow(1.5)}}>
       <Row style={{justifyContent:'space-between',alignItems:'center'}}>
@@ -974,7 +978,7 @@ function ResultsScreen({questions,answers,result,theta,onDismiss}) {
 // ─── TOPICS SCREEN ────────────────────────────────────────────────────────────
 function TopicsScreen({prog,onQuiz}) {
   const tp = prog.topicProgress||{};
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:USER_PB}} showsVerticalScrollIndicator={false}>
     <Text style={S.pgTitle}>נושאים</Text>
     {TOPICS.map(t=>{
       const p=tp[t.id], p2=p?pct(p.correct,p.answered):0;
@@ -1047,7 +1051,7 @@ function ProgressScreen({prog,dispatch,currentUser,onLogout}) {
   });
   const maxQs=Math.max(...last7.map(d=>d.qs),1);
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:USER_PB}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>התקדמות</Text>
     {/* Summary card */}
     <View style={{backgroundColor:C.primary,borderRadius:22,padding:18,marginBottom:14,...shadow(1.5)}}>
@@ -1293,7 +1297,7 @@ function AdminDashboard({gsData,setGsData,onNav}) {
   const recentQuizzes=allHistory.sort((a,b)=>b.date-a.date).slice(0,5);
   const allQsCount=QS.length+gsData.customQs.length;
   const activeGroups=(gsData.groups||[]).length;
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} showsVerticalScrollIndicator={false}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     {/* Hero stats */}
     <Card style={{backgroundColor:C.primary,marginBottom:8}}>
       <Row style={{justifyContent:'space-between',marginBottom:10}}>
@@ -1491,7 +1495,7 @@ function AdminUsers({gsData,setGsData}) {
   const sel=selected?gsData.users.find(x=>x.id===selected.id)||selected:null;
 
   return <View style={{flex:1}}>
-    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
+    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled">
       <Row style={{justifyContent:'space-between',marginBottom:4}}>
         <Row style={{flex:0,gap:8}}>
           <TouchableOpacity style={[S.cntBtn,{paddingHorizontal:12,paddingVertical:8},bulkMode&&S.cntBtnOn]} onPress={()=>{setBulkMode(b=>!b);setBulkSel(new Set());}}>
@@ -1723,8 +1727,39 @@ function AdminUsers({gsData,setGsData}) {
   </View>;
 }
 
-// ─── ADMIN: QUESTIONS ─────────────────────────────────────────────────────────
-// ─── AI HELPERS ───────────────────────────────────────────────────────────────
+// ─── AI HELPERS + AUTO-DETECT ────────────────────────────────────────────────
+const TOPIC_KEYWORDS = {
+  networking:       ['רשת','subnet','vlan','router','switch','osi','tcp','udp','dhcp','dns','nat','cidr','bgp','ospf','routing','ip','ping','arp','mac','bandwidth','latency','wan','lan','wifi','ethernet','packet','frame','hub','bridge','firewall','load balance','port','topology','mesh','ring','bus','star'],
+  security:         ['אבטחה','הצפנה','ssl','tls','vpn','ddos','dos','mitm','phishing','malware','ransomware','antivirus','אנטי','hash','md5','sha','rsa','aes','certificate','סיסמה','password','authentication','2fa','mfa','penetration','vulnerability','exploit','patch','cve','waf','ids','ips','siem'],
+  operatingSystems: ['windows','linux','unix','active directory','ad','gpo','group policy','raid','ntfs','fat','registry','powershell','bash','kernel','process','thread','driver','boot','bios','uefi','hypervisor','virtualization','vm','hyper-v','permission','acl','user account','domain','forest','ou','ldap'],
+  cloud:            ['cloud','aws','azure','gcp','google cloud','s3','ec2','iam','fargate','ecs','eks','lambda','serverless','container','docker','kubernetes','k8s','devops','ci/cd','paas','saas','iaas','availability zone','region','cdn','cloudfront','load balancer','auto scaling','blob','bucket'],
+  itManagement:     ['ניהול','helpdesk','sla','ticketing','itil','itsm','change management','incident','problem','cmdb','asset','service desk','kpi','slo','rto','rpo','disaster recovery','bcm','onboarding','offboarding','procurement','license','vendor','budget'],
+  protocols:        ['protocol','http','https','ftp','sftp','smtp','pop3','imap','ssh','telnet','snmp','icmp','ntp','radius','tacacs','kerberos','oauth','saml','ldap','sip','voip','rtp','ppp','frame relay','mpls','bgp','ospf','rip','eigrp'],
+};
+function detectTopic(text) {
+  const lower = (text||'').toLowerCase();
+  let best=null, bestCount=0;
+  for(const [tid,kws] of Object.entries(TOPIC_KEYWORDS)){
+    const count=kws.filter(k=>lower.includes(k)).length;
+    if(count>bestCount){bestCount=count;best=tid;}
+  }
+  return best;
+}
+function detectDifficulty(questionText, opts=[]) {
+  const total=(questionText||'').length+opts.join('').length;
+  const techTerms=['cidr','vlan','ospf','bgp','raid','ldap','kerberos','tls','aes','rsa','kubernetes','lambda','iam','oauth','saml'];
+  const hasTech=techTerms.some(t=>(questionText||'').toLowerCase().includes(t));
+  if(hasTech||total>280)return 'advanced';
+  if(total>160)return 'intermediate';
+  return 'beginner';
+}
+const Q_TEMPLATES = [
+  {label:'השוואה',icon:'🔄',q:'מה ההבדל בין {A} ל-{B}?',opts:['{A} מהיר יותר, {B} אמין יותר','{A} פועל בשכבה X; {B} בשכבה Y','{A} ו-{B} זהים','אין הבדל משמעותי'],a:1,exp:''},
+  {label:'הגדרה',icon:'📖',q:'מה הוא {TERM}?',opts:['הגדרה נכונה','הגדרה שגויה א','הגדרה שגויה ב','הגדרה שגויה ג'],a:0,exp:''},
+  {label:'תפקיד',icon:'⚙️',q:'מה תפקידו של {COMPONENT}?',opts:['תפקיד נכון','תפקיד לא נכון א','תפקיד לא נכון ב','תפקיד לא נכון ג'],a:0,exp:''},
+  {label:'פורט/מספר',icon:'🔢',q:'באיזה פורט משתמש {PROTOCOL}?',opts:['פורט נכון','פורט שגוי א','פורט שגוי ב','פורט שגוי ג'],a:0,exp:''},
+  {label:'תרחיש',icon:'🏗️',q:'מנהל רשת צריך ל... מה הפתרון הנכון?',opts:['פתרון נכון','פתרון שגוי א','פתרון שגוי ב','פתרון שגוי ג'],a:0,exp:''},
+];
 const AI_AGENTS = [
   { id:'curriculum', icon:'📚', name:'מומחה תכנית לימודים', color:'#1e40af',
     desc:'שאלות מקיפות המכסות מושגי יסוד',
@@ -1837,7 +1872,7 @@ function AdminQuestions({gsData,setGsData}) {
   const [editingId,setEditingId]=useState(null);
   const [previewQ,setPreviewQ]=useState(null);
   const [search,setSearch]=useState('');
-  const EMPTY={topic:'networking',diff:'intermediate',type:'mc',q:'',opts:['','','',''],a:0,exp:''};
+  const EMPTY={topic:'networking',diff:'intermediate',type:'mc',q:'',opts:['','','',''],a:0,exp:'',passage:''};
   const [form,setForm]=useState(EMPTY);
 
   // AI state
@@ -1859,17 +1894,21 @@ function AdminQuestions({gsData,setGsData}) {
 
   function saveQ(){
     if(!form.q.trim()||form.opts.some(o=>!o.trim())){Alert.alert('שגיאה','מלא את כל השדות');return;}
+    // Auto-assign topic/difficulty if using detected values
+    const finalTopic=form.topic||(detectTopic(form.q+' '+form.opts.join(' '))||'networking');
+    const finalDiff=form.diff||detectDifficulty(form.q,form.opts);
+    const finalForm={...form,topic:finalTopic,diff:finalDiff};
     if(editingId){
-      setGsData(gd=>({...gd,customQs:gd.customQs.map(q=>q.id===editingId?{...q,...form}:q)}));
+      setGsData(gd=>({...gd,customQs:gd.customQs.map(q=>q.id===editingId?{...q,...finalForm}:q)}));
       setEditingId(null);
     } else {
-      setGsData(gd=>({...gd,customQs:[...gd.customQs,{...form,id:`cq_${Date.now()}`,custom:true,vs:0.5}]}));
+      setGsData(gd=>({...gd,customQs:[...gd.customQs,{...finalForm,id:`cq_${Date.now()}`,custom:true,vs:0.5}]}));
     }
     setForm(EMPTY);setTab('custom');
   }
   function delQ(id){Alert.alert('מחיקה','למחוק שאלה זו?',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>setGsData(gd=>({...gd,customQs:gd.customQs.filter(q=>q.id!==id)}))}]);}
-  function editQ(q){setForm({topic:q.topic,diff:q.diff,type:q.type||'mc',q:q.q,opts:[...q.opts],a:q.a,exp:q.exp});setEditingId(q.id);setTab('add');}
-  function dupQ(q){setForm({topic:q.topic,diff:q.diff,type:q.type||'mc',q:q.q+' (עותק)',opts:[...q.opts],a:q.a,exp:q.exp});setEditingId(null);setTab('add');}
+  function editQ(q){setForm({topic:q.topic,diff:q.diff,type:q.type||'mc',q:q.q,opts:[...q.opts],a:q.a,exp:q.exp||'',passage:q.passage||''});setEditingId(q.id);setTab('add');}
+  function dupQ(q){setForm({topic:q.topic,diff:q.diff,type:q.type||'mc',q:q.q+' (עותק)',opts:[...q.opts],a:q.a,exp:q.exp||'',passage:q.passage||''});setEditingId(null);setTab('add');}
 
   // ── AI generation ──
   async function generateAI(){
@@ -1927,8 +1966,8 @@ function AdminQuestions({gsData,setGsData}) {
   const letters=['א','ב','ג','ד'];
   const typeLabel={mc:'MC',reading:'קריאה',restatement:'שקילות'};
 
-  return <View style={{flex:1}}>
-    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
+  return <KAV style={{flex:1}}>
+    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled">
       {/* Stats bar */}
       <Row style={{gap:8,marginBottom:8}}>
         {[{v:QS.length,l:'בסיס',c:C.cyan},{v:gsData.customQs.length,l:'מותאמות',c:C.orange},
@@ -2044,83 +2083,174 @@ function AdminQuestions({gsData,setGsData}) {
           </Card>);})}
       </>}
 
-      {tab==='add'&&<Card>
-        <Text style={{textAlign:'right',fontWeight:'700',fontSize:16,marginBottom:14,color:C.primary}}>{editingId?'✏️ עריכת שאלה':'➕ שאלה חדשה'}</Text>
-        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>נושא</Text>
-        <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:6,marginBottom:12}}>
-          {TOPICS.map(t=>(
-            <TouchableOpacity key={t.id} onPress={()=>setForm(f=>({...f,topic:t.id}))}
-              style={{backgroundColor:form.topic===t.id?t.color:C.fill,borderRadius:8,paddingHorizontal:10,paddingVertical:6,borderWidth:1,borderColor:form.topic===t.id?t.color:C.border}}>
-              <Text style={{fontSize:12,fontWeight:'700',color:form.topic===t.id?'#fff':C.text}}>{t.icon} {t.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>רמת קושי</Text>
-        <Row style={{gap:6,marginBottom:12}}>
-          {['beginner','intermediate','advanced','expert'].map(d=>(
-            <TouchableOpacity key={d} onPress={()=>setForm(f=>({...f,diff:d}))}
-              style={[S.cntBtn,form.diff===d&&{backgroundColor:DIFF_COLOR[d],borderColor:DIFF_COLOR[d]},{flex:1,paddingVertical:8}]}>
-              <Text style={{fontSize:11,fontWeight:'700',color:form.diff===d?'#fff':C.text}}>{DIFF_LABEL[d]}</Text>
-            </TouchableOpacity>
-          ))}
-        </Row>
-        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>סוג שאלה</Text>
-        <Row style={{gap:8,marginBottom:12}}>
-          {[['mc','רב-ברירה'],['reading','קריאה'],['restatement','שקילות']].map(([v,l])=>(
-            <TouchableOpacity key={v} style={[S.cntBtn,form.type===v&&S.cntBtnOn,{flex:1}]} onPress={()=>setForm(f=>({...f,type:v}))}>
-              <Text style={[S.cntTxt,form.type===v&&{color:'#fff'},{fontSize:11}]}>{l}</Text>
-            </TouchableOpacity>
-          ))}
-        </Row>
-        {form.type==='reading'&&<>
-          <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>קטע קריאה</Text>
-          <TextInput style={[S.inp,{height:90,textAlignVertical:'top',marginBottom:12}]}
+      {tab==='add'&&<View>
+        {/* Header */}
+        <Card style={{marginBottom:10,flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:12}}>
+          <View style={{width:40,height:40,borderRadius:20,backgroundColor:editingId?C.warning+'20':C.primary+'15',alignItems:'center',justifyContent:'center'}}>
+            <Text style={{fontSize:20}}>{editingId?'✏️':'➕'}</Text>
+          </View>
+          <View style={{flex:1}}>
+            <Text style={{textAlign:'right',fontWeight:'800',fontSize:16,color:editingId?C.warning:C.primary}}>{editingId?'עריכת שאלה':'יצירת שאלה חדשה'}</Text>
+            <Text style={{textAlign:'right',fontSize:11,color:C.muted,marginTop:2}}>כל השדות ישמרו אוטומטית</Text>
+          </View>
+        </Card>
+
+        {/* Template Quick-fill */}
+        <Card style={{marginBottom:10}}>
+          <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.muted,marginBottom:8}}>תבניות מהירות</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6}}>
+            {Q_TEMPLATES.map((tpl,i)=>(
+              <TouchableOpacity key={i} onPress={()=>setForm(f=>({...f,q:tpl.q,opts:tpl.opts,a:tpl.a,exp:tpl.exp}))}
+                style={{backgroundColor:C.primary+'10',borderRadius:20,paddingHorizontal:14,paddingVertical:7,borderWidth:1.5,borderColor:C.primary+'30',flexDirection:'row-reverse',alignItems:'center',gap:5}}>
+                <Text style={{fontSize:14}}>{tpl.icon}</Text>
+                <Text style={{fontSize:11,fontWeight:'700',color:C.primary}}>{tpl.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </Card>
+
+        {/* Type selector */}
+        <Card style={{marginBottom:10}}>
+          <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.muted,marginBottom:8}}>סוג שאלה</Text>
+          <Row style={{gap:8}}>
+            {[['mc','📋 רב-ברירה'],['reading','📖 קריאה'],['restatement','🔁 שקילות']].map(([v,l])=>(
+              <TouchableOpacity key={v} style={[S.cntBtn,form.type===v&&S.cntBtnOn,{flex:1,paddingVertical:10}]} onPress={()=>setForm(f=>({...f,type:v}))}>
+                <Text style={[{fontSize:11,fontWeight:'700',color:C.text},form.type===v&&{color:'#fff'}]}>{l}</Text>
+              </TouchableOpacity>
+            ))}
+          </Row>
+        </Card>
+
+        {/* Passage (reading) */}
+        {form.type==='reading'&&<Card style={{marginBottom:10}}>
+          <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.muted,marginBottom:8}}>📖 קטע קריאה</Text>
+          <TextInput style={[S.inp,{height:100,textAlignVertical:'top',marginBottom:0}]}
             value={form.passage||''} onChangeText={v=>setForm(f=>({...f,passage:v}))}
             placeholder="הכנס את קטע הקריאה..." placeholderTextColor={C.muted} textAlign="right" multiline/>
-        </>}
-        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>שאלה</Text>
-        <TextInput style={[S.inp,{height:80,textAlignVertical:'top',marginBottom:12}]}
-          value={form.q} onChangeText={v=>setForm(f=>({...f,q:v}))}
-          placeholder="הכנס את השאלה..." placeholderTextColor={C.muted} textAlign="right" multiline/>
-        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>תשובות — לחץ על האות לסימון הנכונה</Text>
-        {form.opts.map((opt,i)=>(
-          <View key={i} style={{flexDirection:'row-reverse',alignItems:'center',marginBottom:8,gap:8}}>
-            <TouchableOpacity onPress={()=>setForm(f=>({...f,a:i}))}
-              style={{width:34,height:34,borderRadius:17,backgroundColor:form.a===i?C.success:C.fill,borderWidth:2,borderColor:form.a===i?C.success:C.border,alignItems:'center',justifyContent:'center'}}>
-              <Text style={{fontWeight:'800',color:form.a===i?'#fff':C.muted,fontSize:13}}>{letters[i]}</Text>
+        </Card>}
+
+        {/* Question input with auto-detect */}
+        <Card style={{marginBottom:10}}>
+          <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.muted,marginBottom:8}}>❓ טקסט השאלה</Text>
+          <TextInput style={[S.inp,{height:90,textAlignVertical:'top',marginBottom:10}]}
+            value={form.q} onChangeText={v=>{
+              setForm(f=>({...f,q:v}));
+            }}
+            placeholder="הכנס את השאלה..." placeholderTextColor={C.muted} textAlign="right" multiline/>
+          <Row style={{gap:8,flexDirection:'row-reverse'}}>
+            <TouchableOpacity onPress={()=>{
+              const t=detectTopic(form.q+' '+form.opts.join(' '));
+              if(t){setForm(f=>({...f,topic:t}));Alert.alert('✓ נושא זוהה',TOPICS.find(tp=>tp.id===t)?.name||t);}
+              else{Alert.alert('לא זוהה','לא נמצאו מילות מפתח מוכרות. בחר נושא ידנית');}
+            }} style={{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6,backgroundColor:C.cyan+'15',borderRadius:10,paddingVertical:8,borderWidth:1,borderColor:C.cyan+'40'}}>
+              <Icon name="color-wand-outline" size={14} color={C.cyan}/>
+              <Text style={{fontSize:11,fontWeight:'700',color:C.cyan}}>זהה נושא</Text>
             </TouchableOpacity>
-            <TextInput style={[S.inp,{flex:1,marginBottom:0,paddingVertical:10}]}
-              value={opt} onChangeText={v=>setForm(f=>({...f,opts:f.opts.map((o,j)=>j===i?v:o)}))}
-              placeholder={`אפשרות ${letters[i]}...`} placeholderTextColor={C.muted} textAlign="right"/>
+            <TouchableOpacity onPress={()=>{
+              const d=detectDifficulty(form.q,form.opts);
+              setForm(f=>({...f,diff:d}));
+              Alert.alert('✓ קושי זוהה',DIFF_LABEL[d]);
+            }} style={{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6,backgroundColor:C.purple+'15',borderRadius:10,paddingVertical:8,borderWidth:1,borderColor:C.purple+'40'}}>
+              <Icon name="speedometer-outline" size={14} color={C.purple}/>
+              <Text style={{fontSize:11,fontWeight:'700',color:C.purple}}>זהה קושי</Text>
+            </TouchableOpacity>
+          </Row>
+        </Card>
+
+        {/* Topic selector */}
+        <Card style={{marginBottom:10}}>
+          <Row style={{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+            <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.muted}}>🗂️ נושא</Text>
+            {form.topic&&<Text style={{fontSize:11,color:TOPICS.find(t=>t.id===form.topic)?.color||C.primary,fontWeight:'700'}}>
+              {TOPICS.find(t=>t.id===form.topic)?.icon} {TOPICS.find(t=>t.id===form.topic)?.name}
+            </Text>}
+          </Row>
+          <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:7}}>
+            {TOPICS.map(t=>(
+              <TouchableOpacity key={t.id} onPress={()=>setForm(f=>({...f,topic:t.id}))}
+                style={{backgroundColor:form.topic===t.id?t.color:C.fill,borderRadius:10,paddingHorizontal:12,paddingVertical:8,borderWidth:1.5,borderColor:form.topic===t.id?t.color:C.border,
+                  minWidth:(W-80)/3-10,alignItems:'center'}}>
+                <Text style={{fontSize:16,marginBottom:2}}>{t.icon}</Text>
+                <Text style={{fontSize:10,fontWeight:'700',color:form.topic===t.id?'#fff':C.text,textAlign:'center'}}>{t.name}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        ))}
-        <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>הסבר</Text>
-        <TextInput style={[S.inp,{height:70,textAlignVertical:'top',marginBottom:16}]}
-          value={form.exp} onChangeText={v=>setForm(f=>({...f,exp:v}))}
-          placeholder="הסבר לתשובה הנכונה..." placeholderTextColor={C.muted} textAlign="right" multiline/>
-        {/* live preview */}
-        {form.q.trim()&&<>
-          <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>תצוגה מקדימה</Text>
-          <Card style={{backgroundColor:'#eff6ff',borderWidth:1,borderColor:C.primary+'40',marginBottom:14}}>
-            <Text style={{textAlign:'right',fontSize:15,fontWeight:'700',color:C.text,marginBottom:8}}>{form.q}</Text>
-            {form.opts.map((o,i)=><View key={i} style={{flexDirection:'row-reverse',alignItems:'center',gap:8,marginBottom:5,backgroundColor:form.a===i?C.success+'15':C.fill,borderRadius:8,padding:8}}>
-              <View style={{width:24,height:24,borderRadius:12,backgroundColor:form.a===i?C.success:C.border,alignItems:'center',justifyContent:'center'}}>
-                <Text style={{fontSize:11,fontWeight:'800',color:form.a===i?'#fff':C.muted}}>{letters[i]}</Text>
-              </View>
-              <Text style={{flex:1,textAlign:'right',fontSize:13,color:C.text}}>{o||`אפשרות ${letters[i]}`}</Text>
-            </View>)}
-          </Card>
-        </>}
-        <Row style={{gap:10}}>
+        </Card>
+
+        {/* Difficulty selector */}
+        <Card style={{marginBottom:10}}>
+          <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.muted,marginBottom:8}}>🎯 רמת קושי</Text>
+          <Row style={{gap:7}}>
+            {['beginner','intermediate','advanced','expert'].map(d=>(
+              <TouchableOpacity key={d} onPress={()=>setForm(f=>({...f,diff:d}))}
+                style={[{flex:1,borderRadius:10,paddingVertical:10,alignItems:'center',borderWidth:2,
+                  backgroundColor:form.diff===d?DIFF_COLOR[d]:C.fill,
+                  borderColor:form.diff===d?DIFF_COLOR[d]:C.border}]}>
+                <Text style={{fontSize:15,marginBottom:2}}>{d==='beginner'?'🟢':d==='intermediate'?'🟡':d==='advanced'?'🟠':'🔴'}</Text>
+                <Text style={{fontSize:10,fontWeight:'800',color:form.diff===d?'#fff':C.text}}>{DIFF_LABEL[d]}</Text>
+              </TouchableOpacity>
+            ))}
+          </Row>
+        </Card>
+
+        {/* Answer options */}
+        <Card style={{marginBottom:10}}>
+          <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.muted,marginBottom:8}}>✅ תשובות — לחץ על האות לסימון הנכונה</Text>
+          {form.opts.map((opt,i)=>(
+            <View key={i} style={{flexDirection:'row-reverse',alignItems:'center',marginBottom:9,gap:8}}>
+              <TouchableOpacity onPress={()=>setForm(f=>({...f,a:i}))}
+                style={{width:36,height:36,borderRadius:18,backgroundColor:form.a===i?C.success:C.fill,
+                  borderWidth:2,borderColor:form.a===i?C.success:C.border,alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <Text style={{fontWeight:'900',color:form.a===i?'#fff':C.muted,fontSize:14}}>{letters[i]}</Text>
+              </TouchableOpacity>
+              <TextInput style={[S.inp,{flex:1,marginBottom:0,borderColor:form.a===i?C.success+'80':C.border,backgroundColor:form.a===i?C.success+'08':C.fill}]}
+                value={opt} onChangeText={v=>setForm(f=>({...f,opts:f.opts.map((o,j)=>j===i?v:o)}))}
+                placeholder={`אפשרות ${letters[i]}...`} placeholderTextColor={C.muted} textAlign="right"/>
+            </View>
+          ))}
+        </Card>
+
+        {/* Explanation */}
+        <Card style={{marginBottom:10}}>
+          <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.muted,marginBottom:8}}>💡 הסבר לתשובה</Text>
+          <TextInput style={[S.inp,{height:72,textAlignVertical:'top',marginBottom:0}]}
+            value={form.exp} onChangeText={v=>setForm(f=>({...f,exp:v}))}
+            placeholder="הסבר לתשובה הנכונה (מומלץ)..." placeholderTextColor={C.muted} textAlign="right" multiline/>
+        </Card>
+
+        {/* Live preview */}
+        {form.q.trim()&&<Card style={{marginBottom:10,backgroundColor:'#eff6ff',borderWidth:1,borderColor:C.primary+'30'}}>
+          <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.primary,marginBottom:10}}>👁️ תצוגה מקדימה</Text>
+          {form.type==='reading'&&form.passage?.trim()&&<View style={{backgroundColor:C.fill,borderRadius:10,padding:10,marginBottom:10,borderWidth:1,borderColor:C.border}}>
+            <Text style={{textAlign:'right',fontSize:12,color:C.text,lineHeight:20}}>{form.passage}</Text>
+          </View>}
+          <Text style={{textAlign:'right',fontSize:15,fontWeight:'700',color:C.text,marginBottom:10}}>{form.q}</Text>
+          {form.opts.map((o,i)=><View key={i} style={{flexDirection:'row-reverse',alignItems:'center',gap:8,marginBottom:6,
+            backgroundColor:form.a===i?C.success+'15':C.fill,borderRadius:10,padding:9,
+            borderWidth:1,borderColor:form.a===i?C.success+'40':C.border}}>
+            <View style={{width:26,height:26,borderRadius:13,backgroundColor:form.a===i?C.success:C.border,alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <Text style={{fontSize:11,fontWeight:'900',color:form.a===i?'#fff':C.muted}}>{letters[i]}</Text>
+            </View>
+            <Text style={{flex:1,textAlign:'right',fontSize:13,color:C.text}}>{o||`אפשרות ${letters[i]}`}</Text>
+            {form.a===i&&<Icon name="checkmark-circle" size={16} color={C.success}/>}
+          </View>)}
+          {form.exp?.trim()&&<View style={{backgroundColor:C.warning+'12',borderRadius:10,padding:9,marginTop:6,borderWidth:1,borderColor:C.warning+'30'}}>
+            <Text style={{textAlign:'right',fontSize:12,color:C.warning,fontWeight:'700',marginBottom:3}}>💡 הסבר</Text>
+            <Text style={{textAlign:'right',fontSize:12,color:C.text,lineHeight:18}}>{form.exp}</Text>
+          </View>}
+        </Card>}
+
+        {/* Action buttons */}
+        <Row style={{gap:10,marginBottom:10}}>
           <TouchableOpacity style={[S.outBtn,{flex:1,borderColor:C.border}]} onPress={()=>{setForm(EMPTY);setEditingId(null);setTab('custom');}}>
             <Text style={{color:C.muted,fontWeight:'700'}}>ביטול</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[S.btn,{flex:2,marginBottom:0}]} onPress={saveQ}>
             <Icon name="save-outline" size={16} color="#fff"/>
-            <Text style={[S.btnTxt,{marginRight:8}]}>{editingId?'עדכן':'שמור שאלה'}</Text>
+            <Text style={[S.btnTxt,{marginRight:8}]}>{editingId?'עדכן שאלה':'שמור שאלה'}</Text>
           </TouchableOpacity>
         </Row>
-      </Card>}
+      </View>}
       {/* ── AI Generation Tab ── */}
       {tab==='ai'&&<View>
         {!gsData.settings.aiApiKey&&<View style={{backgroundColor:C.warningLight,borderRadius:14,padding:14,marginBottom:12,borderWidth:1,borderColor:C.warning+'40',flexDirection:'row-reverse',gap:10,alignItems:'flex-start'}}>
@@ -2342,7 +2472,7 @@ function AdminQuestions({gsData,setGsData}) {
         </ScrollView>
       </View>
     </View>}
-  </View>;
+  </KAV>;
 }
 
 // ─── ADMIN: ANALYTICS ─────────────────────────────────────────────────────────
@@ -2371,7 +2501,7 @@ function AdminAnalytics({gsData}) {
     needs:students.filter(u=>(u.prog?.totalAnswered||0)>0&&pct(u.prog.totalCorrect,u.prog.totalAnswered)<70).length,
     none:students.filter(u=>!(u.prog?.totalAnswered>0)).length,
   };
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>אנליטיקה 📈</Text>
     <Row style={{gap:8,marginBottom:12}}>
       {[{v:`${overallRate}%`,l:'ציון ממוצע',c:overallRate>=70?C.success:C.warning},
@@ -2443,7 +2573,7 @@ function AdminAnnouncements({gsData,setGsData}) {
   }
   function delAnn(id){setGsData(gd=>({...gd,announcements:gd.announcements.filter(a=>a.id!==id)}));}
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled">
     <Row style={{justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
       <TouchableOpacity style={[S.btn,{marginBottom:0,paddingHorizontal:16,paddingVertical:10}]} onPress={()=>setShowForm(s=>!s)}>
         <Icon name={showForm?'close':'add'} size={18} color="#fff"/>
@@ -2515,7 +2645,7 @@ function AdminLeaderboard({gsData}) {
     return {...u,score,answered,streak:p.streakDays||0};
   }).filter(u=>u.answered>0).sort((a,b)=>b.score-a.score||b.answered-a.answered);
   const medals=['🥇','🥈','🥉'];
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>לוח מובילים 🏆</Text>
     <ScrollView horizontal showsHorizontalScrollIndicator={false}
       contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:14}}>
@@ -2592,7 +2722,7 @@ function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
     Alert.alert(`דוח ביצועים (${students.length} סטודנטים)`,summary);
   }
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:40}} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>הגדרות מנהל ⚙️</Text>
     <Card style={{backgroundColor:C.primary,marginBottom:14}}>
       <Row style={{justifyContent:'space-between',alignItems:'center'}}>
@@ -2707,7 +2837,7 @@ function AdminGroups({gsData,setGsData}) {
   function moveToGroup(uid,gid){setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===uid?{...u,group:gid}:u)}));}
 
   return <View style={{flex:1}}>
-    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} keyboardShouldPersistTaps="handled">
+    <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled">
       <Row style={{justifyContent:'space-between',marginBottom:4}}>
         <TouchableOpacity style={[S.cntBtn,{paddingHorizontal:14,paddingVertical:8},showForm&&S.cntBtnOn]} onPress={()=>setShowForm(s=>!s)}>
           <Icon name={showForm?'close':'add-circle-outline'} size={16} color={showForm?'#fff':C.text}/>
@@ -2844,7 +2974,7 @@ function AdminReports({gsData}) {
 
   function exportText(title,lines){Alert.alert(title,lines.join('\n'));}
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:20}} showsVerticalScrollIndicator={false}>
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>דוחות 📋</Text>
     {/* Report type tabs */}
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:14}}>
@@ -3113,7 +3243,7 @@ function AdminAITools({gsData,setGsData}) {
     finally{setLoading(false);setImproveFeedback('');}
   }
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:40}} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>כלי AI 🤖</Text>
     {!gsData.settings.aiApiKey&&<View style={{backgroundColor:C.warningLight,borderRadius:14,padding:14,marginBottom:14,borderWidth:1,borderColor:C.warning+'40'}}>
       <Row style={{justifyContent:'flex-end',gap:6,marginBottom:4}}>
@@ -3515,28 +3645,28 @@ export default function App() {
 const S = StyleSheet.create({
   scr:{flex:1,backgroundColor:C.bg,paddingHorizontal:16,paddingTop:12,paddingBottom:0},
   center:{flex:1,justifyContent:'center',alignItems:'center',backgroundColor:C.bg},
-  pgTitle:{fontSize:27,fontWeight:'900',textAlign:'right',color:C.text,marginBottom:14,letterSpacing:0.2},
+  pgTitle:{fontSize:isSmall?22:27,fontWeight:'900',textAlign:'right',color:C.text,marginBottom:14,letterSpacing:0.2},
   sec:{fontSize:14,fontWeight:'800',textAlign:'right',color:C.text,marginTop:14,marginBottom:10},
   card:{backgroundColor:C.card,borderRadius:18,padding:14,marginBottom:10,shadowColor:'#1e40af',shadowOpacity:0.07,shadowRadius:10,shadowOffset:{width:0,height:3},elevation:3},
   opt:{borderRadius:16,borderWidth:1.5,padding:14,marginBottom:10},
   optLetter:{width:32,height:32,borderRadius:16,alignItems:'center',justifyContent:'center'},
-  btn:{flexDirection:'row-reverse',backgroundColor:C.primary,borderRadius:16,paddingVertical:16,alignItems:'center',justifyContent:'center',marginBottom:4},
+  btn:{flexDirection:'row-reverse',backgroundColor:C.primary,borderRadius:16,paddingVertical:isSmall?13:16,alignItems:'center',justifyContent:'center',marginBottom:4,minHeight:48},
   btnTxt:{color:'#fff',fontSize:16,fontWeight:'800'},
-  outBtn:{flexDirection:'row-reverse',borderWidth:1.5,borderColor:C.primary+'60',borderRadius:16,paddingVertical:14,alignItems:'center',justifyContent:'center'},
-  cntBtn:{flex:1,backgroundColor:C.fill,borderRadius:12,paddingVertical:12,alignItems:'center',borderWidth:1.5,borderColor:C.border},
+  outBtn:{flexDirection:'row-reverse',borderWidth:1.5,borderColor:C.primary+'60',borderRadius:16,paddingVertical:isSmall?11:14,alignItems:'center',justifyContent:'center',minHeight:44},
+  cntBtn:{flex:1,backgroundColor:C.fill,borderRadius:12,paddingVertical:12,alignItems:'center',borderWidth:1.5,borderColor:C.border,minHeight:44},
   cntBtnOn:{backgroundColor:C.primary,borderColor:C.primary},
   cntTxt:{fontSize:14,fontWeight:'700',color:C.text},
-  modeBtn:{flex:1,backgroundColor:C.card,borderRadius:16,padding:16,alignItems:'center',borderWidth:1.5,borderColor:C.border},
+  modeBtn:{flex:1,backgroundColor:C.card,borderRadius:16,padding:16,alignItems:'center',borderWidth:1.5,borderColor:C.border,minHeight:80},
   modeBtnOn:{borderColor:C.primary,backgroundColor:'#eff6ff'},
   topicOpt:{backgroundColor:C.card,borderRadius:14,paddingHorizontal:14,paddingVertical:14,marginBottom:10,borderWidth:1.5,borderColor:C.border,shadowColor:'#000',shadowOpacity:0.04,shadowRadius:6,shadowOffset:{width:0,height:2},elevation:2},
   topicOptOn:{borderColor:C.primary,backgroundColor:'#eff6ff'},
-  inp:{backgroundColor:C.fill,borderRadius:12,padding:14,fontSize:15,borderWidth:1.5,borderColor:C.border,color:C.text},
+  inp:{backgroundColor:C.fill,borderRadius:12,padding:14,fontSize:15,borderWidth:1.5,borderColor:C.border,color:C.text,minHeight:48},
   inpLabel:{textAlign:'right',fontSize:13,color:C.muted,marginBottom:7,fontWeight:'600'},
-  onbInput:{backgroundColor:'rgba(255,255,255,0.15)',borderRadius:14,padding:15,fontSize:16,borderWidth:1.5,borderColor:'rgba(255,255,255,0.35)',color:'#fff'},
+  onbInput:{backgroundColor:'rgba(255,255,255,0.15)',borderRadius:14,padding:15,fontSize:16,borderWidth:1.5,borderColor:'rgba(255,255,255,0.35)',color:'#fff',minHeight:50},
   timerBox:{flexDirection:'row-reverse',alignItems:'center',paddingHorizontal:10,paddingVertical:5,borderRadius:20,borderWidth:1,gap:4},
   qBar:{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',paddingHorizontal:16,paddingVertical:10},
-  qBottom:{position:'absolute',bottom:0,left:0,right:0,padding:16,paddingBottom:Platform.OS==='ios'?34:16,backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,shadowColor:'#000',shadowOpacity:0.06,shadowRadius:8,shadowOffset:{width:0,height:-2},elevation:4},
-  tabBar:{flexDirection:'row-reverse',backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,paddingBottom:Platform.OS==='ios'?22:8,paddingTop:6},
+  qBottom:{position:'absolute',bottom:0,left:0,right:0,padding:16,paddingBottom:isIOS?34:16,backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,shadowColor:'#000',shadowOpacity:0.06,shadowRadius:8,shadowOffset:{width:0,height:-2},elevation:4},
+  tabBar:{flexDirection:'row-reverse',backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,paddingBottom:isIOS?22:8,paddingTop:6},
   tabItem:{flex:1,alignItems:'center',paddingTop:4,position:'relative'},
   tabInd:{position:'absolute',top:0,left:'20%',right:'20%',height:3,backgroundColor:C.primary,borderBottomLeftRadius:2,borderBottomRightRadius:2},
 });
