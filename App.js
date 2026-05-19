@@ -10,9 +10,16 @@ const _mem = {};
 const Store = { get: k => Promise.resolve(_mem[k] ?? null), set: (k,v) => { _mem[k]=v; } };
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
-const C = { primary:'#1e40af', blue:'#3b82f6', success:'#15803d', warning:'#d97706',
-  danger:'#dc2626', purple:'#7c3aed', cyan:'#0891b2', orange:'#ea580c',
-  bg:'#f1f5f9', card:'#fff', text:'#0f172a', muted:'#64748b', border:'#e2e8f0', fill:'#f8fafc' };
+const C = { primary:'#1e40af', primaryLight:'#3b82f6', primaryDark:'#1e3a8a',
+  blue:'#3b82f6', success:'#16a34a', successLight:'#dcfce7', warning:'#d97706', warningLight:'#fef9c3',
+  danger:'#dc2626', dangerLight:'#fee2e2', purple:'#7c3aed', purpleLight:'#ede9fe',
+  cyan:'#0891b2', orange:'#ea580c',
+  bg:'#f0f4f8', card:'#ffffff', text:'#0f172a', muted:'#64748b', border:'#e2e8f0',
+  fill:'#f8fafc', overlay:'rgba(0,0,0,0.04)' };
+const shadow = (size=1) => ({
+  shadowColor:'#1e40af', shadowOpacity:0.08*size, shadowRadius:8*size,
+  shadowOffset:{width:0,height:3*size}, elevation:3*size,
+});
 
 // ─── DIFFICULTY → THETA MAP ──────────────────────────────────────────────────
 const DIFF_THETA = { beginner:-1, intermediate:0, advanced:1, expert:2 };
@@ -260,7 +267,7 @@ const AdaptiveEngine = {
 
 // ─── SCORING ENGINE ───────────────────────────────────────────────────────────
 const Scoring = {
-  compute(questions, answers, startTime) {
+  compute(questions, answers, startTime, passGrade=70) {
     let correct = 0, diffScore = 0;
     const topicMap = {};
     questions.forEach((q, i) => {
@@ -273,9 +280,9 @@ const Scoring = {
     const total = questions.length;
     const base = total > 0 ? Math.round(correct / total * 100) : 0;
     const weighted = total > 0 ? Math.round(diffScore / (total * 3) * 100) : 0;
-    const pass = base >= 70;
+    const pass = base >= passGrade;
     const secs = (Date.now() - startTime) / 1000;
-    return { correct, total, base, weighted, pass, secs, topicMap };
+    return { correct, total, base, weighted, pass, passGrade, secs, topicMap };
   },
 };
 
@@ -293,8 +300,8 @@ function reducer(state, action) {
     case 'LOAD': return {...INIT_PROG,...action.payload};
     case 'SETTINGS': return {...state,...action.payload};
     case 'RECORD': {
-      const {questions, answers, startTime} = action.payload;
-      const result = Scoring.compute(questions, answers, startTime);
+      const {questions, answers, startTime, passGrade=70} = action.payload;
+      const result = Scoring.compute(questions, answers, startTime, passGrade);
       const tp = {...state.topicProgress};
       Object.entries(result.topicMap).forEach(([tid,tm]) => {
         const p = tp[tid]||{answered:0,correct:0};
@@ -341,18 +348,18 @@ function KAV({children,style}) {
 function Row({children,style}) { return <View style={[{flexDirection:'row-reverse',alignItems:'center'},style]}>{children}</View>; }
 function Col({children,style}) { return <View style={[{alignItems:'flex-end'},style]}>{children}</View>; }
 function Card({children,style,onPress}) {
-  if(onPress) return <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={[S.card,style]}>{children}</TouchableOpacity>;
+  if(onPress) return <TouchableOpacity onPress={onPress} activeOpacity={0.80} style={[S.card,style]}>{children}</TouchableOpacity>;
   return <View style={[S.card,style]}>{children}</View>;
 }
 function Pill({label,color,small}) {
-  return <View style={{backgroundColor:color+'22',paddingHorizontal:8,paddingVertical:3,borderRadius:20}}>
+  return <View style={{backgroundColor:color+'20',paddingHorizontal:small?7:10,paddingVertical:small?2:4,borderRadius:20,borderWidth:1,borderColor:color+'40'}}>
     <Text style={{color,fontWeight:'700',fontSize:small?10:12}}>{label}</Text>
   </View>;
 }
-function Bar({value,total=100,color=C.primary,h=7}) {
+function Bar({value,total=100,color=C.primary,h=8}) {
   const w = total>0?Math.min(value/total,1)*100:0;
-  return <View style={{height:h,backgroundColor:C.fill,borderRadius:10,overflow:'hidden',width:'100%'}}>
-    <View style={{width:`${w}%`,height:h,backgroundColor:color,borderRadius:10}}/>
+  return <View style={{height:h,backgroundColor:C.fill,borderRadius:100,overflow:'hidden',width:'100%',borderWidth:1,borderColor:C.border}}>
+    <View style={{width:`${w}%`,height:h,backgroundColor:color,borderRadius:100}}/>
   </View>;
 }
 function Icon({name,size=20,color=C.text}) { return <Ionicons name={name} size={size} color={color}/>; }
@@ -375,19 +382,22 @@ function AnswerOpt({text,index,selected,correctIdx,studyMode,onPress}) {
     ]).start();
     onPress(index);
   }
-  let bg=C.card, border=C.border;
-  if(answered&&studyMode) { if(isCorrect){bg=C.success+'18';border=C.success;} else if(isWrong){bg=C.danger+'18';border=C.danger;} }
-  else if(isSelected&&!studyMode){bg=C.primary+'12';border=C.primary;}
+  let bg=C.card, border=C.border, letterBg=C.fill, letterColor=C.muted;
+  if(answered&&studyMode) {
+    if(isCorrect){bg=C.successLight;border=C.success;letterBg=C.success;letterColor='#fff';}
+    else if(isWrong){bg=C.dangerLight;border=C.danger;letterBg=C.danger;letterColor='#fff';}
+  } else if(isSelected&&!studyMode){bg=C.primary+'0f';border=C.primary;letterBg=C.primary;letterColor='#fff';}
 
   return <Animated.View style={{transform:[{scale}]}}>
     <TouchableOpacity onPress={tap} disabled={answered}
-      style={[S.opt,{backgroundColor:bg,borderColor:border}]} activeOpacity={0.85}>
+      style={[S.opt,{backgroundColor:bg,borderColor:border,...shadow(0.6)}]} activeOpacity={0.82}>
       <Row>
-        {answered&&studyMode&&isCorrect&&<Icon name="checkmark-circle" size={18} color={C.success}/>}
-        {answered&&studyMode&&isWrong&&<Icon name="close-circle" size={18} color={C.danger}/>}
-        <Text style={{flex:1,textAlign:'right',fontSize:15,color:C.text,marginHorizontal:8,lineHeight:22}}>{text}</Text>
-        <View style={[S.optLetter,{backgroundColor:isSelected?(isWrong?C.danger:C.primary):C.fill}]}>
-          <Text style={{fontSize:12,fontWeight:'700',color:isSelected?'#fff':C.muted}}>{letters[index]}</Text>
+        {answered&&studyMode&&isCorrect&&<Icon name="checkmark-circle" size={20} color={C.success}/>}
+        {answered&&studyMode&&isWrong&&<Icon name="close-circle" size={20} color={C.danger}/>}
+        {(!answered||!studyMode)&&<View style={{width:6,height:6,borderRadius:3,backgroundColor:isSelected?C.primary:C.border,marginLeft:4}}/>}
+        <Text style={{flex:1,textAlign:'right',fontSize:15,color:answered&&studyMode&&isWrong?C.danger:C.text,marginHorizontal:10,lineHeight:23}}>{text}</Text>
+        <View style={[S.optLetter,{backgroundColor:letterBg}]}>
+          <Text style={{fontSize:13,fontWeight:'800',color:letterColor}}>{letters[index]}</Text>
         </View>
       </Row>
     </TouchableOpacity>
@@ -465,56 +475,57 @@ function OnboardingScreen({onDone}) {
     {icon:'📊',text:'ניתוח מיומנויות מפורט'},
     {icon:'🎯',text:'מצב לימוד ומבחן מלא'},
   ];
-  return <SafeAreaView style={{flex:1,backgroundColor:C.primary}}>
+  return <SafeAreaView style={{flex:1,backgroundColor:C.primaryDark}}>
     <StatusBar barStyle="light-content"/>
     <KAV>
       <ScrollView contentContainerStyle={{flexGrow:1}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={{flex:1,padding:28,paddingTop:20}}>
           {/* Step dots */}
-          <Row style={{justifyContent:'center',gap:8,marginBottom:24}}>
-            {[0,1].map(i=><View key={i} style={{width:i===step?24:8,height:8,borderRadius:4,backgroundColor:i===step?'#fff':'rgba(255,255,255,0.35)'}}/>)}
+          <Row style={{justifyContent:'center',gap:6,marginBottom:28}}>
+            {[0,1].map(i=><View key={i} style={{width:i===step?28:8,height:8,borderRadius:4,backgroundColor:i===step?'#fff':'rgba(255,255,255,0.3)'}}/>)}
           </Row>
           {step===0?<>
-            <View style={{alignItems:'center',marginBottom:32}}>
-              <View style={{width:100,height:100,borderRadius:50,backgroundColor:'rgba(255,255,255,0.15)',alignItems:'center',justifyContent:'center',marginBottom:16}}>
-                <Text style={{fontSize:52}}>🌐</Text>
+            <View style={{alignItems:'center',marginBottom:36}}>
+              <View style={{width:110,height:110,borderRadius:55,backgroundColor:'rgba(255,255,255,0.12)',alignItems:'center',justifyContent:'center',marginBottom:18,borderWidth:2,borderColor:'rgba(255,255,255,0.25)'}}>
+                <Text style={{fontSize:58}}>🌐</Text>
               </View>
-              <Text style={{fontSize:28,fontWeight:'900',color:'#fff',textAlign:'center'}}>AmirNet Plus</Text>
-              <Text style={{fontSize:14,color:'#bfdbfe',textAlign:'center',marginTop:6,lineHeight:20}}>הכנה מקצועית לבחינת אמירנט IT</Text>
+              <Text style={{fontSize:30,fontWeight:'900',color:'#fff',textAlign:'center',letterSpacing:0.3}}>AmirNet Plus</Text>
+              <Text style={{fontSize:14,color:'#93c5fd',textAlign:'center',marginTop:8,lineHeight:21}}>הכנה מקצועית לבחינת אמירנט IT</Text>
             </View>
-            <View style={{gap:10,marginBottom:32}}>
+            <View style={{gap:10,marginBottom:36}}>
               {features.map(f=>(
-                <View key={f.text} style={{flexDirection:'row-reverse',alignItems:'center',backgroundColor:'rgba(255,255,255,0.1)',borderRadius:12,paddingHorizontal:14,paddingVertical:12,gap:12}}>
-                  <Text style={{fontSize:22}}>{f.icon}</Text>
-                  <Text style={{color:'#e0f2fe',fontSize:14,flex:1,textAlign:'right'}}>{f.text}</Text>
+                <View key={f.text} style={{flexDirection:'row-reverse',alignItems:'center',backgroundColor:'rgba(255,255,255,0.08)',borderRadius:16,paddingHorizontal:16,paddingVertical:14,gap:14,borderWidth:1,borderColor:'rgba(255,255,255,0.12)'}}>
+                  <Text style={{fontSize:24}}>{f.icon}</Text>
+                  <Text style={{color:'#e0f2fe',fontSize:14,flex:1,textAlign:'right',lineHeight:21}}>{f.text}</Text>
                 </View>
               ))}
             </View>
-            <TouchableOpacity style={[S.btn,{backgroundColor:'#fff'}]} onPress={()=>goStep(1)}>
-              <Text style={[S.btnTxt,{color:C.primary}]}>בוא נתחיל ←</Text>
+            <TouchableOpacity style={[S.btn,{backgroundColor:'rgba(255,255,255,0.95)',borderRadius:18}]} onPress={()=>goStep(1)} activeOpacity={0.85}>
+              <Icon name="arrow-back" size={18} color={C.primary}/>
+              <Text style={[S.btnTxt,{color:C.primary,marginRight:8}]}>בוא נתחיל</Text>
             </TouchableOpacity>
           </>:<>
-            <Text style={{fontSize:22,fontWeight:'900',color:'#fff',textAlign:'right',marginBottom:6}}>קצת עליך 👤</Text>
-            <Text style={{color:'#bfdbfe',textAlign:'right',fontSize:13,marginBottom:24}}>נתאים את החוויה לך</Text>
-            <Text style={{color:'#bfdbfe',textAlign:'right',marginBottom:6,fontSize:13}}>שמך</Text>
-            <TextInput style={[S.onbInput,{marginBottom:20}]} value={name} onChangeText={setName}
+            <Text style={{fontSize:24,fontWeight:'900',color:'#fff',textAlign:'right',marginBottom:6}}>קצת עליך 👤</Text>
+            <Text style={{color:'#93c5fd',textAlign:'right',fontSize:14,marginBottom:28}}>נתאים את החוויה לרמתך</Text>
+            <Text style={{color:'#bfdbfe',textAlign:'right',marginBottom:8,fontSize:13,fontWeight:'600'}}>שמך</Text>
+            <TextInput style={[S.onbInput,{marginBottom:24}]} value={name} onChangeText={setName}
               placeholder="הכנס שם..." placeholderTextColor="#93c5fd" textAlign="right" autoFocus={isIOS}/>
-            <Text style={{color:'#bfdbfe',textAlign:'right',marginBottom:10,fontSize:13}}>יעד יומי (שאלות)</Text>
-            <Row style={{gap:8,marginBottom:32}}>
+            <Text style={{color:'#bfdbfe',textAlign:'right',marginBottom:10,fontSize:13,fontWeight:'600'}}>יעד יומי (שאלות)</Text>
+            <Row style={{gap:8,marginBottom:36}}>
               {['10','20','30','50'].map(n=>(
                 <TouchableOpacity key={n} onPress={()=>setGoal(n)}
-                  style={{flex:1,backgroundColor:goal===n?'#fff':'transparent',borderWidth:1.5,borderColor:'#fff',borderRadius:12,paddingVertical:12,alignItems:'center'}}>
-                  <Text style={{color:goal===n?C.primary:'#fff',fontWeight:'800',fontSize:15}}>{n}</Text>
+                  style={{flex:1,backgroundColor:goal===n?'rgba(255,255,255,0.95)':'rgba(255,255,255,0.08)',borderWidth:1.5,borderColor:goal===n?'#fff':'rgba(255,255,255,0.3)',borderRadius:14,paddingVertical:14,alignItems:'center'}}>
+                  <Text style={{color:goal===n?C.primary:'#fff',fontWeight:'900',fontSize:16}}>{n}</Text>
                 </TouchableOpacity>
               ))}
             </Row>
-            <TouchableOpacity style={[S.btn,{backgroundColor:'#fff'}]}
-              onPress={()=>onDone({userName:name.trim()||'לומד',dailyGoal:parseInt(goal)||20})}>
-              <Icon name="checkmark" size={18} color={C.primary}/>
-              <Text style={[S.btnTxt,{color:C.primary,marginRight:8}]}>כניסה</Text>
+            <TouchableOpacity style={[S.btn,{backgroundColor:'rgba(255,255,255,0.95)',borderRadius:18}]}
+              onPress={()=>onDone({userName:name.trim()||'לומד',dailyGoal:parseInt(goal)||20})} activeOpacity={0.85}>
+              <Icon name="checkmark-circle" size={20} color={C.primary}/>
+              <Text style={[S.btnTxt,{color:C.primary,marginRight:8}]}>התחל ללמוד</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={()=>goStep(0)} style={{alignItems:'center',marginTop:14}}>
-              <Text style={{color:'#bfdbfe',fontSize:13}}>← חזור</Text>
+            <TouchableOpacity onPress={()=>goStep(0)} style={{alignItems:'center',marginTop:16}}>
+              <Text style={{color:'#93c5fd',fontSize:13}}>← חזור</Text>
             </TouchableOpacity>
           </>}
         </View>
@@ -533,18 +544,33 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout}) {
   const lastH = prog.quizHistory?.[0];
   const lastTopic = lastH?.topic?topicById(lastH.topic):null;
 
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:110}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     {/* Header */}
-    <Row style={{justifyContent:'space-between',paddingVertical:10}}>
-      <View style={{flexDirection:'row-reverse',alignItems:'center',backgroundColor:'#fff7ed',paddingHorizontal:10,paddingVertical:5,borderRadius:20,borderWidth:1,borderColor:C.warning+'40'}}>
-        <Text style={{fontSize:13}}>🔥</Text>
-        <Text style={{fontSize:12,fontWeight:'700',color:C.warning,marginRight:3}}>{prog.streakDays||0} ימים</Text>
+    <View style={{backgroundColor:C.primary,borderRadius:24,padding:18,marginBottom:14,...shadow(1.5)}}>
+      <Row style={{justifyContent:'space-between',marginBottom:12}}>
+        <View style={{flexDirection:'row-reverse',alignItems:'center',backgroundColor:'rgba(255,255,255,0.15)',paddingHorizontal:10,paddingVertical:5,borderRadius:20}}>
+          <Text style={{fontSize:14}}>🔥</Text>
+          <Text style={{fontSize:12,fontWeight:'800',color:'#fde68a',marginRight:3}}>{prog.streakDays||0} ימים</Text>
+        </View>
+        <Col>
+          <Text style={{fontSize:22,fontWeight:'900',color:'#fff'}}>שלום, {prog.userName||'לומד'} 👋</Text>
+          <Text style={{fontSize:12,color:'#93c5fd',marginTop:2}}>הכנה לבחינת אמירנט IT</Text>
+        </Col>
+      </Row>
+      {/* Daily Goal inside header */}
+      <View style={{backgroundColor:'rgba(255,255,255,0.12)',borderRadius:16,padding:12}}>
+        <Row style={{justifyContent:'space-between',marginBottom:8}}>
+          <Row style={{flex:0,gap:4}}>
+            <Icon name={goalDone?'checkmark-circle':'today-outline'} size={15} color={goalDone?'#86efac':'#93c5fd'}/>
+            <Text style={{fontSize:12,color:goalDone?'#86efac':'#93c5fd',fontWeight:'700'}}>{goalDone?'יעד הושג! 🎯':'יעד יומי'}</Text>
+          </Row>
+          <Text style={{fontSize:18,fontWeight:'900',color:'#fff'}}>{todayAns}<Text style={{fontSize:13,color:'#93c5fd'}}>/{prog.dailyGoal}</Text></Text>
+        </Row>
+        <View style={{height:6,backgroundColor:'rgba(255,255,255,0.2)',borderRadius:100,overflow:'hidden'}}>
+          <View style={{width:`${Math.min((todayAns/(prog.dailyGoal||1))*100,100)}%`,height:6,backgroundColor:goalDone?'#86efac':'#60a5fa',borderRadius:100}}/>
+        </View>
       </View>
-      <Col>
-        <Text style={{fontSize:21,fontWeight:'900',color:C.text}}>שלום, {prog.userName} 👋</Text>
-        <Text style={{fontSize:13,color:C.muted}}>הכנה לבחינת אמירנט</Text>
-      </Col>
-    </Row>
+    </View>
 
     {/* Announcements */}
     {announcements.length>0&&announcements.slice(0,3).map(a=>{
@@ -559,50 +585,49 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout}) {
       </View>;
     })}
 
-    {/* Daily Goal */}
-    <Card style={goalDone?{borderWidth:1.5,borderColor:C.success+'55',backgroundColor:'#f0fdf4'}:{}}>
-      <Row style={{justifyContent:'space-between',marginBottom:8}}>
-        <Row style={{flex:0,gap:4}}>
-          <Icon name={goalDone?'checkmark-circle':'today-outline'} size={15} color={goalDone?C.success:C.primary}/>
-          <Text style={{fontSize:13,color:goalDone?C.success:C.primary,fontWeight:'700'}}>{goalDone?'יעד הושג 🎯':'יעד יומי'}</Text>
-        </Row>
-        <Text style={{fontSize:20,fontWeight:'900',color:goalDone?C.success:C.primary}}>{todayAns}/{prog.dailyGoal}</Text>
-      </Row>
-      <Bar value={todayAns} total={prog.dailyGoal} color={goalDone?C.success:C.primary} h={9}/>
-    </Card>
-
     {/* Stats */}
     <Row style={{gap:8,marginBottom:4}}>
       {[
-        {i:'help-circle',v:prog.totalAnswered||0,l:'שאלות',c:C.primary},
-        {i:'trophy',v:overall>0?`${overall}%`:'–',l:'הצלחה',c:overall>=70?C.success:C.warning},
-        {i:'flame',v:prog.streakDays||0,l:'רצף',c:C.warning},
-        {i:'bookmark',v:prog.bookmarkedIds?.length||0,l:'שמורות',c:C.purple},
-      ].map(s=><Card key={s.l} style={{flex:1,alignItems:'center',padding:10,marginBottom:0}}>
-        <Icon name={s.i} size={18} color={s.c}/>
-        <Text style={{fontSize:17,fontWeight:'900',color:s.c,marginTop:3}}>{s.v}</Text>
-        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>{s.l}</Text>
+        {i:'help-circle',v:prog.totalAnswered||0,l:'שאלות',c:C.primary,bg:'#eff6ff'},
+        {i:'trophy',v:overall>0?`${overall}%`:'–',l:'הצלחה',c:overall>=70?C.success:C.warning,bg:overall>=70?'#f0fdf4':'#fffbeb'},
+        {i:'flame',v:prog.streakDays||0,l:'רצף',c:C.orange,bg:'#fff7ed'},
+        {i:'bookmark',v:prog.bookmarkedIds?.length||0,l:'שמורות',c:C.purple,bg:C.purpleLight},
+      ].map(s=><Card key={s.l} style={{flex:1,alignItems:'center',padding:12,marginBottom:0,borderWidth:1,borderColor:s.bg,...shadow(0.7)}}>
+        <View style={{width:36,height:36,borderRadius:18,backgroundColor:s.bg,alignItems:'center',justifyContent:'center',marginBottom:6}}>
+          <Icon name={s.i} size={18} color={s.c}/>
+        </View>
+        <Text style={{fontSize:17,fontWeight:'900',color:s.c}}>{s.v}</Text>
+        <Text style={{fontSize:10,color:C.muted,marginTop:2}}>{s.l}</Text>
       </Card>)}
     </Row>
 
     {/* Quick Actions */}
-    <Sec title="בחינות"/>
-    <Row style={{gap:10}}>
-      <Card style={{flex:1,alignItems:'center',padding:14}} onPress={()=>onQuiz({count:10,topic:null,mode:'exam',timer:0,adaptive:false})}>
-        <Icon name="play-circle" size={30} color={C.primary}/>
-        <Text style={{fontWeight:'700',color:C.primary,marginTop:4,fontSize:13}}>בחינה מהירה</Text>
-        <Text style={{fontSize:11,color:C.muted}}>10 שאלות</Text>
-      </Card>
-      <Card style={{flex:1,alignItems:'center',padding:14}} onPress={()=>onQuiz({count:40,topic:null,mode:'exam',timer:45*60,adaptive:false})}>
-        <Icon name="school" size={30} color={C.danger}/>
-        <Text style={{fontWeight:'700',color:C.danger,marginTop:4,fontSize:13}}>בחינה מלאה</Text>
-        <Text style={{fontSize:11,color:C.muted}}>40 שאלות • 45′</Text>
-      </Card>
-      <Card style={{flex:1,alignItems:'center',padding:14}} onPress={()=>onQuiz({count:20,topic:null,mode:'exam',timer:0,adaptive:true})}>
-        <Icon name="analytics" size={30} color={C.purple}/>
-        <Text style={{fontWeight:'700',color:C.purple,marginTop:4,fontSize:13}}>אדפטיבי</Text>
-        <Text style={{fontSize:11,color:C.muted}}>מתאים לרמתך</Text>
-      </Card>
+    <Sec title="התחל עכשיו"/>
+    <Row style={{gap:10,marginBottom:4}}>
+      <TouchableOpacity style={{flex:1,backgroundColor:'#eff6ff',borderRadius:18,padding:14,alignItems:'center',borderWidth:1.5,borderColor:C.primary+'30',...shadow(0.8)}}
+        onPress={()=>onQuiz({count:10,topic:null,mode:'exam',timer:0,adaptive:false})} activeOpacity={0.8}>
+        <View style={{width:44,height:44,borderRadius:22,backgroundColor:C.primary,alignItems:'center',justifyContent:'center',marginBottom:8}}>
+          <Icon name="play" size={22} color="#fff"/>
+        </View>
+        <Text style={{fontWeight:'800',color:C.primary,fontSize:13}}>מהיר</Text>
+        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>10 שאלות</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={{flex:1,backgroundColor:'#fef2f2',borderRadius:18,padding:14,alignItems:'center',borderWidth:1.5,borderColor:C.danger+'30',...shadow(0.8)}}
+        onPress={()=>onQuiz({count:40,topic:null,mode:'exam',timer:45*60,adaptive:false})} activeOpacity={0.8}>
+        <View style={{width:44,height:44,borderRadius:22,backgroundColor:C.danger,alignItems:'center',justifyContent:'center',marginBottom:8}}>
+          <Icon name="school" size={22} color="#fff"/>
+        </View>
+        <Text style={{fontWeight:'800',color:C.danger,fontSize:13}}>מלא</Text>
+        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>40 שאלות • 45′</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={{flex:1,backgroundColor:C.purpleLight,borderRadius:18,padding:14,alignItems:'center',borderWidth:1.5,borderColor:C.purple+'30',...shadow(0.8)}}
+        onPress={()=>onQuiz({count:20,topic:null,mode:'exam',timer:0,adaptive:true})} activeOpacity={0.8}>
+        <View style={{width:44,height:44,borderRadius:22,backgroundColor:C.purple,alignItems:'center',justifyContent:'center',marginBottom:8}}>
+          <Icon name="analytics" size={22} color="#fff"/>
+        </View>
+        <Text style={{fontWeight:'800',color:C.purple,fontSize:13}}>אדפטיבי</Text>
+        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>מתאים לרמה</Text>
+      </TouchableOpacity>
     </Row>
 
     {weak.length>0&&<>
@@ -652,15 +677,19 @@ function QuizSetupScreen({onStart}) {
   const [mode,setMode]=useState('exam');
   const [timerMin,setTimerMin]=useState(0);
   const [adaptive,setAdaptive]=useState(false);
-  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:110}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>הגדרות בחינה</Text>
-    <Card style={{backgroundColor:C.primary,marginBottom:16}}>
-      <Row style={{justifyContent:'space-between'}}>
-        <Icon name="school" size={42} color="#bfdbfe"/>
-        <Col style={{alignItems:'flex-end'}}><Text style={{fontSize:19,fontWeight:'800',color:'#fff'}}>בחינת אמירנט</Text>
-          <Text style={{fontSize:13,color:'#bfdbfe'}}>הגדר והתחל</Text></Col>
+    <View style={{backgroundColor:C.primary,borderRadius:22,padding:18,marginBottom:16,...shadow(1.5)}}>
+      <Row style={{justifyContent:'space-between',alignItems:'center'}}>
+        <View style={{width:52,height:52,borderRadius:26,backgroundColor:'rgba(255,255,255,0.15)',alignItems:'center',justifyContent:'center'}}>
+          <Icon name="school" size={28} color="#fff"/>
+        </View>
+        <Col style={{alignItems:'flex-end',flex:1,paddingRight:12}}>
+          <Text style={{fontSize:20,fontWeight:'900',color:'#fff'}}>בחינת אמירנט</Text>
+          <Text style={{fontSize:12,color:'#93c5fd',marginTop:3}}>הגדר את הבחינה והתחל</Text>
+        </Col>
       </Row>
-    </Card>
+    </View>
 
     <Sec title="מספר שאלות"/>
     <Row style={{gap:8,marginBottom:16}}>
@@ -727,7 +756,7 @@ function QuizSetupScreen({onStart}) {
 }
 
 // ─── QUIZ ENGINE SCREEN ───────────────────────────────────────────────────────
-function QuizScreen({config,dispatch,onFinish,allQs=QS}) {
+function QuizScreen({config,dispatch,onFinish,allQs=QS,passGrade=70}) {
   const [questions,setQuestions] = useState(()=>config.adaptive?[AdaptiveEngine.selectNext(0,[],allQs,config.topic)].filter(Boolean):getPool(config.topic,config.count,allQs));
   const [idx,setIdx] = useState(0);
   const [answers,setAnswers] = useState({});
@@ -761,14 +790,14 @@ function QuizScreen({config,dispatch,onFinish,allQs=QS}) {
     const finalAns = {...answers,[idx]:selected};
     const isLast = config.adaptive ? questions.length>=config.count : idx===questions.length-1;
     if(isLast) {
-      dispatch({type:'RECORD',payload:{questions,answers:finalAns,startTime}});
+      dispatch({type:'RECORD',payload:{questions,answers:finalAns,startTime,passGrade}});
       if(config.adaptive) dispatch({type:'RECORD_ADAPTIVE',payload:{theta_start:0,theta_end:theta,questions_count:questions.length}});
       setAnswers(finalAns); setDone(true);
     } else if(config.adaptive) {
       const usedIds = questions.map(q=>q.id);
       const next = AdaptiveEngine.selectNext(theta,usedIds,allQs,config.topic);
       if(next) { animNext(()=>{ setQuestions(qs=>[...qs,next]); setIdx(i=>i+1); setSelected(null); setShowExp(false); }); }
-      else { dispatch({type:'RECORD',payload:{questions,answers:finalAns,startTime}}); setAnswers(finalAns); setDone(true); }
+      else { dispatch({type:'RECORD',payload:{questions,answers:finalAns,startTime,passGrade}}); setAnswers(finalAns); setDone(true); }
     } else {
       animNext(()=>{ setIdx(i=>i+1); setSelected(null); setShowExp(false); });
     }
@@ -776,13 +805,13 @@ function QuizScreen({config,dispatch,onFinish,allQs=QS}) {
 
   function handleTimeUp() {
     Alert.alert('הזמן נגמר!','הבחינה הסתיימה.',[{text:'תוצאות',onPress:()=>{
-      dispatch({type:'RECORD',payload:{questions,answers,startTime}});
+      dispatch({type:'RECORD',payload:{questions,answers,startTime,passGrade}});
       setDone(true);
     }}]);
   }
 
   if(done) {
-    const result = Scoring.compute(questions,answers,startTime);
+    const result = Scoring.compute(questions,answers,startTime,passGrade);
     return <ResultsScreen questions={questions} answers={answers} result={result} theta={config.adaptive?theta:null} onDismiss={onFinish}/>;
   }
 
@@ -790,50 +819,71 @@ function QuizScreen({config,dispatch,onFinish,allQs=QS}) {
   const t = topicById(q.topic);
   const maxIdx = config.adaptive?config.count-1:questions.length-1;
 
+  const progressPct = (idx/Math.max(maxIdx,1))*100;
+  const progressColor = config.adaptive?C.purple:C.primary;
   return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
     <StatusBar barStyle="dark-content"/>
-    <View style={S.qBar}>
-      <Row style={{flex:0,gap:8}}>
+    {/* Top Bar */}
+    <View style={[S.qBar,{paddingVertical:12}]}>
+      <Row style={{flex:0,gap:10}}>
         {config.timer>0&&<ExamTimer totalSeconds={config.timer} onTimeUp={handleTimeUp}/>}
-        <TouchableOpacity onPress={()=>setFlagged(f=>{const n=new Set(f);n.has(q.id)?n.delete(q.id):n.add(q.id);return n;})}>
-          <Icon name={flagged.has(q.id)?'flag':'flag-outline'} size={20} color={flagged.has(q.id)?C.warning:C.muted}/>
+        <TouchableOpacity onPress={()=>setFlagged(f=>{const n=new Set(f);n.has(q.id)?n.delete(q.id):n.add(q.id);return n;})}
+          style={{width:36,height:36,borderRadius:18,backgroundColor:flagged.has(q.id)?C.warning+'20':C.fill,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:flagged.has(q.id)?C.warning+'60':C.border}}>
+          <Icon name={flagged.has(q.id)?'flag':'flag-outline'} size={17} color={flagged.has(q.id)?C.warning:C.muted}/>
         </TouchableOpacity>
-        <Text style={{fontWeight:'700',fontSize:14}}>{idx+1}/{config.adaptive?config.count:questions.length}</Text>
+        <View style={{backgroundColor:C.fill,borderRadius:20,paddingHorizontal:12,paddingVertical:5,borderWidth:1,borderColor:C.border}}>
+          <Text style={{fontWeight:'800',fontSize:13,color:C.text}}>{idx+1}<Text style={{color:C.muted,fontWeight:'400'}}>/{config.adaptive?config.count:questions.length}</Text></Text>
+        </View>
       </Row>
-      <TouchableOpacity onPress={onFinish}><Icon name="close-circle" size={24} color={C.danger}/></TouchableOpacity>
+      <TouchableOpacity onPress={onFinish} style={{width:36,height:36,borderRadius:18,backgroundColor:C.dangerLight,alignItems:'center',justifyContent:'center'}}>
+        <Icon name="close" size={18} color={C.danger}/>
+      </TouchableOpacity>
     </View>
-    <View style={{height:4,backgroundColor:C.fill}}>
-      <View style={{width:`${(idx/Math.max(maxIdx,1))*100}%`,height:4,backgroundColor:config.adaptive?C.purple:C.primary}}/>
+    {/* Progress Bar */}
+    <View style={{height:5,backgroundColor:C.fill,marginHorizontal:16,borderRadius:100,overflow:'hidden',marginBottom:4}}>
+      <View style={{width:`${progressPct}%`,height:5,backgroundColor:progressColor,borderRadius:100}}/>
     </View>
-    {config.adaptive&&<View style={{backgroundColor:C.purple+'10',paddingHorizontal:16,paddingVertical:4}}>
+    {config.adaptive&&<View style={{backgroundColor:C.purple+'10',paddingHorizontal:16,paddingVertical:6}}>
       <Row style={{justifyContent:'space-between'}}>
         <Pill label={`θ = ${theta.toFixed(2)}`} color={C.purple} small/>
         <Text style={{fontSize:11,color:C.purple,fontWeight:'700'}}>רמה: {DIFF_LABEL[AdaptiveEngine.thetaToLevel(theta)]}</Text>
       </Row>
     </View>}
 
-    <ScrollView contentContainerStyle={{padding:16,paddingBottom:isIOS?120:110}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={{padding:16,paddingBottom:isIOS?130:120}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <Animated.View style={{opacity:fadeAnim}}>
         {q.type==='reading'&&<PassageCard passage={q.passage}/>}
-        <Card style={{marginBottom:14,borderTopWidth:3,borderTopColor:t?.color||C.primary}}>
-          <Row style={{justifyContent:'space-between',marginBottom:8}}>
+        {/* Question Card */}
+        <Card style={{marginBottom:16,borderWidth:0,overflow:'hidden',...shadow(1.2)}}>
+          <View style={{height:4,backgroundColor:t?.color||C.primary,marginHorizontal:-14,marginTop:-14,marginBottom:14,borderTopLeftRadius:18,borderTopRightRadius:18}}/>
+          <Row style={{justifyContent:'space-between',marginBottom:10}}>
             <Pill label={DIFF_LABEL[q.diff]} color={DIFF_COLOR[q.diff]}/>
-            <Row style={{flex:0,gap:4}}><Text style={{fontSize:12,color:C.muted}}>{t?.name}</Text><Text style={{fontSize:16}}>{t?.icon}</Text></Row>
+            <Row style={{flex:0,gap:6}}>
+              <Text style={{fontSize:12,color:C.muted,fontWeight:'600'}}>{t?.name}</Text>
+              <View style={{width:28,height:28,borderRadius:14,backgroundColor:(t?.color||C.primary)+'20',alignItems:'center',justifyContent:'center'}}>
+                <Text style={{fontSize:16}}>{t?.icon}</Text>
+              </View>
+            </Row>
           </Row>
-          {q.type==='restatement'&&<Text style={{fontSize:12,color:C.purple,fontWeight:'700',textAlign:'right',marginBottom:6}}>🔁 בחר את ההצהרה השקולה</Text>}
-          <Text style={{fontSize:17,fontWeight:'700',textAlign:'right',color:C.text,lineHeight:27}}>{q.q}</Text>
+          {q.type==='restatement'&&<View style={{backgroundColor:C.purpleLight,borderRadius:10,paddingHorizontal:10,paddingVertical:5,marginBottom:8,alignSelf:'flex-end'}}>
+            <Text style={{fontSize:11,color:C.purple,fontWeight:'700'}}>🔁 בחר את ההצהרה השקולה</Text>
+          </View>}
+          <Text style={{fontSize:17,fontWeight:'700',textAlign:'right',color:C.text,lineHeight:28}}>{q.q}</Text>
         </Card>
         {q.opts.map((opt,i)=><AnswerOpt key={i} text={opt} index={i} selected={selected} correctIdx={q.a} studyMode={config.mode==='study'} onPress={handleSelect}/>)}
-        {config.mode==='study'&&showExp&&<Card style={{backgroundColor:'#fffbeb',borderWidth:1,borderColor:C.warning+'50',marginTop:8}}>
-          <Row style={{justifyContent:'flex-end',marginBottom:6}}><Text style={{fontWeight:'700',color:C.warning,fontSize:13}}>💡 הסבר</Text></Row>
-          <Text style={{textAlign:'right',fontSize:14,color:C.text,lineHeight:22}}>{q.exp}</Text>
-        </Card>}
+        {config.mode==='study'&&showExp&&<View style={{backgroundColor:'#fffbeb',borderRadius:16,padding:14,borderWidth:1.5,borderColor:C.warning+'60',marginTop:10,...shadow(0.6)}}>
+          <Row style={{justifyContent:'flex-end',marginBottom:8,gap:4}}>
+            <Text style={{fontWeight:'800',color:C.warning,fontSize:14}}>הסבר</Text>
+            <Text style={{fontSize:16}}>💡</Text>
+          </Row>
+          <Text style={{textAlign:'right',fontSize:14,color:C.text,lineHeight:23}}>{q.exp}</Text>
+        </View>}
       </Animated.View>
     </ScrollView>
-    {selected!==null&&<View style={S.qBottom}>
-      <TouchableOpacity style={S.btn} onPress={handleNext}>
-        <Icon name={idx===maxIdx?'checkmark':'arrow-back'} size={17} color="#fff"/>
-        <Text style={[S.btnTxt,{marginRight:8}]}>{idx===maxIdx?'סיים':'הבא'}</Text>
+    {selected!==null&&<View style={[S.qBottom,{gap:0}]}>
+      <TouchableOpacity style={[S.btn,shadow(1)]} onPress={handleNext}>
+        <Icon name={idx===maxIdx?'checkmark-circle':'arrow-back'} size={19} color="#fff"/>
+        <Text style={[S.btnTxt,{marginRight:10,fontSize:16}]}>{idx===maxIdx?'סיים בחינה':'הבא'}</Text>
       </TouchableOpacity>
     </View>}
   </SafeAreaView>;
@@ -842,34 +892,39 @@ function QuizScreen({config,dispatch,onFinish,allQs=QS}) {
 // ─── RESULTS SCREEN ───────────────────────────────────────────────────────────
 function ResultsScreen({questions,answers,result,theta,onDismiss}) {
   const [detail,setDetail] = useState(false);
-  const {base,weighted,correct,total,pass,secs,topicMap} = result;
+  const {base,weighted,correct,total,pass,passGrade=70,secs,topicMap} = result;
   const gradeColor = pass?C.success:base>=60?C.warning:C.danger;
-  const gradeLabel2 = base>=90?'מצוין! 🌟':base>=75?'טוב מאוד':base>=70?'עבר ✓':base>=60?'כמעט...':'נכשל';
+  const gradeLabel2 = base>=90?'מצוין! 🌟':base>=75?'טוב מאוד':base>=passGrade?'עבר ✓':base>=60?'כמעט...':'נכשל';
   return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
     <StatusBar barStyle="dark-content"/>
-    <View style={S.qBar}>
-      <TouchableOpacity onPress={onDismiss}><Icon name="close" size={22} color={C.muted}/></TouchableOpacity>
-      <Text style={{fontWeight:'800',fontSize:16}}>תוצאות</Text>
+    <View style={[S.qBar,{paddingVertical:12}]}>
+      <TouchableOpacity onPress={onDismiss} style={{width:36,height:36,borderRadius:18,backgroundColor:C.fill,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:C.border}}>
+        <Icon name="close" size={18} color={C.muted}/>
+      </TouchableOpacity>
+      <Text style={{fontWeight:'900',fontSize:17,color:C.text}}>תוצאות הבחינה</Text>
     </View>
-    <ScrollView contentContainerStyle={{padding:16,paddingBottom:isIOS?120:100}} showsVerticalScrollIndicator={false}>
-      {/* Score */}
-      <View style={{alignItems:'center',paddingVertical:20}}>
-        <View style={{width:140,height:140,borderRadius:70,borderWidth:12,borderColor:gradeColor,alignItems:'center',justifyContent:'center'}}>
-          <Text style={{fontSize:36,fontWeight:'900',color:gradeColor}}>{base}%</Text>
+    <ScrollView contentContainerStyle={{padding:16,paddingBottom:isIOS?130:110}} showsVerticalScrollIndicator={false}>
+      {/* Score Hero */}
+      <View style={{backgroundColor:gradeColor,borderRadius:24,padding:24,alignItems:'center',marginBottom:14,...shadow(1.5)}}>
+        <View style={{width:120,height:120,borderRadius:60,backgroundColor:'rgba(255,255,255,0.2)',borderWidth:6,borderColor:'rgba(255,255,255,0.4)',alignItems:'center',justifyContent:'center',marginBottom:12}}>
+          <Text style={{fontSize:42,fontWeight:'900',color:'#fff'}}>{base}</Text>
+          <Text style={{fontSize:16,color:'rgba(255,255,255,0.8)',fontWeight:'700',marginTop:-4}}>%</Text>
         </View>
-        <View style={{backgroundColor:gradeColor+'18',borderWidth:2,borderColor:gradeColor,borderRadius:30,paddingHorizontal:24,paddingVertical:8,marginTop:14}}>
-          <Text style={{fontSize:18,fontWeight:'900',color:gradeColor}}>{gradeLabel2}</Text>
-        </View>
-        <Text style={{color:C.muted,fontSize:14,marginTop:8}}>{correct} מתוך {total} נכונות</Text>
-        {theta!==null&&<Pill label={`רמה: ${DIFF_LABEL[AdaptiveEngine.thetaToLevel(theta)]} (θ=${theta.toFixed(2)})`} color={C.purple}/>}
+        <Text style={{fontSize:24,fontWeight:'900',color:'#fff',marginBottom:4}}>{gradeLabel2}</Text>
+        <Text style={{fontSize:14,color:'rgba(255,255,255,0.8)'}}>{correct} מתוך {total} נכונות</Text>
+        {theta!==null&&<View style={{backgroundColor:'rgba(255,255,255,0.2)',borderRadius:20,paddingHorizontal:14,paddingVertical:5,marginTop:8}}>
+          <Text style={{color:'#fff',fontWeight:'700',fontSize:12}}>רמה: {DIFF_LABEL[AdaptiveEngine.thetaToLevel(theta)]} • θ={theta.toFixed(2)}</Text>
+        </View>}
       </View>
       {/* Stats */}
-      <Card style={{flexDirection:'row-reverse',marginBottom:12}}>
-        {[{v:correct,l:'נכון',c:C.success,i:'checkmark-circle'},{v:total-correct,l:'שגוי',c:C.danger,i:'close-circle'},{v:fmtTime(secs),l:'זמן',c:C.primary,i:'time'}].map((s,i,arr)=>(
-          <View key={s.l} style={[{flex:1,alignItems:'center',paddingVertical:10},i<arr.length-1&&{borderRightWidth:1,borderRightColor:C.border}]}>
-            <Icon name={s.i} size={18} color={s.c}/>
-            <Text style={{fontSize:20,fontWeight:'900',color:s.c,marginTop:3}}>{s.v}</Text>
-            <Text style={{fontSize:12,color:C.muted}}>{s.l}</Text>
+      <Card style={{flexDirection:'row-reverse',marginBottom:12,...shadow(0.8)}}>
+        {[{v:correct,l:'נכון',c:C.success,i:'checkmark-circle',bg:'#f0fdf4'},{v:total-correct,l:'שגוי',c:C.danger,i:'close-circle',bg:C.dangerLight},{v:fmtTime(secs),l:'זמן',c:C.primary,i:'time-outline',bg:'#eff6ff'}].map((s,i,arr)=>(
+          <View key={s.l} style={[{flex:1,alignItems:'center',paddingVertical:12},i<arr.length-1&&{borderRightWidth:1,borderRightColor:C.border}]}>
+            <View style={{width:36,height:36,borderRadius:18,backgroundColor:s.bg,alignItems:'center',justifyContent:'center',marginBottom:5}}>
+              <Icon name={s.i} size={18} color={s.c}/>
+            </View>
+            <Text style={{fontSize:20,fontWeight:'900',color:s.c}}>{s.v}</Text>
+            <Text style={{fontSize:11,color:C.muted,marginTop:2}}>{s.l}</Text>
           </View>
         ))}
       </Card>
@@ -908,9 +963,9 @@ function ResultsScreen({questions,answers,result,theta,onDismiss}) {
       {detail&&questions.map((q,i)=><ReviewRow key={q.id} q={q} idx={i} sel={answers[i]}/>)}
     </ScrollView>
     <View style={S.qBottom}>
-      <TouchableOpacity style={S.btn} onPress={onDismiss}>
-        <Icon name="home" size={17} color="#fff"/>
-        <Text style={[S.btnTxt,{marginRight:8}]}>חזור לבית</Text>
+      <TouchableOpacity style={[S.btn,shadow(1)]} onPress={onDismiss}>
+        <Icon name="home" size={19} color="#fff"/>
+        <Text style={[S.btnTxt,{marginRight:10,fontSize:16}]}>חזור לבית</Text>
       </TouchableOpacity>
     </View>
   </SafeAreaView>;
@@ -928,29 +983,38 @@ function TopicsScreen({prog,onQuiz}) {
       const med=QS.filter(q=>q.topic===t.id&&q.diff==='intermediate').length;
       const adv=QS.filter(q=>q.topic===t.id&&q.diff==='advanced').length;
       const exp=QS.filter(q=>q.topic===t.id&&q.diff==='expert').length;
-      return <Card key={t.id} style={{marginBottom:14,borderTopWidth:3,borderTopColor:t.color}} onPress={()=>onQuiz({count:total,topic:t.id,mode:'exam',timer:0,adaptive:false})}>
-        <Row style={{justifyContent:'space-between',marginBottom:8}}>
-          <Col><Text style={{fontSize:12,color:C.muted}}>{p?.answered||0}/{total}</Text>
-            {p2>0&&<Text style={{fontSize:12,fontWeight:'700',color:p2>=70?C.success:C.warning}}>{p2}%</Text>}</Col>
-          <Row style={{flex:0,gap:10}}>
-            <Col style={{alignItems:'flex-end'}}>
-              <Text style={{fontSize:17,fontWeight:'800'}}>{t.name}</Text>
+      return <TouchableOpacity key={t.id} style={{backgroundColor:C.card,borderRadius:20,marginBottom:14,overflow:'hidden',...shadow(1)}}
+        onPress={()=>onQuiz({count:total,topic:t.id,mode:'exam',timer:0,adaptive:false})} activeOpacity={0.82}>
+        <View style={{height:5,backgroundColor:t.color}}/>
+        <View style={{padding:14}}>
+          <Row style={{justifyContent:'space-between',marginBottom:10}}>
+            <Col>
+              {p2>0&&<View style={{backgroundColor:p2>=70?C.successLight:C.warningLight,borderRadius:20,paddingHorizontal:10,paddingVertical:3,borderWidth:1,borderColor:p2>=70?C.success+'40':C.warning+'40'}}>
+                <Text style={{fontSize:13,fontWeight:'800',color:p2>=70?C.success:C.warning}}>{p2}%</Text>
+              </View>}
+              <Text style={{fontSize:11,color:C.muted,marginTop:4}}>{p?.answered||0}/{total} שאלות</Text>
             </Col>
-            <View style={{width:50,height:50,borderRadius:25,backgroundColor:t.color+'20',alignItems:'center',justifyContent:'center'}}>
-              <Text style={{fontSize:26}}>{t.icon}</Text>
+            <Row style={{flex:0,gap:10}}>
+              <Text style={{fontSize:18,fontWeight:'800',color:C.text}}>{t.name}</Text>
+              <View style={{width:52,height:52,borderRadius:26,backgroundColor:t.color+'20',alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:t.color+'30'}}>
+                <Text style={{fontSize:28}}>{t.icon}</Text>
+              </View>
+            </Row>
+          </Row>
+          <Bar value={p2} total={100} color={t.color} h={7}/>
+          <Row style={{justifyContent:'space-between',marginTop:10}}>
+            <Row style={{flex:0,gap:5,flexWrap:'wrap'}}>
+              {[['קל',C.success,easy],['בינוני',C.warning,med],['מתקדם',C.orange,adv],['מומחה',C.danger,exp]].filter(([,, n])=>n>0).map(([l,c,n])=>(
+                <Pill key={l} label={`${n} ${l}`} color={c} small/>
+              ))}
+            </Row>
+            <View style={{backgroundColor:C.primary,borderRadius:20,paddingHorizontal:12,paddingVertical:5,flexDirection:'row-reverse',alignItems:'center',gap:4}}>
+              <Icon name="arrow-back" size={13} color="#fff"/>
+              <Text style={{fontSize:12,color:'#fff',fontWeight:'800'}}>התחל</Text>
             </View>
           </Row>
-        </Row>
-        <Bar value={p2} total={100} color={t.color} h={6}/>
-        <Row style={{justifyContent:'space-between',marginTop:8}}>
-          <Row style={{flex:0,gap:5}}>
-            {[['קל',C.success,easy],['בינוני',C.warning,med],['מתקדם',C.orange,adv],['מומחה',C.danger,exp]].filter(([,, n])=>n>0).map(([l,c,n])=>(
-              <Pill key={l} label={`${n} ${l}`} color={c} small/>
-            ))}
-          </Row>
-          <Row style={{flex:0,gap:2}}><Text style={{fontSize:12,color:C.primary,fontWeight:'700'}}>התחל</Text><Icon name="arrow-back" size={13} color={C.primary}/></Row>
-        </Row>
-      </Card>;
+        </View>
+      </TouchableOpacity>;
     })}
   </ScrollView>;
 }
@@ -986,19 +1050,23 @@ function ProgressScreen({prog,dispatch,currentUser,onLogout}) {
   return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:100}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>התקדמות</Text>
     {/* Summary card */}
-    <Card style={{backgroundColor:C.primary,marginBottom:14}}>
+    <View style={{backgroundColor:C.primary,borderRadius:22,padding:18,marginBottom:14,...shadow(1.5)}}>
       <Row style={{justifyContent:'space-between',alignItems:'center'}}>
-        <View style={{width:100,height:100,borderRadius:50,borderWidth:10,borderColor:'#fff3',alignItems:'center',justifyContent:'center'}}>
-          <Text style={{fontSize:28,fontWeight:'900',color:'#fff'}}>{overall}%</Text>
+        <View style={{width:100,height:100,borderRadius:50,borderWidth:8,borderColor:'rgba(255,255,255,0.3)',backgroundColor:'rgba(255,255,255,0.12)',alignItems:'center',justifyContent:'center'}}>
+          <Text style={{fontSize:30,fontWeight:'900',color:'#fff'}}>{overall}%</Text>
+          <Text style={{fontSize:10,color:'rgba(255,255,255,0.7)',fontWeight:'600'}}>ציון כללי</Text>
         </View>
-        <Col style={{flex:1,alignItems:'flex-end',paddingRight:14}}>
-          <Text style={{color:'#bfdbfe',fontSize:12,marginBottom:3}}>ציון כללי</Text>
-          <Text style={{color:'#fff',fontSize:20,fontWeight:'900'}}>{prog.totalAnswered||0} שאלות</Text>
-          <Text style={{color:'#bfdbfe',fontSize:13}}>{prog.totalCorrect||0} נכונות</Text>
-          <Text style={{color:'#fde68a',fontWeight:'700',marginTop:6}}>🔥 {prog.streakDays||0} ימי רצף</Text>
+        <Col style={{flex:1,alignItems:'flex-end',paddingRight:14,gap:5}}>
+          <Text style={{color:'#fff',fontSize:22,fontWeight:'900'}}>{prog.totalAnswered||0}<Text style={{fontSize:14,color:'#93c5fd',fontWeight:'500'}}> שאלות</Text></Text>
+          <Text style={{color:'#93c5fd',fontSize:13}}>{prog.totalCorrect||0} נכונות</Text>
+          <View style={{flexDirection:'row-reverse',gap:10,marginTop:4}}>
+            <View style={{backgroundColor:'rgba(253,230,138,0.2)',borderRadius:16,paddingHorizontal:10,paddingVertical:4}}>
+              <Text style={{color:'#fde68a',fontWeight:'800',fontSize:13}}>🔥 {prog.streakDays||0} רצף</Text>
+            </View>
+          </View>
         </Col>
       </Row>
-    </Card>
+    </View>
     {/* Activity chart */}
     <Card>
       <Text style={{textAlign:'right',fontWeight:'700',fontSize:14,marginBottom:12}}>פעילות 7 ימים</Text>
@@ -1042,13 +1110,13 @@ function ProgressScreen({prog,dispatch,currentUser,onLogout}) {
       </Card>
     );})}
     {/* Achievements */}
-    <Sec title="הישגים"/>
+    <Sec title="הישגים 🏆"/>
     <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:10,marginBottom:14}}>
       {achievements.map((a,i)=>(
-        <View key={i} style={[{width:(W-56)/4,backgroundColor:C.card,borderRadius:14,padding:10,alignItems:'center',shadowColor:'#000',shadowOpacity:0.05,shadowRadius:4,elevation:1},!a.done&&{opacity:0.3}]}>
-          <Text style={{fontSize:26}}>{a.icon}</Text>
-          <Text style={{fontSize:10,color:C.text,marginTop:3,textAlign:'center'}}>{a.label}</Text>
-          {a.done&&<Icon name="checkmark-circle" size={12} color={C.success}/>}
+        <View key={i} style={[{width:(W-56)/4,backgroundColor:C.card,borderRadius:16,padding:10,alignItems:'center',...shadow(0.5),borderWidth:1,borderColor:a.done?C.success+'30':C.border},!a.done&&{opacity:0.35}]}>
+          <Text style={{fontSize:28}}>{a.icon}</Text>
+          <Text style={{fontSize:9,color:a.done?C.text:C.muted,marginTop:4,textAlign:'center',fontWeight:a.done?'700':'400'}}>{a.label}</Text>
+          {a.done&&<View style={{marginTop:3}}><Icon name="checkmark-circle" size={14} color={C.success}/></View>}
         </View>
       ))}
     </View>
@@ -1094,15 +1162,27 @@ function ProgressScreen({prog,dispatch,currentUser,onLogout}) {
 
 // ─── TAB BAR ──────────────────────────────────────────────────────────────────
 function TabBar({tab,setTab}) {
-  const tabs=[{id:'home',label:'בית',icon:'home-outline',active:'home'},{id:'topics',label:'נושאים',icon:'book-outline',active:'book'},{id:'quiz',label:'בחינה',icon:'pencil-outline',active:'pencil'},{id:'progress',label:'התקדמות',icon:'bar-chart-outline',active:'bar-chart'}];
-  return <View style={S.tabBar}>
-    {tabs.map(t=>{const on=tab===t.id;return(
-      <TouchableOpacity key={t.id} style={S.tabItem} onPress={()=>setTab(t.id)} activeOpacity={0.7}>
-        {on&&<View style={S.tabInd}/>}
-        <Icon name={on?t.active:t.icon} size={22} color={on?C.primary:C.muted}/>
-        <Text style={{fontSize:11,color:on?C.primary:C.muted,fontWeight:on?'700':'400',marginTop:3}}>{t.label}</Text>
-      </TouchableOpacity>
-    );})}
+  const tabs=[
+    {id:'home',label:'בית',icon:'home-outline',active:'home'},
+    {id:'topics',label:'נושאים',icon:'book-outline',active:'book'},
+    {id:'quiz',label:'בחינה',icon:'pencil-outline',active:'pencil'},
+    {id:'progress',label:'התקדמות',icon:'bar-chart-outline',active:'bar-chart'},
+  ];
+  return <View style={[S.tabBar,{borderTopWidth:1,borderTopColor:C.border,shadowColor:'#000',shadowOpacity:0.04,shadowRadius:6,shadowOffset:{width:0,height:-2},elevation:4}]}>
+    {tabs.map(t=>{
+      const on=tab===t.id;
+      return <TouchableOpacity key={t.id} style={S.tabItem} onPress={()=>setTab(t.id)} activeOpacity={0.75}>
+        <View style={{alignItems:'center',justifyContent:'center',paddingTop:2}}>
+          {on?<View style={{backgroundColor:C.primary+'15',borderRadius:16,paddingHorizontal:14,paddingVertical:5,alignItems:'center',minWidth:56}}>
+            <Icon name={t.active} size={22} color={C.primary}/>
+            <Text style={{fontSize:10,color:C.primary,fontWeight:'800',marginTop:2}}>{t.label}</Text>
+          </View>:<View style={{alignItems:'center',paddingHorizontal:14,paddingVertical:5}}>
+            <Icon name={t.icon} size={22} color={C.muted}/>
+            <Text style={{fontSize:10,color:C.muted,fontWeight:'400',marginTop:2}}>{t.label}</Text>
+          </View>}
+        </View>
+      </TouchableOpacity>;
+    })}
   </View>;
 }
 
@@ -1113,63 +1193,71 @@ function AuthScreen({gsData,onLogin,onRegister}) {
   const [password,setPassword]=useState('');
   const [name,setName]=useState('');
   const [showPwd,setShowPwd]=useState(false);
-  return <SafeAreaView style={{flex:1,backgroundColor:C.primary}}>
+  return <SafeAreaView style={{flex:1,backgroundColor:C.primaryDark}}>
     <StatusBar barStyle="light-content"/>
     <KAV>
-      <View style={{alignItems:'center',paddingTop:isIOS?32:40,paddingBottom:24}}>
-        <View style={{width:76,height:76,borderRadius:38,backgroundColor:'rgba(255,255,255,0.18)',alignItems:'center',justifyContent:'center',marginBottom:12}}>
-          <Text style={{fontSize:40}}>🌐</Text>
+      {/* Hero Header */}
+      <View style={{alignItems:'center',paddingTop:isIOS?28:36,paddingBottom:28}}>
+        <View style={{position:'relative',marginBottom:14}}>
+          <View style={{width:90,height:90,borderRadius:45,backgroundColor:'rgba(255,255,255,0.12)',alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:'rgba(255,255,255,0.25)'}}>
+            <Text style={{fontSize:46}}>🌐</Text>
+          </View>
+          <View style={{position:'absolute',bottom:-4,right:-4,width:28,height:28,borderRadius:14,backgroundColor:C.success,alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:C.primaryDark}}>
+            <Icon name="checkmark" size={14} color="#fff"/>
+          </View>
         </View>
-        <Text style={{fontSize:26,fontWeight:'900',color:'#fff'}}>AmirNet Plus</Text>
-        <Text style={{fontSize:13,color:'#bfdbfe',marginTop:4}}>הכנה מקצועית לבחינת אמירנט</Text>
+        <Text style={{fontSize:28,fontWeight:'900',color:'#fff',letterSpacing:0.3}}>AmirNet Plus</Text>
+        <Text style={{fontSize:13,color:'#93c5fd',marginTop:5}}>הכנה מקצועית לבחינת אמירנט IT</Text>
       </View>
-      <View style={{flex:1,backgroundColor:C.bg,borderTopLeftRadius:28,borderTopRightRadius:28,overflow:'hidden'}}>
-        <View style={{flexDirection:'row-reverse',backgroundColor:C.fill,margin:16,borderRadius:12,padding:4}}>
-          {[['login','התחברות'],['register','הרשמה']].map(([v,l])=>(
+      {/* Form Card */}
+      <View style={{flex:1,backgroundColor:C.bg,borderTopLeftRadius:32,borderTopRightRadius:32}}>
+        {/* Tab Switcher */}
+        <View style={{flexDirection:'row-reverse',backgroundColor:C.fill,margin:18,marginBottom:4,borderRadius:14,padding:4,borderWidth:1,borderColor:C.border}}>
+          {[['login','התחברות','log-in-outline'],['register','הרשמה','person-add-outline']].map(([v,l,ic])=>(
             <TouchableOpacity key={v} onPress={()=>setTab(v)}
-              style={{flex:1,paddingVertical:10,borderRadius:10,alignItems:'center',
-                backgroundColor:tab===v?C.card:'transparent',
-                shadowColor:tab===v?'#000':'transparent',shadowOpacity:0.08,shadowRadius:4,elevation:tab===v?2:0}}>
+              style={{flex:1,flexDirection:'row-reverse',paddingVertical:11,borderRadius:10,alignItems:'center',justifyContent:'center',gap:5,
+                backgroundColor:tab===v?C.card:'transparent',...(tab===v?shadow(0.8):{})}}>
+              <Icon name={ic} size={15} color={tab===v?C.primary:C.muted}/>
               <Text style={{fontWeight:'700',color:tab===v?C.primary:C.muted,fontSize:14}}>{l}</Text>
             </TouchableOpacity>
           ))}
         </View>
-        <ScrollView contentContainerStyle={{paddingHorizontal:20,paddingBottom:40}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{paddingHorizontal:20,paddingBottom:48}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {tab==='register'&&<>
-            <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>שם מלא</Text>
-            <TextInput style={[S.inp,{marginBottom:12}]} value={name} onChangeText={setName}
+            <Text style={S.inpLabel}>שם מלא</Text>
+            <TextInput style={[S.inp,{marginBottom:14}]} value={name} onChangeText={setName}
               placeholder="הכנס שמך המלא..." placeholderTextColor={C.muted} textAlign="right"
               returnKeyType="next"/>
           </>}
-          <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>שם משתמש</Text>
-          <TextInput style={[S.inp,{marginBottom:12}]} value={username} onChangeText={setUsername}
-            placeholder="username" placeholderTextColor={C.muted} textAlign="right"
+          <Text style={S.inpLabel}>שם משתמש</Text>
+          <TextInput style={[S.inp,{marginBottom:14}]} value={username} onChangeText={setUsername}
+            placeholder="username" placeholderTextColor={C.muted} textAlign="left"
             autoCapitalize="none" autoCorrect={false} returnKeyType="next"/>
-          <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:6}}>סיסמה</Text>
-          <View style={{marginBottom:4}}>
+          <Text style={S.inpLabel}>סיסמה</Text>
+          <View style={{marginBottom:6}}>
             <TextInput style={S.inp} value={password} onChangeText={setPassword}
-              placeholder="••••••" placeholderTextColor={C.muted} textAlign="right"
+              placeholder="••••••" placeholderTextColor={C.muted} textAlign="left"
               secureTextEntry={!showPwd} autoCapitalize="none" returnKeyType="done"
               onSubmitEditing={()=>tab==='login'?onLogin(username.trim(),password):onRegister(name.trim(),username.trim(),password)}/>
-            <TouchableOpacity onPress={()=>setShowPwd(s=>!s)} style={{position:'absolute',left:12,top:14}}>
+            <TouchableOpacity onPress={()=>setShowPwd(s=>!s)} style={{position:'absolute',left:14,top:14}}>
               <Icon name={showPwd?'eye-off-outline':'eye-outline'} size={18} color={C.muted}/>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={[S.btn,{marginTop:20}]}
+          <TouchableOpacity style={[S.btn,{marginTop:20,...shadow(1.2)}]}
             onPress={()=>tab==='login'?onLogin(username.trim(),password):onRegister(name.trim(),username.trim(),password)}>
             <Icon name={tab==='login'?'log-in-outline':'person-add-outline'} size={18} color="#fff"/>
             <Text style={[S.btnTxt,{marginRight:8}]}>{tab==='login'?'התחבר':'הרשם'}</Text>
           </TouchableOpacity>
-          {tab==='login'&&<View style={{backgroundColor:'#eff6ff',borderRadius:12,padding:12,marginTop:16,borderWidth:1,borderColor:C.primary+'30'}}>
-            <Row style={{justifyContent:'flex-end',gap:6,marginBottom:4}}>
-              <Text style={{fontSize:13,color:C.primary,fontWeight:'700'}}>כניסת מנהל</Text>
+          {tab==='login'&&<View style={{backgroundColor:'#eff6ff',borderRadius:14,padding:14,marginTop:18,borderWidth:1,borderColor:C.primary+'30',...shadow(0.5)}}>
+            <Row style={{justifyContent:'flex-end',gap:6,marginBottom:5}}>
+              <Text style={{fontSize:13,color:C.primary,fontWeight:'800'}}>כניסת מנהל</Text>
               <Icon name="shield-checkmark" size={16} color={C.primary}/>
             </Row>
-            <Text style={{textAlign:'right',fontSize:12,color:C.muted}}>משתמש: admin  •  סיסמה: admin123</Text>
+            <Text style={{textAlign:'right',fontSize:12,color:C.muted}}>משתמש: <Text style={{color:C.primary,fontWeight:'700'}}>admin</Text>  •  סיסמה: <Text style={{color:C.primary,fontWeight:'700'}}>admin123</Text></Text>
           </View>}
-          {tab==='register'&&!gsData.settings.regEnabled&&<View style={{backgroundColor:'#fef2f2',borderRadius:12,padding:12,marginTop:12,borderWidth:1,borderColor:C.danger+'30'}}>
-            <Text style={{textAlign:'right',fontSize:13,color:C.danger,fontWeight:'700'}}>⚠️ ההרשמה סגורה</Text>
-            <Text style={{textAlign:'right',fontSize:12,color:C.danger}}>צור קשר עם המנהל</Text>
+          {tab==='register'&&!gsData.settings.regEnabled&&<View style={{backgroundColor:C.dangerLight,borderRadius:14,padding:14,marginTop:14,borderWidth:1,borderColor:C.danger+'30'}}>
+            <Text style={{textAlign:'right',fontSize:14,color:C.danger,fontWeight:'800'}}>⚠️ ההרשמה סגורה</Text>
+            <Text style={{textAlign:'right',fontSize:12,color:C.danger,marginTop:3}}>צור קשר עם המנהל</Text>
           </View>}
         </ScrollView>
       </View>
@@ -1372,9 +1460,13 @@ function AdminUsers({gsData,setGsData}) {
   function deleteUser(id){Alert.alert('מחיקה','למחוק משתמש לצמיתות?',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>{setGsData(gd=>({...gd,users:gd.users.filter(u=>u.id!==id)}));if(selected?.id===id)setSelected(null);}}]);}
   function saveNote(id,note){setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===id?{...u,note}:u)}));}
   function saveEdit(id){
-    if(!editName.trim()||!editUser.trim()){Alert.alert('שגיאה','מלא שם ושם משתמש');return;}
-    if(gsData.users.find(u=>u.username===editUser.trim()&&u.id!==id)){Alert.alert('שגיאה','שם משתמש תפוס');return;}
-    setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===id?{...u,name:editName.trim(),username:editUser.trim()}:u)}));
+    const u=gsData.users.find(x=>x.id===id);
+    const finalName=(editName.trim()||u?.name||'');
+    const finalUser=(editUser.trim()||u?.username||'');
+    if(!finalName||!finalUser){Alert.alert('שגיאה','מלא שם ושם משתמש');return;}
+    if(gsData.users.find(x=>x.username===finalUser&&x.id!==id)){Alert.alert('שגיאה','שם משתמש תפוס');return;}
+    setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===id?{...u,name:finalName,username:finalUser}:u)}));
+    setEditName('');setEditUser('');
     Alert.alert('✓','נשמר');
   }
   function addStudent(){
@@ -1414,9 +1506,14 @@ function AdminUsers({gsData,setGsData}) {
       {/* Add student form */}
       {addMode&&<Card style={{marginBottom:12}}>
         <Text style={{textAlign:'right',fontWeight:'700',fontSize:15,color:C.primary,marginBottom:12}}>➕ הוסף סטודנט</Text>
-        {[{v:newName,s:setNewName,ph:'שם מלא',kb:'default'},{v:newUser,s:setNewUser,ph:'שם משתמש',kb:'default'},{v:newPwd,s:setNewPwd,ph:'סיסמה',kb:'default'}].map(({v,s,ph})=>(
-          <TextInput key={ph} style={[S.inp,{marginBottom:8}]} value={v} onChangeText={s} placeholder={ph} placeholderTextColor={C.muted} textAlign="right" autoCapitalize="none"/>
-        ))}
+        <TextInput style={[S.inp,{marginBottom:8}]} value={newName} onChangeText={setNewName}
+          placeholder="שם מלא" placeholderTextColor={C.muted} textAlign="right"/>
+        <TextInput style={[S.inp,{marginBottom:8}]} value={newUser} onChangeText={setNewUser}
+          placeholder="username" placeholderTextColor={C.muted} textAlign="left"
+          autoCapitalize="none" autoCorrect={false}/>
+        <TextInput style={[S.inp,{marginBottom:8}]} value={newPwd} onChangeText={setNewPwd}
+          placeholder="••••••" placeholderTextColor={C.muted} textAlign="left"
+          secureTextEntry autoCapitalize="none"/>
         {(gsData.groups||[]).length>0&&<>
           <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:6}}>קבוצה (אופציונלי)</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:8}}>
@@ -1513,7 +1610,7 @@ function AdminUsers({gsData,setGsData}) {
     {sel&&<View style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'rgba(0,0,0,0.55)',justifyContent:'flex-end'}}>
       <View style={{backgroundColor:C.bg,borderTopLeftRadius:24,borderTopRightRadius:24,maxHeight:'92%'}}>
         <View style={{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',padding:16,borderBottomWidth:1,borderBottomColor:C.border}}>
-          <TouchableOpacity onPress={()=>setSelected(null)}><Icon name="close" size={22} color={C.muted}/></TouchableOpacity>
+          <TouchableOpacity onPress={()=>{setSelected(null);setEditName('');setEditUser('');setNoteEdit('');}}><Icon name="close" size={22} color={C.muted}/></TouchableOpacity>
           <Row style={{flex:0,gap:8}}>
             <View style={{width:36,height:36,borderRadius:18,backgroundColor:C.primary+'20',alignItems:'center',justifyContent:'center'}}>
               <Text style={{fontSize:16,fontWeight:'900',color:C.primary}}>{sel.name.charAt(0)}</Text>
@@ -1541,13 +1638,17 @@ function AdminUsers({gsData,setGsData}) {
           {/* Edit name/username */}
           <Sec title="עריכת פרטים"/>
           <Card style={{marginBottom:8}}>
-            {[{v:editName||sel.name,s:setEditName,ph:'שם מלא',lbl:'שם'},{v:editUser||sel.username,s:setEditUser,ph:'username',lbl:'שם משתמש'}].map(({v,s,ph,lbl})=>(
-              <View key={lbl} style={{marginBottom:8}}>
-                <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:4}}>{lbl}</Text>
-                <TextInput style={S.inp} value={editName===''&&lbl==='שם'?sel.name:editUser===''&&lbl==='שם משתמש'?sel.username:v}
-                  onChangeText={s} placeholder={ph} placeholderTextColor={C.muted} textAlign="right" autoCapitalize="none"/>
-              </View>
-            ))}
+            <View style={{marginBottom:8}}>
+              <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:4}}>שם</Text>
+              <TextInput style={S.inp} value={editName||sel.name} onChangeText={setEditName}
+                placeholder="שם מלא" placeholderTextColor={C.muted} textAlign="right"/>
+            </View>
+            <View style={{marginBottom:8}}>
+              <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:4}}>שם משתמש</Text>
+              <TextInput style={S.inp} value={editUser||sel.username} onChangeText={setEditUser}
+                placeholder="username" placeholderTextColor={C.muted} textAlign="left"
+                autoCapitalize="none" autoCorrect={false}/>
+            </View>
             <TouchableOpacity style={[S.btn,{marginTop:4,marginBottom:0}]} onPress={()=>saveEdit(sel.id)}>
               <Icon name="save-outline" size={16} color="#fff"/><Text style={[S.btnTxt,{marginRight:6,fontSize:14}]}>שמור שינויים</Text>
             </TouchableOpacity>
@@ -2181,7 +2282,7 @@ function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
       {[[oldPwd,setOldPwd,'סיסמה נוכחית'],[newPwd,setNewPwd,'סיסמה חדשה'],[confPwd,setConfPwd,'אישור סיסמה']].map(([val,setter,label])=>(
         <View key={label} style={{marginBottom:10}}>
           <Text style={{textAlign:'right',fontSize:13,color:C.muted,marginBottom:4}}>{label}</Text>
-          <TextInput style={S.inp} value={val} onChangeText={setter} placeholder="••••••" placeholderTextColor={C.muted} textAlign="right" secureTextEntry autoCapitalize="none"/>
+          <TextInput style={S.inp} value={val} onChangeText={setter} placeholder="••••••" placeholderTextColor={C.muted} textAlign="left" secureTextEntry autoCapitalize="none"/>
         </View>
       ))}
       <TouchableOpacity style={[S.outBtn,{marginTop:4}]} onPress={changePwd}>
@@ -2558,19 +2659,24 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
   ];
   const unread=(gsData.users.filter(u=>u.role==='student'&&(u.prog?.totalAnswered||0)>=10&&pct(u.prog.totalCorrect,u.prog.totalAnswered)<70)).length;
   return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
-    <StatusBar barStyle="dark-content"/>
+    <StatusBar barStyle="light-content"/>
     {/* Admin top bar */}
-    <View style={{backgroundColor:C.primary,paddingHorizontal:16,paddingVertical:7}}>
+    <View style={{backgroundColor:C.primaryDark,paddingHorizontal:16,paddingVertical:10}}>
       <Row style={{justifyContent:'space-between',alignItems:'center'}}>
         <Row style={{flex:0,gap:8}}>
-          {unread>0&&<View style={{backgroundColor:C.danger,borderRadius:10,paddingHorizontal:7,paddingVertical:2}}>
-            <Text style={{color:'#fff',fontSize:10,fontWeight:'900'}}>{unread} ⚠️</Text>
+          {unread>0&&<View style={{backgroundColor:C.danger,borderRadius:12,paddingHorizontal:8,paddingVertical:3,flexDirection:'row-reverse',alignItems:'center',gap:4}}>
+            <Icon name="warning" size={11} color="#fff"/>
+            <Text style={{color:'#fff',fontSize:10,fontWeight:'900'}}>{unread}</Text>
           </View>}
-          <Text style={{color:'#bfdbfe',fontSize:11}}>v3.0</Text>
+          <View style={{backgroundColor:'rgba(255,255,255,0.1)',borderRadius:10,paddingHorizontal:8,paddingVertical:3}}>
+            <Text style={{color:'#93c5fd',fontSize:10,fontWeight:'700'}}>v3.0</Text>
+          </View>
         </Row>
-        <Row style={{flex:0,gap:6}}>
-          <Icon name="shield-checkmark" size={14} color="#fde68a"/>
-          <Text style={{color:'#fde68a',fontSize:13,fontWeight:'800'}}>מצב מנהל • {currentUser.name}</Text>
+        <Row style={{flex:0,gap:8}}>
+          <Text style={{color:'#fde68a',fontSize:13,fontWeight:'800'}}>{currentUser.name}</Text>
+          <View style={{width:30,height:30,borderRadius:15,backgroundColor:'rgba(253,230,138,0.2)',alignItems:'center',justifyContent:'center',borderWidth:1.5,borderColor:'rgba(253,230,138,0.4)'}}>
+            <Icon name="shield-checkmark" size={15} color="#fde68a"/>
+          </View>
         </Row>
       </Row>
     </View>
@@ -2587,20 +2693,21 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false}
       style={{backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,flexGrow:0}}
-      contentContainerStyle={{flexDirection:'row-reverse',paddingBottom:isIOS?20:6,paddingTop:6,paddingHorizontal:4}}>
+      contentContainerStyle={{flexDirection:'row-reverse',paddingBottom:isIOS?22:8,paddingTop:6,paddingHorizontal:6}}>
       {adminTabs.map(t=>{
         const on=adminTab===t.id;
         const badge=t.id==='reports'&&unread>0?unread:0;
-        return <TouchableOpacity key={t.id} onPress={()=>setAdminTab(t.id)} activeOpacity={0.7}
-          style={{alignItems:'center',paddingHorizontal:10,paddingTop:4,minWidth:56}}>
-          {on&&<View style={{position:'absolute',top:0,left:'10%',right:'10%',height:2.5,backgroundColor:C.primary,borderBottomLeftRadius:2,borderBottomRightRadius:2}}/>}
+        return <TouchableOpacity key={t.id} onPress={()=>setAdminTab(t.id)} activeOpacity={0.75}
+          style={{alignItems:'center',paddingHorizontal:8,paddingTop:4,minWidth:58}}>
           <View style={{position:'relative'}}>
-            <Icon name={on?t.active:t.icon} size={22} color={on?C.primary:C.muted}/>
-            {badge>0&&<View style={{position:'absolute',top:-4,right:-6,backgroundColor:C.danger,borderRadius:8,minWidth:16,height:16,alignItems:'center',justifyContent:'center',paddingHorizontal:2}}>
+            <View style={{width:40,height:40,borderRadius:20,backgroundColor:on?C.primary+'15':C.fill,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:on?C.primary+'40':C.border}}>
+              <Icon name={on?t.active:t.icon} size={20} color={on?C.primary:C.muted}/>
+            </View>
+            {badge>0&&<View style={{position:'absolute',top:-3,right:-3,backgroundColor:C.danger,borderRadius:8,minWidth:16,height:16,alignItems:'center',justifyContent:'center',paddingHorizontal:2,borderWidth:1.5,borderColor:C.card}}>
               <Text style={{color:'#fff',fontSize:9,fontWeight:'900'}}>{badge}</Text>
             </View>}
           </View>
-          <Text style={{fontSize:9,color:on?C.primary:C.muted,fontWeight:on?'700':'400',marginTop:2,textAlign:'center'}}>{t.label}</Text>
+          <Text style={{fontSize:9,color:on?C.primary:C.muted,fontWeight:on?'800':'400',marginTop:3,textAlign:'center'}}>{t.label}</Text>
         </TouchableOpacity>;
       })}
     </ScrollView>
@@ -2661,11 +2768,18 @@ export default function App() {
     setCurrentUser(null);dispatch({type:'RESET'});setTab('home');setQuiz(null);
   }
 
-  if(!loaded)return <SafeAreaView style={S.center}><Text style={{fontSize:48,marginBottom:8}}>🌐</Text><Text style={{fontSize:20,fontWeight:'800',color:C.primary}}>AmirNet Plus</Text></SafeAreaView>;
+  if(!loaded)return <SafeAreaView style={[S.center,{backgroundColor:C.primary}]}>
+    <StatusBar barStyle="light-content"/>
+    <View style={{width:96,height:96,borderRadius:48,backgroundColor:'rgba(255,255,255,0.18)',alignItems:'center',justifyContent:'center',marginBottom:16,...shadow(2)}}>
+      <Text style={{fontSize:52}}>🌐</Text>
+    </View>
+    <Text style={{fontSize:26,fontWeight:'900',color:'#fff',letterSpacing:0.5}}>AmirNet Plus</Text>
+    <Text style={{fontSize:13,color:'#bfdbfe',marginTop:6}}>טוען...</Text>
+  </SafeAreaView>;
   if(!currentUser)return <AuthScreen gsData={gsData} onLogin={handleLogin} onRegister={handleRegister}/>;
   if(currentUser.role==='admin')return <AdminPanel gsData={gsData} setGsData={setGsData} currentUser={currentUser} onLogout={handleLogout}/>;
   if(!prog.onboarded)return <OnboardingScreen onDone={p=>{dispatch({type:'SETTINGS',payload:{...p,onboarded:true}});setCurrentUser(u=>({...u,onboarded:true}));setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===currentUser.id?{...u,onboarded:true}:u)}));}}/>;
-  if(quiz)return <QuizScreen config={quiz} dispatch={go} onFinish={()=>setQuiz(null)} allQs={[...QS,...gsData.customQs]}/>;
+  if(quiz)return <QuizScreen config={quiz} dispatch={go} onFinish={()=>setQuiz(null)} allQs={[...QS,...gsData.customQs]} passGrade={gsData.settings.passGrade||70}/>;
   const activeAnn=gsData.announcements.filter(a=>!a.expiresAt||a.expiresAt>Date.now());
   return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
     <StatusBar barStyle="dark-content"/>
@@ -2681,27 +2795,28 @@ export default function App() {
 const S = StyleSheet.create({
   scr:{flex:1,backgroundColor:C.bg,paddingHorizontal:16,paddingTop:12,paddingBottom:0},
   center:{flex:1,justifyContent:'center',alignItems:'center',backgroundColor:C.bg},
-  pgTitle:{fontSize:26,fontWeight:'900',textAlign:'right',color:C.text,marginBottom:14},
-  sec:{fontSize:14,fontWeight:'800',textAlign:'right',color:C.text,marginTop:10,marginBottom:8},
-  card:{backgroundColor:C.card,borderRadius:16,padding:14,marginBottom:10,shadowColor:'#000',shadowOpacity:0.06,shadowRadius:8,shadowOffset:{width:0,height:2},elevation:3},
-  opt:{borderRadius:14,borderWidth:1.5,padding:14,marginBottom:10},
-  optLetter:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center'},
-  btn:{flexDirection:'row-reverse',backgroundColor:C.primary,borderRadius:14,paddingVertical:15,alignItems:'center',justifyContent:'center',marginBottom:4},
+  pgTitle:{fontSize:27,fontWeight:'900',textAlign:'right',color:C.text,marginBottom:14,letterSpacing:0.2},
+  sec:{fontSize:14,fontWeight:'800',textAlign:'right',color:C.text,marginTop:14,marginBottom:10},
+  card:{backgroundColor:C.card,borderRadius:18,padding:14,marginBottom:10,shadowColor:'#1e40af',shadowOpacity:0.07,shadowRadius:10,shadowOffset:{width:0,height:3},elevation:3},
+  opt:{borderRadius:16,borderWidth:1.5,padding:14,marginBottom:10},
+  optLetter:{width:32,height:32,borderRadius:16,alignItems:'center',justifyContent:'center'},
+  btn:{flexDirection:'row-reverse',backgroundColor:C.primary,borderRadius:16,paddingVertical:16,alignItems:'center',justifyContent:'center',marginBottom:4},
   btnTxt:{color:'#fff',fontSize:16,fontWeight:'800'},
-  outBtn:{flexDirection:'row-reverse',borderWidth:1.5,borderColor:C.primary+'60',borderRadius:14,paddingVertical:14,alignItems:'center',justifyContent:'center'},
-  cntBtn:{flex:1,backgroundColor:C.fill,borderRadius:10,paddingVertical:11,alignItems:'center',borderWidth:1,borderColor:C.border},
+  outBtn:{flexDirection:'row-reverse',borderWidth:1.5,borderColor:C.primary+'60',borderRadius:16,paddingVertical:14,alignItems:'center',justifyContent:'center'},
+  cntBtn:{flex:1,backgroundColor:C.fill,borderRadius:12,paddingVertical:12,alignItems:'center',borderWidth:1.5,borderColor:C.border},
   cntBtnOn:{backgroundColor:C.primary,borderColor:C.primary},
   cntTxt:{fontSize:14,fontWeight:'700',color:C.text},
-  modeBtn:{flex:1,backgroundColor:C.card,borderRadius:14,padding:15,alignItems:'center',borderWidth:1.5,borderColor:C.border},
-  modeBtnOn:{borderColor:C.primary,backgroundColor:C.primary+'0a'},
-  topicOpt:{backgroundColor:C.card,borderRadius:12,paddingHorizontal:14,paddingVertical:12,marginBottom:8,borderWidth:1.5,borderColor:C.border},
-  topicOptOn:{borderColor:C.primary,backgroundColor:C.primary+'08'},
-  inp:{backgroundColor:C.fill,borderRadius:10,padding:12,fontSize:15,borderWidth:1,borderColor:C.border,color:C.text},
-  onbInput:{backgroundColor:'rgba(255,255,255,0.15)',borderRadius:12,padding:14,fontSize:16,borderWidth:1.5,borderColor:'rgba(255,255,255,0.4)',color:'#fff'},
+  modeBtn:{flex:1,backgroundColor:C.card,borderRadius:16,padding:16,alignItems:'center',borderWidth:1.5,borderColor:C.border},
+  modeBtnOn:{borderColor:C.primary,backgroundColor:'#eff6ff'},
+  topicOpt:{backgroundColor:C.card,borderRadius:14,paddingHorizontal:14,paddingVertical:14,marginBottom:10,borderWidth:1.5,borderColor:C.border,shadowColor:'#000',shadowOpacity:0.04,shadowRadius:6,shadowOffset:{width:0,height:2},elevation:2},
+  topicOptOn:{borderColor:C.primary,backgroundColor:'#eff6ff'},
+  inp:{backgroundColor:C.fill,borderRadius:12,padding:14,fontSize:15,borderWidth:1.5,borderColor:C.border,color:C.text},
+  inpLabel:{textAlign:'right',fontSize:13,color:C.muted,marginBottom:7,fontWeight:'600'},
+  onbInput:{backgroundColor:'rgba(255,255,255,0.15)',borderRadius:14,padding:15,fontSize:16,borderWidth:1.5,borderColor:'rgba(255,255,255,0.35)',color:'#fff'},
   timerBox:{flexDirection:'row-reverse',alignItems:'center',paddingHorizontal:10,paddingVertical:5,borderRadius:20,borderWidth:1,gap:4},
   qBar:{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center',paddingHorizontal:16,paddingVertical:10},
-  qBottom:{position:'absolute',bottom:0,left:0,right:0,padding:16,paddingBottom:Platform.OS==='ios'?32:16,backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border},
-  tabBar:{flexDirection:'row-reverse',backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,paddingBottom:Platform.OS==='ios'?20:6,paddingTop:6},
+  qBottom:{position:'absolute',bottom:0,left:0,right:0,padding:16,paddingBottom:Platform.OS==='ios'?34:16,backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,shadowColor:'#000',shadowOpacity:0.06,shadowRadius:8,shadowOffset:{width:0,height:-2},elevation:4},
+  tabBar:{flexDirection:'row-reverse',backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,paddingBottom:Platform.OS==='ios'?22:8,paddingTop:6},
   tabItem:{flex:1,alignItems:'center',paddingTop:4,position:'relative'},
-  tabInd:{position:'absolute',top:0,left:'20%',right:'20%',height:2.5,backgroundColor:C.primary,borderBottomLeftRadius:2,borderBottomRightRadius:2},
+  tabInd:{position:'absolute',top:0,left:'20%',right:'20%',height:3,backgroundColor:C.primary,borderBottomLeftRadius:2,borderBottomRightRadius:2},
 });
