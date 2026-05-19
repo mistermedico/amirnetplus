@@ -3507,6 +3507,91 @@ function AdminAITools({gsData,setGsData}) {
   </ScrollView>;
 }
 
+// ─── ADMIN: ACTIVITY LOG ──────────────────────────────────────────────────────
+const LOG_TYPES={
+  login:{icon:'🔐',label:'כניסה',color:C.success},
+  logout:{icon:'🚪',label:'יציאה',color:C.muted},
+  user_reg:{icon:'👤',label:'הרשמה',color:C.cyan},
+  user_create:{icon:'➕',label:'משתמש חדש',color:C.cyan},
+  user_block:{icon:'🚫',label:'חסימה',color:C.danger},
+  user_unblock:{icon:'✅',label:'שחרור',color:C.success},
+  q_create:{icon:'📝',label:'שאלה חדשה',color:C.primary},
+  q_edit:{icon:'✏️',label:'עריכת שאלה',color:C.orange},
+  q_delete:{icon:'🗑️',label:'מחיקת שאלה',color:C.danger},
+  announcement:{icon:'📢',label:'הודעה',color:C.purple},
+  settings:{icon:'⚙️',label:'הגדרות',color:C.warning},
+  ai_gen:{icon:'🤖',label:'AI',color:C.purple},
+};
+function AdminActivityLog({gsData,setGsData}) {
+  const [filter,setFilter]=useState('all');
+  const [search,setSearch]=useState('');
+  const log=[...(gsData.activityLog||[])].reverse();
+  const filters=[
+    {id:'all',label:'הכל'},
+    {id:'login',label:'כניסות'},
+    {id:'user',label:'משתמשים'},
+    {id:'question',label:'שאלות'},
+    {id:'settings',label:'הגדרות'},
+  ];
+  const filtered=log.filter(e=>{
+    if(filter==='login'&&!['login','logout','user_reg'].includes(e.type))return false;
+    if(filter==='user'&&!['user_create','user_block','user_unblock','user_reg'].includes(e.type))return false;
+    if(filter==='question'&&!['q_create','q_edit','q_delete'].includes(e.type))return false;
+    if(filter==='settings'&&e.type!=='settings')return false;
+    if(search&&!e.user?.includes(search)&&!e.detail?.includes(search))return false;
+    return true;
+  });
+  function clearLog(){
+    Alert.alert('מחיקת יומן','למחוק את כל רשומות היומן?',[{text:'ביטול',style:'cancel'},{text:'מחק',style:'destructive',onPress:()=>setGsData(gd=>({...gd,activityLog:[]}))}]);
+  }
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled">
+    <Row style={{justifyContent:'space-between',marginBottom:12}}>
+      <TouchableOpacity onPress={clearLog} style={{backgroundColor:C.dangerLight,borderRadius:10,paddingHorizontal:12,paddingVertical:7,borderWidth:1,borderColor:C.danger+'30'}}>
+        <Text style={{fontSize:12,color:C.danger,fontWeight:'700'}}>🗑️ נקה יומן</Text>
+      </TouchableOpacity>
+      <Text style={S.pgTitle}>יומן פעילות 📋</Text>
+    </Row>
+    <TextInput style={[S.inp,{marginBottom:8}]} value={search} onChangeText={setSearch}
+      placeholder="🔍 חיפוש לפי משתמש או פעולה..." placeholderTextColor={C.muted} textAlign="right"/>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{flexDirection:'row-reverse',gap:6,marginBottom:12}}>
+      {filters.map(f=>(
+        <TouchableOpacity key={f.id} style={[S.cntBtn,filter===f.id&&S.cntBtnOn,{paddingHorizontal:14,paddingVertical:6,flex:0}]}
+          onPress={()=>setFilter(f.id)}>
+          <Text style={{fontSize:12,fontWeight:'700',color:filter===f.id?'#fff':C.text}}>{f.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+    <Card style={{flexDirection:'row-reverse',alignItems:'center',gap:8,marginBottom:12,paddingVertical:10}}>
+      <Icon name="list-outline" size={16} color={C.primary}/>
+      <Text style={{flex:1,textAlign:'right',fontSize:13,color:C.muted}}>{filtered.length} רשומות{filter!=='all'?` (מסונן)`:''}  •  סה"כ {log.length} פעולות</Text>
+    </Card>
+    {filtered.length===0&&<Card style={{alignItems:'center',paddingVertical:32}}>
+      <Text style={{fontSize:32,marginBottom:8}}>📋</Text>
+      <Text style={{fontSize:14,color:C.muted,textAlign:'center'}}>אין פעולות{filter!=='all'?' בקטגוריה זו':''} עדיין</Text>
+    </Card>}
+    {filtered.map(e=>{
+      const meta=LOG_TYPES[e.type]||{icon:'•',label:e.type,color:C.muted};
+      return <Card key={e.id} style={{marginBottom:8,paddingVertical:10}}>
+        <Row style={{gap:10,alignItems:'flex-start'}}>
+          <View style={{width:38,height:38,borderRadius:19,backgroundColor:meta.color+'18',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            <Text style={{fontSize:18}}>{meta.icon}</Text>
+          </View>
+          <View style={{flex:1,alignItems:'flex-end'}}>
+            <Row style={{justifyContent:'space-between',width:'100%',marginBottom:3}}>
+              <Text style={{fontSize:11,color:C.muted,fontFamily:'monospace'}}>{fmtIL(e.ts)}</Text>
+              <View style={{backgroundColor:meta.color+'18',borderRadius:8,paddingHorizontal:8,paddingVertical:2}}>
+                <Text style={{fontSize:10,color:meta.color,fontWeight:'800'}}>{meta.label}</Text>
+              </View>
+            </Row>
+            <Text style={{textAlign:'right',fontSize:13,color:C.text,fontWeight:'700',marginBottom:2}}>@{e.user}</Text>
+            <Text style={{textAlign:'right',fontSize:12,color:C.muted,lineHeight:18}}>{e.detail}</Text>
+          </View>
+        </Row>
+      </Card>;
+    })}
+  </ScrollView>;
+}
+
 // ─── ADMIN PANEL ──────────────────────────────────────────────────────────────
 function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
   const [adminTab,setAdminTab]=useState('dashboard');
@@ -3521,6 +3606,7 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
     {id:'reports',label:'דוחות',icon:'document-text-outline',active:'document-text'},
     {id:'settings',label:'הגדרות',icon:'settings-outline',active:'settings'},
     {id:'aitools',label:'AI כלים',icon:'sparkles-outline',active:'sparkles'},
+    {id:'activitylog',label:'יומן',icon:'list-outline',active:'list'},
   ];
   const unread=(gsData.users.filter(u=>u.role==='student'&&(u.prog?.totalAnswered||0)>=10&&pct(u.prog.totalCorrect,u.prog.totalAnswered)<70)).length;
   return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
@@ -3556,6 +3642,7 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
       {adminTab==='reports'&&<AdminReports gsData={gsData}/>}
       {adminTab==='settings'&&<AdminSettings gsData={gsData} setGsData={setGsData} onLogout={onLogout} adminUser={currentUser}/>}
       {adminTab==='aitools'&&<AdminAITools gsData={gsData} setGsData={setGsData}/>}
+      {adminTab==='activitylog'&&<AdminActivityLog gsData={gsData} setGsData={setGsData}/>}
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false}
       style={{backgroundColor:C.card,borderTopWidth:1,borderTopColor:C.border,flexGrow:0}}
