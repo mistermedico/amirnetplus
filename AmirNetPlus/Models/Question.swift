@@ -75,8 +75,13 @@ struct Question: Identifiable, Codable {
     let explanation: String
     let topic: TopicID
     let difficulty: Difficulty
+    var chapterID: UUID?
+    var examIDs: [UUID]
+    var tags: [String]
 
-    init(id: UUID = UUID(), questionText: String, options: [String], correctIndex: Int, explanation: String, topic: TopicID, difficulty: Difficulty) {
+    init(id: UUID = UUID(), questionText: String, options: [String], correctIndex: Int,
+         explanation: String, topic: TopicID, difficulty: Difficulty,
+         chapterID: UUID? = nil, examIDs: [UUID] = [], tags: [String] = []) {
         self.id = id
         self.questionText = questionText
         self.options = options
@@ -84,6 +89,9 @@ struct Question: Identifiable, Codable {
         self.explanation = explanation
         self.topic = topic
         self.difficulty = difficulty
+        self.chapterID = chapterID
+        self.examIDs = examIDs
+        self.tags = tags
     }
 }
 
