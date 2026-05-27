@@ -127,14 +127,14 @@ class UserProgress {
             date: session.startTime,
             score: session.score,
             total: session.questions.count,
-            topicID: session.questions.first?.topic.rawValue,
+            topicID: session.topicIDForHistory,
             durationSeconds: session.duration
         )
         quizHistory.insert(entry, at: 0)
         if quizHistory.count > 200 { quizHistory = Array(quizHistory.prefix(200)) }
 
         recordDailyActivity(answered: session.questions.count, correct: session.score)
-        updateStreak()
+        updateStreak(afterStudy: true)
         checkAchievements()
         recalculateWeakTopics()
         save()
@@ -164,6 +164,7 @@ class UserProgress {
 
     func addCustomQuestion(_ q: CustomQuestion) {
         customQuestions.insert(q, at: 0)
+        checkAchievements()
         save()
     }
 
@@ -181,6 +182,31 @@ class UserProgress {
         save()
     }
 
+    func duplicateCustomQuestion(id: UUID) {
+        guard let original = customQuestions.first(where: { $0.id == id }) else { return }
+        let copy = CustomQuestion(
+            questionText: "\(original.questionText) (עותק)",
+            options: original.options,
+            correctIndex: original.correctIndex,
+            explanation: original.explanation,
+            topic: original.topic,
+            difficulty: original.difficulty
+        )
+        customQuestions.insert(copy, at: 0)
+        checkAchievements()
+        save()
+    }
+
+    func deleteCustomQuestions(ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        customQuestions.removeAll { ids.contains($0.id) }
+        bookmarkedQuestionIDs.subtract(ids)
+        for id in ids {
+            notes.removeValue(forKey: id)
+        }
+        save()
+    }
+
     // MARK: - Notes
 
     func setNote(_ text: String, for questionID: UUID) {
@@ -192,6 +218,7 @@ class UserProgress {
 
     func addStudyPlan(_ plan: StudyPlan) {
         studyPlans.insert(plan, at: 0)
+        checkAchievements()
         save()
     }
 
@@ -247,25 +274,34 @@ class UserProgress {
         } else {
             dailyActivity.append(DailyActivity(date: today, questionsAnswered: answered, correctAnswers: correct))
         }
-        dailyActivity = dailyActivity.suffix(30)
+        dailyActivity = Array(dailyActivity.suffix(30))
     }
 
-    private func updateStreak() {
+    private func updateStreak(afterStudy: Bool = false) {
         let today = Calendar.current.startOfDay(for: Date())
         guard let last = lastStudyDate else {
-            lastStudyDate = today
-            streakDays = 0
+            if afterStudy {
+                lastStudyDate = today
+                streakDays = max(streakDays, 1)
+            }
             return
         }
         let lastDay = Calendar.current.startOfDay(for: last)
         let diff = Calendar.current.dateComponents([.day], from: lastDay, to: today).day ?? 0
         if diff == 0 {
+            if afterStudy && streakDays == 0 {
+                streakDays = 1
+            }
         } else if diff == 1 {
-            streakDays += 1
-            lastStudyDate = today
+            if afterStudy {
+                streakDays += 1
+                lastStudyDate = today
+            }
         } else {
-            streakDays = 0
-            lastStudyDate = today
+            streakDays = afterStudy ? 1 : 0
+            if afterStudy {
+                lastStudyDate = today
+            }
         }
     }
 

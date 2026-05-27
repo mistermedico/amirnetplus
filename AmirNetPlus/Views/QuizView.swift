@@ -161,6 +161,7 @@ struct QuizFlowView: View {
     private func advanceQuestion() {
         withAnimation(.easeInOut(duration: 0.2)) {
             if session.currentIndex == session.questions.count - 1 {
+                session.finish()
                 showResult = true
             } else {
                 session.next()

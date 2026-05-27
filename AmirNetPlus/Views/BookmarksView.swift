@@ -285,6 +285,7 @@ struct BookmarkedQuizView: View {
                         Button {
                             withAnimation {
                                 if session.currentIndex == session.questions.count - 1 {
+                                    session.finish()
                                     showResult = true
                                 } else {
                                     session.next()

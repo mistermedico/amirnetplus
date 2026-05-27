@@ -10,6 +10,8 @@ struct AdminView: View {
     @State private var filterTopic: TopicID? = nil
     @State private var showDeleteConfirm = false
     @State private var pendingDeleteID: UUID? = nil
+    @State private var showBulkDeleteConfirm = false
+    @State private var pendingBulkDeleteIDs: Set<UUID> = []
 
     private var filteredCustom: [CustomQuestion] {
         var list = progress.customQuestions
@@ -18,6 +20,10 @@ struct AdminView: View {
             list = list.filter { $0.questionText.localizedCaseInsensitiveContains(searchText) }
         }
         return list
+    }
+
+    private var hasActiveFilters: Bool {
+        filterTopic != nil || !searchText.isEmpty
     }
 
     var body: some View {
@@ -39,12 +45,7 @@ struct AdminView: View {
                     filterMenu
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showAddQuestion = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundStyle(.blue)
-                    }
+                    adminActionsMenu
                 }
             }
             .sheet(isPresented: $showAddQuestion) {
@@ -61,6 +62,17 @@ struct AdminView: View {
             } message: {
                 Text("האם אתה בטוח שברצונך למחוק את השאלה? פעולה זו אינה הפיכה.")
             }
+            .alert("מחיקת שאלות", isPresented: $showBulkDeleteConfirm) {
+                Button("מחק", role: .destructive) {
+                    progress.deleteCustomQuestions(ids: pendingBulkDeleteIDs)
+                    pendingBulkDeleteIDs = []
+                }
+                Button("ביטול", role: .cancel) {
+                    pendingBulkDeleteIDs = []
+                }
+            } message: {
+                Text("האם למחוק \(pendingBulkDeleteIDs.count) שאלות מותאמות? פעולה זו אינה הפיכה.")
+            }
         }
     }
 
@@ -74,6 +86,40 @@ struct AdminView: View {
         } label: {
             Label(filterTopic?.displayName ?? "סנן", systemImage: "line.3.horizontal.decrease.circle")
                 .foregroundStyle(filterTopic != nil ? .blue : .primary)
+        }
+    }
+
+    private var adminActionsMenu: some View {
+        Menu {
+            Button {
+                showAddQuestion = true
+            } label: {
+                Label("הוסף שאלה", systemImage: "plus.circle")
+            }
+
+            if hasActiveFilters {
+                Button {
+                    searchText = ""
+                    filterTopic = nil
+                } label: {
+                    Label("נקה סינון וחיפוש", systemImage: "line.3.horizontal.decrease.circle")
+                }
+            }
+
+            if !filteredCustom.isEmpty {
+                Button(role: .destructive) {
+                    pendingBulkDeleteIDs = Set(filteredCustom.map(\.id))
+                    showBulkDeleteConfirm = true
+                } label: {
+                    Label(
+                        hasActiveFilters ? "מחק תוצאות מסוננות" : "מחק את כל השאלות שלי",
+                        systemImage: "trash"
+                    )
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .foregroundStyle(.blue)
         }
     }
 
@@ -109,6 +155,9 @@ struct AdminView: View {
                         Button { editingQuestion = q } label: {
                             Label("עריכה", systemImage: "pencil")
                         }.tint(.blue)
+                        Button { progress.duplicateCustomQuestion(id: q.id) } label: {
+                            Label("שכפל", systemImage: "plus.square.on.square")
+                        }.tint(.green)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
@@ -121,6 +170,9 @@ struct AdminView: View {
                     .contextMenu {
                         Button { editingQuestion = q } label: {
                             Label("ערוך שאלה", systemImage: "pencil")
+                        }
+                        Button { progress.duplicateCustomQuestion(id: q.id) } label: {
+                            Label("שכפל שאלה", systemImage: "plus.square.on.square")
                         }
                         Button(role: .destructive) {
                             pendingDeleteID = q.id
@@ -455,7 +507,7 @@ struct QuestionFormView: View {
 
     private var optionsSection: some View {
         Section {
-            ForEach(0..<4, id: \.self) { idx in
+            ForEach(0..<options.count, id: \.self) { idx in
                 HStack(spacing: 10) {
                     Button {
                         correctIndex = idx
@@ -466,10 +518,27 @@ struct QuestionFormView: View {
                     .buttonStyle(.plain)
                     TextField("אפשרות \(idx + 1)", text: $options[idx])
                         .multilineTextAlignment(.trailing)
+
+                    if options.count > 2 {
+                        Button(role: .destructive) {
+                            removeOption(at: idx)
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if options.count < 6 {
+                Button {
+                    options.append("")
+                } label: {
+                    Label("הוסף אפשרות", systemImage: "plus.circle")
                 }
             }
         } header: {
-            Text("אפשרויות תשובה (סמן את הנכונה)")
+            Text("אפשרויות תשובה (2-6, סמן את הנכונה)")
         } footer: {
             Text("לחץ על העיגול לצד האפשרות הנכונה")
         }
@@ -501,18 +570,33 @@ struct QuestionFormView: View {
     private func prefill() {
         if case .edit(let q) = mode {
             questionText = q.questionText
-            options = q.options
-            correctIndex = q.correctIndex
+            options = Array(q.options.prefix(6))
+            while options.count < 2 { options.append("") }
+            correctIndex = min(q.correctIndex, options.count - 1)
             explanation = q.explanation
             topic = q.topic
             difficulty = q.difficulty
         }
     }
 
+    private func removeOption(at idx: Int) {
+        guard options.count > 2, options.indices.contains(idx) else { return }
+        options.remove(at: idx)
+        if correctIndex == idx {
+            correctIndex = min(idx, options.count - 1)
+        } else if correctIndex > idx {
+            correctIndex -= 1
+        }
+    }
+
     private func save() {
+        let trimmedOptions = options.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         guard !questionText.trimmingCharacters(in: .whitespaces).isEmpty,
-              options.allSatisfy({ !$0.trimmingCharacters(in: .whitespaces).isEmpty }),
-              !explanation.trimmingCharacters(in: .whitespaces).isEmpty else {
+              trimmedOptions.count >= 2,
+              trimmedOptions.count <= 6,
+              trimmedOptions.allSatisfy({ !$0.isEmpty }),
+              trimmedOptions.indices.contains(correctIndex),
+              !explanation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             showValidationAlert = true
             return
         }
@@ -520,20 +604,20 @@ struct QuestionFormView: View {
         switch mode {
         case .add:
             let q = CustomQuestion(
-                questionText: questionText.trimmingCharacters(in: .whitespaces),
-                options: options.map { $0.trimmingCharacters(in: .whitespaces) },
+                questionText: questionText.trimmingCharacters(in: .whitespacesAndNewlines),
+                options: trimmedOptions,
                 correctIndex: correctIndex,
-                explanation: explanation.trimmingCharacters(in: .whitespaces),
+                explanation: explanation.trimmingCharacters(in: .whitespacesAndNewlines),
                 topic: topic,
                 difficulty: difficulty
             )
             progress.addCustomQuestion(q)
         case .edit(let original):
             var updated = original
-            updated.questionText = questionText.trimmingCharacters(in: .whitespaces)
-            updated.options = options.map { $0.trimmingCharacters(in: .whitespaces) }
+            updated.questionText = questionText.trimmingCharacters(in: .whitespacesAndNewlines)
+            updated.options = trimmedOptions
             updated.correctIndex = correctIndex
-            updated.explanation = explanation.trimmingCharacters(in: .whitespaces)
+            updated.explanation = explanation.trimmingCharacters(in: .whitespacesAndNewlines)
             updated.topic = topic
             updated.difficulty = difficulty
             progress.updateCustomQuestion(updated)
