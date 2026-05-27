@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useReducer, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
   Dimensions, Platform, Alert, Switch, TextInput, StatusBar, Animated,
-  KeyboardAvoidingView, Pressable, ActivityIndicator } from 'react-native';
+  KeyboardAvoidingView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width: W, height: H } = Dimensions.get('window');

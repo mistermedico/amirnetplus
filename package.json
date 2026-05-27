@@ -8,7 +8,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "eslint .",
+    "check:deps": "expo install --check",
+    "build:web": "expo export --platform web"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -20,6 +22,8 @@
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.5"
+    "@babel/core": "^7.28.5",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~56.0.4"
   }
 }
