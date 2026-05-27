@@ -103,6 +103,10 @@ export function getRandomQuestions(
     pool = pool.filter(q => q.difficulty === difficulty);
   }
 
-  const shuffled = pool.sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, Math.min(count, shuffled.length));
+  // Fisher-Yates shuffle for unbiased randomization
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, Math.min(count, pool.length));
 }

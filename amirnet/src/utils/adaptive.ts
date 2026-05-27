@@ -44,8 +44,10 @@ export function selectNextQuestion(
   const preferred = available
     .filter(q => q.difficulty === target)
     .sort((a, b) => {
-      const perfA = performance[a.id]?.accuracy ?? 0.5;
-      const perfB = performance[b.id]?.accuracy ?? 0.5;
+      const pA = performance[a.id];
+      const pB = performance[b.id];
+      const perfA = pA && pA.timesAnswered > 0 ? pA.timesCorrect / pA.timesAnswered : 0.5;
+      const perfB = pB && pB.timesAnswered > 0 ? pB.timesCorrect / pB.timesAnswered : 0.5;
       return perfA - perfB; // show hardest (lowest accuracy) first
     });
 

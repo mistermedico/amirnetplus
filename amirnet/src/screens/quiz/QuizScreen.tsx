@@ -36,7 +36,9 @@ export default function QuizScreen({ navigation, route }: Props) {
 
   const question = questions[currentIndex];
   const isLast = currentIndex === questions.length - 1;
-  const progress = (currentIndex + 1) / questions.length;
+  const progress = questions.length > 0 ? (currentIndex + 1) / questions.length : 0;
+
+  if (!question) return null;
 
   function handleSelect(idx: number) {
     if (selected !== null) return;

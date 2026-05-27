@@ -12,7 +12,7 @@ import { parseCSV, parseJSON, generateCSVTemplate } from '../../utils/questionPa
 import { Question } from '../../types';
 import { Card, PrimaryButton } from '../../components/common';
 
-type ImportMode = 'csv' | 'json' | 'manual';
+type ImportMode = 'csv' | 'json';
 
 export default function ImportQuestionsScreen({ navigation }: any) {
   const { dispatch } = useApp();

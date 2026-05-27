@@ -21,7 +21,7 @@ export default function QuizResultsScreen({ navigation, route }: Props) {
   const { questions, answers, score, duration, mode } = route.params;
   const [expanded, setExpanded] = useState<number | null>(null);
 
-  const pct = (score / questions.length) * 100;
+  const pct = questions.length > 0 ? (score / questions.length) * 100 : 0;
   const wrong = questions.length - score;
   const grade = pct >= 90 ? 'מצוין! 🌟' : pct >= 75 ? 'טוב מאוד 👍' : pct >= 60 ? 'טוב ✓' : pct >= 50 ? 'עובר' : 'נסה שוב 🔄';
   const ringColor = pct >= 80 ? COLORS.success : pct >= 60 ? COLORS.warning : COLORS.danger;
