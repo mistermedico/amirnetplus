@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "AmirNet Plus",
+    "slug": "amirnetplus",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "amirnetplus",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.amirnetplus.app"
+    },
+    "android": {
+      "package": "com.amirnetplus.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1e40af"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}
