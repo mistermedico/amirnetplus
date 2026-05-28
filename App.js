@@ -40,214 +40,169 @@ const shadow = (size=1) => ({
 const DIFF_THETA = { beginner:-1, intermediate:0, advanced:1, expert:2 };
 const THETA_DIFF = t => t < -0.5 ? 'beginner' : t < 0.5 ? 'intermediate' : t < 1.5 ? 'advanced' : 'expert';
 const DIFF_COLOR = { beginner:C.success, intermediate:C.warning, advanced:C.orange, expert:C.danger };
-const DIFF_LABEL = { beginner:'קל', intermediate:'בינוני', advanced:'מתקדם', expert:'מומחה' };
+const DIFF_LABEL = { beginner:'בסיסי', intermediate:'בינוני', advanced:'מתקדם', expert:'גבוה' };
 
-// ─── TOPICS / SECTIONS ───────────────────────────────────────────────────────
+// ─── AMIRNET SECTIONS ────────────────────────────────────────────────────────
 const TOPICS = [
-  { id:'networking',       name:'רשתות תקשורת',     icon:'🌐', color:C.primary },
-  { id:'security',         name:'אבטחת מידע',        icon:'🔒', color:C.danger  },
-  { id:'operatingSystems', name:'מערכות הפעלה',      icon:'💻', color:C.success },
-  { id:'cloud',            name:'ענן ווירטואליזציה', icon:'☁️', color:C.cyan   },
-  { id:'itManagement',     name:'ניהול IT',           icon:'👥', color:C.warning },
-  { id:'protocols',        name:'פרוטוקולים',         icon:'🔄', color:C.purple  },
+  { id:'sentenceCompletion', name:'השלמת משפטים', icon:'✍️', color:C.primary, short:'Sentence Completion' },
+  { id:'restatement', name:'ניסוח מחדש', icon:'🔁', color:C.purple, short:'Restatement' },
+  { id:'reading', name:'הבנת הנקרא', icon:'📖', color:C.success, short:'Reading Comprehension' },
+  { id:'vocabulary', name:'אוצר מילים', icon:'🧠', color:C.orange, short:'Vocabulary' },
+  { id:'grammarContext', name:'דקדוק בהקשר', icon:'🧩', color:C.cyan, short:'Grammar in Context' },
 ];
 const topicById = id => TOPICS.find(t => t.id === id);
 
-// ─── QUESTION BANK ───────────────────────────────────────────────────────────
-// type: 'mc' = multiple choice, 'reading' = passage + question, 'restatement' = match equivalent
+const AMIRNET_EXAM_PLAN = [
+  { id:'sc1', topic:'sentenceCompletion', title:'השלמת משפטים 1', count:4, seconds:4*60 },
+  { id:'sc2', topic:'sentenceCompletion', title:'השלמת משפטים 2', count:4, seconds:4*60 },
+  { id:'reading', topic:'reading', title:'הבנת הנקרא', count:5, seconds:15*60 },
+  { id:'rs1', topic:'restatement', title:'ניסוח מחדש 1', count:3, seconds:6*60 },
+  { id:'rs2', topic:'restatement', title:'ניסוח מחדש 2', count:3, seconds:6*60 },
+  { id:'sc3', topic:'sentenceCompletion', title:'השלמת משפטים 3', count:4, seconds:4*60 },
+];
+const AMIRNET_FULL_EXAM_SECONDS = AMIRNET_EXAM_PLAN.reduce((sum, p) => sum + p.seconds, 0);
+const AMIRNET_FULL_EXAM_COUNT = AMIRNET_EXAM_PLAN.reduce((sum, p) => sum + p.count, 0);
+
+// type: 'mc' = sentence completion / vocabulary, 'reading' = passage + question, 'restatement' = equivalent sentence
 const QS = [
-  // ── NETWORKING mc ──
-  { id:'n1', type:'mc', topic:'networking', diff:'beginner',     vs:0.72,
-    q:'כמה שכבות יש במודל OSI?', opts:['5','6','7','8'], a:2,
-    exp:'מודל OSI = 7 שכבות: פיזית, קישור נתונים, רשת, תחבורה, סשן, מצגת, יישום.' },
-  { id:'n2', type:'mc', topic:'networking', diff:'beginner',     vs:0.68,
-    q:'באיזו שכבת OSI פועל IP?', opts:['שכבה 2','שכבה 3','שכבה 4','שכבה 5'], a:1,
-    exp:'IP פועל בשכבה 3 (רשת) ואחראי על ניתוב בין רשתות.' },
-  { id:'n3', type:'mc', topic:'networking', diff:'beginner',     vs:0.75,
-    q:'Subnet Mask של Class C?', opts:['255.0.0.0','255.255.0.0','255.255.255.0','255.255.255.255'], a:2,
-    exp:'Class C = 255.255.255.0 (/24), עד 254 מארחים.' },
-  { id:'n4', type:'mc', topic:'networking', diff:'intermediate', vs:0.58,
-    q:'ההבדל בין Router ל-Switch?', opts:['Router שכבה 2','Router ניתוב בין רשתות (שכבה 3), Switch מחבר בתוך רשת (שכבה 2)','זהים','Switch מהיר יותר'], a:1,
-    exp:'Router = שכבה 3, מנתב בין רשתות. Switch = שכבה 2, מחבר בתוך רשת.' },
-  { id:'n5', type:'mc', topic:'networking', diff:'intermediate', vs:0.55,
-    q:'CIDR /24 — מה המשמעות?', opts:['24 מארחים','24 סיביות לרשת, 8 למארח','Mask 255.255.0.0','24 נתבים'], a:1,
-    exp:'/24 = 24 סיביות לרשת → Mask 255.255.255.0 → 254 מארחים.' },
-  { id:'n6', type:'mc', topic:'networking', diff:'intermediate', vs:0.52,
-    q:'Class A פרטי?', opts:['172.16.0.0–172.31','192.168.0.0–192.168','10.0.0.0–10.255.255.255','169.254.0.0'], a:2,
-    exp:'Class A פרטי = 10.0.0.0–10.255.255.255.' },
-  { id:'n7', type:'mc', topic:'networking', diff:'intermediate', vs:0.60,
-    q:'תפקיד ARP?', opts:['הקצאת IP','תרגום שם→IP','תרגום IP→MAC','הצפנה'], a:2,
-    exp:'ARP ממפה IP לכתובת MAC ברשת מקומית.' },
-  { id:'n8', type:'mc', topic:'networking', diff:'beginner',     vs:0.80,
-    q:'פורט HTTPS?', opts:['80','443','8080','8443'], a:1,
-    exp:'HTTPS = פורט 443. HTTP = פורט 80.' },
-  { id:'n9', type:'mc', topic:'networking', diff:'beginner',     vs:0.78,
-    q:'Full-Duplex לעומת Half-Duplex?', opts:['Half מהיר','Full=שליחה+קבלה בו-זמנית; Half=כיוון אחד','Half=Wireless בלבד','Full זול יותר'], a:1,
-    exp:'Full-Duplex = תקשורת דו-כיוונית בו-זמנית. Half = כיוון אחד בכל פעם.' },
-  { id:'n10', type:'mc', topic:'networking', diff:'advanced',    vs:0.38,
-    q:'192.168.1.0/26 — כמה מארחים?', opts:['30','62','126','254'], a:1,
-    exp:'/26 = 6 סיביות למארח → 2^6−2 = 62 מארחים.' },
-  { id:'n11', type:'mc', topic:'networking', diff:'expert',      vs:0.25,
-    q:'VLSM — מה התועלת?', opts:['מאפשר שימוש חוזר ב-IP','מאפשר חלוקת רשת למשנה-רשתות בגדלים שונים','מחליף NAT','מצפין תנועה'], a:1,
-    exp:'VLSM (Variable Length Subnet Masking) = חלוקת Subnet בגדלים שונים לניצול יעיל של כתובות IP.' },
-  // ── SECURITY mc ──
-  { id:'s1', type:'mc', topic:'security', diff:'intermediate', vs:0.55,
-    q:'Symmetric לעומת Asymmetric?', opts:['Symmetric מהיר, מפתח אחד; Asymmetric זוג מפתחות','Asymmetric מהיר','Symmetric שני מפתחות','אין הבדל'], a:0,
-    exp:'Symmetric = מפתח אחד (AES). Asymmetric = ציבורי+פרטי (RSA).' },
-  { id:'s2', type:'mc', topic:'security', diff:'beginner',     vs:0.70,
-    q:'Man-in-the-Middle?', opts:['מתקפה על DNS','תוקף מיירט תקשורת בין שני צדדים','הצפת שרת','פרצה בFW'], a:1,
-    exp:'MITM = תוקף מיירט ויכול לקרוא/לשנות את התקשורת.' },
-  { id:'s3', type:'mc', topic:'security', diff:'beginner',     vs:0.72,
-    q:'DoS לעומת DDoS?', opts:['DoS=מחשב אחד; DDoS=Botnet','DDoS פחות מסוכן','זהים','DoS לנתונים'], a:0,
-    exp:'DoS = מחשב אחד. DDoS = אלפי מחשבים (Botnet).' },
-  { id:'s4', type:'mc', topic:'security', diff:'intermediate', vs:0.58,
-    q:'Stateful Firewall?', opts:['בוחן כותרות בלבד','עוקב אחר מצב חיבורים','מסנן לפי MAC','ללא תצורה'], a:1,
-    exp:'Stateful FW עוקב אחר מצב חיבור ומחליט לפי הקשר.' },
-  { id:'s5', type:'mc', topic:'security', diff:'intermediate', vs:0.56,
-    q:'IDS לעומת IPS?', opts:['IDS=מגיב; IPS=מזהה בלבד','IDS=מזהה; IPS=מזהה+חוסם','זהים','IPS בענן בלבד'], a:1,
-    exp:'IDS = זיהוי+התראה בלבד. IPS = זיהוי+חסימה אקטיבית.' },
-  { id:'s6', type:'mc', topic:'security', diff:'beginner',     vs:0.76,
-    q:'SSL/TLS?', opts:['ניתוב','הצפנה לאבטחת תקשורת','זיהוי משתמשים','DNS מאובטח'], a:1,
-    exp:'TLS מאבטח תקשורת (HTTPS). TLS = גרסה מעודכנת של SSL.' },
-  { id:'s7', type:'mc', topic:'security', diff:'beginner',     vs:0.80,
-    q:'Phishing?', opts:['מצפין קבצים','הונאה לגניבת פרטים דרך הודעות מזויפות','Brute Force','ניצול TCP'], a:1,
-    exp:'Phishing = הנדסה חברתית לגניבת פרטים רגישים.' },
-  { id:'s8', type:'mc', topic:'security', diff:'beginner',     vs:0.82,
-    q:'VPN?', opts:['מנהרה מוצפנת ברשת ציבורית','חומת אש','פרוטוקול ניתוב','אנטי-וירוס'], a:0,
-    exp:'VPN = מנהרה מוצפנת, גישה מאובטחת למשאבים פרטיים.' },
-  { id:'s9', type:'mc', topic:'security', diff:'advanced',     vs:0.40,
-    q:'Zero Trust Architecture?', opts:['מאמין לכולם בתוך הרשת','לא מאמין לאף ישות, בדיקה תמידית','ביטול סיסמאות','VPN לכולם'], a:1,
-    exp:'Zero Trust = "Never trust, always verify" — בדיקת כל גישה ללא קשר למיקום ברשת.' },
-  // ── OS mc ──
-  { id:'o1', type:'mc', topic:'operatingSystems', diff:'beginner',     vs:0.74,
-    q:'Active Directory?', opts:['אנטי-וירוס','שירות ספריה לניהול משתמשים וקבוצות','פרוטוקול','גיבוי'], a:1,
-    exp:'AD = ניהול מרכזי משתמשים, מחשבים ומדיניות אבטחה.' },
-  { id:'o2', type:'mc', topic:'operatingSystems', diff:'intermediate', vs:0.58,
-    q:'Domain Controller לעומת Member Server?', opts:['DC מנהל AD; Member חבר בדומיין','Member חזק יותר','DC=Linux','זהים'], a:0,
-    exp:'DC מריץ AD DS. Member Server חבר בדומיין, לא מריץ AD DS.' },
-  { id:'o3', type:'mc', topic:'operatingSystems', diff:'intermediate', vs:0.55,
-    q:'NTFS לעומת FAT32?', opts:['NTFS מהיר אך לא גדולים','NTFS=הרשאות, הצפנה, קבצים >4GB','FAT32 מתקדם','זהים'], a:1,
-    exp:'NTFS = הרשאות, EFS, דחיסה, ללא מגבלת 4GB. FAT32 מוגבל.' },
-  { id:'o4', type:'mc', topic:'operatingSystems', diff:'beginner',     vs:0.85,
-    q:'בדיקת IP ב-Windows?', opts:['ipconfig','ifconfig','netstat','ping'], a:0,
-    exp:'Windows = ipconfig. Linux/macOS = ifconfig / ip addr.' },
-  { id:'o5', type:'mc', topic:'operatingSystems', diff:'intermediate', vs:0.60,
-    q:'Group Policy (GPO)?', opts:['מדיניות קבוצתית ב-AD','גיבוי','אבטחת רשת','DHCP'], a:0,
-    exp:'GPO = ניהול מרכזי הגדרות בדומיין: סיסמאות, אבטחה, מיפוי כוננים.' },
-  { id:'o6', type:'mc', topic:'operatingSystems', diff:'beginner',     vs:0.88,
-    q:'Linux — קבצים כולל מוסתרים?', opts:['ls -a','ls -l','dir /a','show all'], a:0,
-    exp:'ls -a = כל הקבצים כולל מוסתרים (מתחילים בנקודה).' },
-  { id:'o7', type:'mc', topic:'operatingSystems', diff:'intermediate', vs:0.52,
-    q:'RAID 5?', opts:['גיבוי לדיסק חיצוני','Striping+Parity על 3+ דיסקים, עמיד לכשל דיסק אחד','שיקוף 2 דיסקים','ללא הגנה'], a:1,
-    exp:'RAID 5 = Striping+Parity מפוזר, עמיד לכשל דיסק אחד.' },
-  { id:'o8', type:'mc', topic:'operatingSystems', diff:'beginner',     vs:0.75,
-    q:'Hyper-V?', opts:['אנטי-וירוס','וירטואליזציה של Microsoft ב-Windows Server','ענן','גיבוי'], a:1,
-    exp:'Hyper-V = וירטואליזציה מובנית ב-Windows Server.' },
-  // ── CLOUD mc ──
-  { id:'c1', type:'mc', topic:'cloud', diff:'intermediate', vs:0.58,
-    q:'IaaS / PaaS / SaaS?', opts:['זהים','IaaS=תשתית; PaaS=פלטפורמה; SaaS=תוכנה מוכנה','SaaS מאובטח יותר','PaaS לחברות גדולות'], a:1,
-    exp:'IaaS=EC2, PaaS=App Service, SaaS=Office365.' },
-  { id:'c2', type:'mc', topic:'cloud', diff:'beginner',     vs:0.72,
-    q:'S3 ב-AWS?', opts:['מחשוב','אחסון אובייקטים','רשת','DB'], a:1,
-    exp:'Amazon S3 = Object Storage, זמינות גבוהה.' },
-  { id:'c3', type:'mc', topic:'cloud', diff:'intermediate', vs:0.55,
-    q:'VPC ב-AWS?', opts:['DB','רשת וירטואלית פרטית עם שליטה מלאה','Backup','DNS'], a:1,
-    exp:'VPC = רשת מבודדת ב-AWS, שליטה ב-Subnet, Routing, SG.' },
-  { id:'c4', type:'mc', topic:'cloud', diff:'beginner',     vs:0.70,
-    q:'Public Cloud לעומת Private?', opts:['Public מאובטח יותר','Public=משותף; Private=ייעודי לארגון','Private תמיד זול','זהים'], a:1,
-    exp:'Public = משאבים משותפים. Private = ייעודי, אבטחה גבוהה.' },
-  { id:'c5', type:'mc', topic:'cloud', diff:'intermediate', vs:0.60,
-    q:'Docker?', opts:['OS','Containerization לאפליקציות מבודדות','שפה','גיבוי'], a:1,
-    exp:'Docker = Container עם יחסי תלות, ריצה אחידה בכל סביבה.' },
-  { id:'c6', type:'mc', topic:'cloud', diff:'intermediate', vs:0.55,
-    q:'VM לעומת Container?', opts:['Container כבד יותר','VM=OS מלא; Container=חולק Kernel, יעיל יותר','זהים','VM מהיר יותר'], a:1,
-    exp:'VM = OS מלא (כבד). Container = חולק Kernel (קל+מהיר).' },
-  { id:'c7', type:'mc', topic:'cloud', diff:'beginner',     vs:0.78,
-    q:'Auto Scaling?', opts:['הגדלה ידנית','הוספה/הסרה אוטומטית לפי עומס','גיבוי','עדכונים'], a:1,
-    exp:'Auto Scaling = מוסיף/מסיר משאבים אוטומטית לפי עומס.' },
-  { id:'c8', type:'mc', topic:'cloud', diff:'advanced',    vs:0.38,
-    q:'Kubernetes?', opts:['DB','תזמור Containers בקנה מידה','מערכת הפעלה','שירות DNS'], a:1,
-    exp:'Kubernetes = תזמור ואוטומציה של פריסת Containers בקנה מידה.' },
-  // ── IT MANAGEMENT mc ──
-  { id:'i1', type:'mc', topic:'itManagement', diff:'beginner',     vs:0.72,
-    q:'ITIL?', opts:['שפת תכנות','מסגרת Best Practices לניהול שירותי IT','פרוטוקול','מוצר Microsoft'], a:1,
-    exp:'ITIL = Information Technology Infrastructure Library, ניהול שירותי IT.' },
-  { id:'i2', type:'mc', topic:'itManagement', diff:'intermediate', vs:0.55,
-    q:'Incident לעומת Problem?', opts:['זהים','Incident=שיבוש; Problem=גורם שורשי','Problem קל','Incident אחרי Problem'], a:1,
-    exp:'Incident = שיבוש לא מתוכנן. Problem = Root Cause Analysis.' },
-  { id:'i3', type:'mc', topic:'itManagement', diff:'beginner',     vs:0.70,
-    q:'SLA?', opts:['חוזה חומרה','הסכם רמת שירות: זמינות, זמן תגובה','תוכנה','תקן אבטחה'], a:1,
-    exp:'SLA = הסכם המגדיר ציפיות שירות (זמינות, זמן תגובה, שיקום).' },
-  { id:'i4', type:'mc', topic:'itManagement', diff:'intermediate', vs:0.58,
-    q:'Change Management ב-ITIL?', opts:['שינויים ארגוניים','ניהול מבוקר שינויים ב-IT','עדכונים אוטומטיים','גרסאות קוד'], a:1,
-    exp:'Change Management = RFC, הערכת סיכונים, אישור, ביצוע, תיעוד.' },
-  { id:'i5', type:'mc', topic:'itManagement', diff:'advanced',    vs:0.40,
-    q:'RTO ו-RPO?', opts:['RTO=זמן שיקום מקסימלי; RPO=כמות נתונים שניתן לאבד','שניהם זמן שיקום','RPO=ביצועים','RTO לענן'], a:0,
-    exp:'RTO = זמן שיקום מקסימלי. RPO = כמות נתונים מקסימלית שניתן לאבד.' },
-  { id:'i6', type:'mc', topic:'itManagement', diff:'intermediate', vs:0.56,
-    q:'Help Desk לעומת Service Desk?', opts:['זהים','Help=תקלות; Service=נקודת קשר רחבה + בקשות שירות','Service לחיצוניים','Help יקר'], a:1,
-    exp:'Help Desk = פתרון תקלות. Service Desk = נקודת קשר יחידה רחבה.' },
-  { id:'i7', type:'mc', topic:'itManagement', diff:'advanced',    vs:0.42,
-    q:'CMDB?', opts:['תוכנת אנטי-וירוס','מאגר מידע של רכיבי תשתית ויחסיהם','שירות גיבוי','DB למשתמשים'], a:1,
-    exp:'CMDB (Configuration Management Database) = מאגר כל Configuration Items ויחסיהם ב-IT.' },
-  // ── PROTOCOLS mc ──
-  { id:'p1', type:'mc', topic:'protocols', diff:'beginner',     vs:0.80,
-    q:'פורט DNS?', opts:['53','80','443','25'], a:0,
-    exp:'DNS = פורט 53 (UDP לשאילתות, TCP להעברות אזור).' },
-  { id:'p2', type:'mc', topic:'protocols', diff:'beginner',     vs:0.76,
-    q:'DHCP?', opts:['תרגום שם→IP','הקצאה אוטומטית IP+פרמטרים','הצפנה','ניתוב'], a:1,
-    exp:'DHCP = הקצאה אוטומטית: IP, Mask, Gateway, DNS.' },
-  { id:'p3', type:'mc', topic:'protocols', diff:'beginner',     vs:0.78,
-    q:'TCP לעומת UDP?', opts:['TCP מהיר; UDP אמין','TCP=חיבור+אמין; UDP=ללא חיבור+מהיר','זהים','UDP=הצפנה'], a:1,
-    exp:'TCP = Handshake, מסירה מובטחת. UDP = מהיר, ללא ערבות (DNS, VoIP).' },
-  { id:'p4', type:'mc', topic:'protocols', diff:'beginner',     vs:0.82,
-    q:'SMTP?', opts:['קבלת מיילים','שליחת מיילים בין שרתים','גלישה','קבצים'], a:1,
-    exp:'SMTP = שליחת מיילים, פורט 25/587. IMAP/POP3 לקבלה.' },
-  { id:'p5', type:'mc', topic:'protocols', diff:'beginner',     vs:0.84,
-    q:'HTTP Method נפוץ?', opts:['ENCRYPT','GET','ROUTE','QUERY'], a:1,
-    exp:'HTTP = פרוטוקול האינטרנט. GET לקבלת נתונים.' },
-  { id:'p6', type:'mc', topic:'protocols', diff:'beginner',     vs:0.80,
-    q:'FTP על פורט?', opts:['פורט 21','פורט 22','פורט 80','פורט 443'], a:0,
-    exp:'FTP = פורט 21 (control), 20 (data). SFTP = פורט 22, מאובטח.' },
-  { id:'p7', type:'mc', topic:'protocols', diff:'intermediate', vs:0.60,
-    q:'Three-Way Handshake?', opts:['סגירת חיבור','SYN→SYN-ACK→ACK','שליחת נתונים','בדיקת שגיאות'], a:1,
-    exp:'TCP Handshake: Client→SYN, Server→SYN-ACK, Client→ACK.' },
-  { id:'p8', type:'mc', topic:'protocols', diff:'intermediate', vs:0.55,
-    q:'IMAP לעומת POP3?', opts:['IMAP=מסנכרן+שומר בשרת; POP3=מוריד+מוחק','POP3 מודרני','IMAP=שליחה','זהים'], a:0,
-    exp:'IMAP (143/993) = מסנכרן ממכשירים מרובים. POP3 (110/995) = מוריד ומוחק.' },
-  { id:'p9', type:'mc', topic:'protocols', diff:'advanced',    vs:0.38,
-    q:'BGP?', opts:['פרוטוקול ניתוב פנימי','פרוטוקול ניתוב בין-מערכות אוטונומיות (AS)','פרוטוקול הצפנה','שירות DNS מורחב'], a:1,
-    exp:'BGP (Border Gateway Protocol) = ניתוב בין Autonomous Systems, עמוד השדרה של האינטרנט.' },
-  // ── READING TYPE (passage + question) ──
-  { id:'r1', type:'reading', topic:'networking', diff:'intermediate', vs:0.52,
-    passage:'רשת ה-LAN של חברת XYZ כוללת 3 VLAN: VLAN 10 לניהול, VLAN 20 לעובדים, VLAN 30 לאורחים. הראוטר מחובר ל-Switch בחיבור Trunk המעביר את כל ה-VLANs. כל VLAN מקבל כתובות IP מ-DHCP נפרד, ו-Firewall חוסם תנועה בין VLAN 30 לשאר הרשת.',
-    q:'מדוע הAorG-VLAN מבודד ב-Firewall?', opts:['לחסוך IP','למנוע גישה של אורחים לרשת הפנימית','VLAN 30 איטי יותר','הגדרת ברירת מחדל'], a:1,
-    exp:'VLAN לאורחים מבודד כדי למנוע גישה לנתונים פנימיים — עיקרון Zero Trust ל-Guest Networks.' },
-  { id:'r2', type:'reading', topic:'security', diff:'advanced', vs:0.38,
-    passage:'ארגון גדול גילה שמישהו ניגש לשרת ה-DB הפנימי מכתובת IP חיצונית. בדיקת הלוגים מראה שהגישה הייתה דרך פורט 3389 שנותר פתוח בטעות בFW. הגישה נעשתה בשעות הלילה עם פרטי כניסה של עובד שהתפטר לפני 3 חודשים.',
-    q:'אילו כשלי אבטחה מוצגים בתרחיש? (בחר הכי מקיף)', opts:['רק פורט פתוח','רק חשבון לא נמחק','פורט פתוח שלא לצורך + ניהול גישה לקוי (חשבון לא בוטל) + חוסר ניטור','רק חוסר ניטור'], a:2,
-    exp:'3 כשלים: 1) פורט 3389 (RDP) פתוח לאינטרנט 2) חשבון עובד שעזב לא בוטל 3) אין ניטור בזמן אמת.' },
-  { id:'r3', type:'reading', topic:'cloud', diff:'intermediate', vs:0.50,
-    passage:'צוות DevOps פורס אפליקציה ב-AWS. הם משתמשים ב-ECS (Elastic Container Service) עם Fargate להרצת Containers, S3 לאחסון קבצים סטטיים, RDS (PostgreSQL) ל-Database, ו-CloudFront כ-CDN. ה-Load Balancer מחלק תנועה בין 3 AZs.',
-    q:'מה התועלת של 3 Availability Zones?', opts:['חיסכון בעלויות','זמינות גבוהה — אם AZ אחד נכשל, שניים אחרים ממשיכים','מהירות גבוהה יותר','הדרישה של RDS'], a:1,
-    exp:'Multi-AZ = High Availability. כשל באחד מ-3 AZs לא משבית את השירות — עיקרון ה-Fault Tolerance.' },
-  { id:'r4', type:'reading', topic:'operatingSystems', diff:'beginner', vs:0.65,
-    passage:'מנהל רשת מגדיר GPO חדש בActive Directory. ה-GPO מחייב: סיסמה מינימום 12 תווים, נעילת חשבון אחרי 5 נסיונות, שינוי סיסמה כל 90 יום, ומניעת שימוש ב-10 הסיסמאות האחרונות. ה-GPO מוחל על כל ה-Domain Users OU.',
-    q:'מה מטרת הגדרת "מניעת שימוש ב-10 הסיסמאות האחרונות"?', opts:['לחסוך מקום DB','למנוע שימוש חוזר בסיסמאות ישנות שעלולות להיות חשופות','לחסוך זמן','הדרישה של NTFS'], a:1,
-    exp:'Password History = מניעת שימוש חוזר בסיסמאות ישנות שייתכן שנחשפו או ידועות.' },
-  // ── RESTATEMENT TYPE (match equivalent statement) ──
-  { id:'rs1', type:'restatement', topic:'networking', diff:'intermediate', vs:0.52,
-    q:'באיזו הצהרה מכוונת הכי נכון את המשמעות של "חוק ה-Subnet Mask הוא 255.255.255.0"?',
-    opts:['הרשת תומכת עד 254 מארחים ומסומנת /24','הרשת תומכת 255 מארחים','ה-Subnet Mask מורכב מ-8 סיביות','זו רשת Class B'], a:0,
-    exp:'255.255.255.0 = /24 = 24 סיביות לרשת, 8 למארח → 2^8−2 = 254 מארחים.' },
-  { id:'rs2', type:'restatement', topic:'security', diff:'advanced', vs:0.38,
-    q:'מהי ההצהרה השקולה ל: "IPS פועל inline ברשת"?',
-    opts:['IPS מנטר תנועה ממרחק','IPS ממוקם בנתיב התנועה ויכול לחסום בזמן אמת','IPS פועל רק כשיש התקפה','IPS הוא סוג של FW'], a:1,
-    exp:'Inline = בנתיב התנועה. זה מה שמאפשר ל-IPS לחסום (לא רק להתריע) בזמן אמת.' },
-  { id:'rs3', type:'restatement', topic:'itManagement', diff:'intermediate', vs:0.55,
-    q:'מהי ההצהרה הנכונה ביותר ל: "RTO = 4 שעות"?',
-    opts:['מותר לאבד 4 שעות של נתונים','השירות חייב לחזור לפעולה תוך 4 שעות מרגע הכשל','הגיבוי נעשה כל 4 שעות','4 שעות זמן עבודה יומי'], a:1,
-    exp:'RTO (Recovery Time Objective) = הזמן המקסימלי המוסכם לשיקום השירות לאחר כשל.' },
+  { id:'sc1', type:'mc', topic:'sentenceCompletion', diff:'beginner', vs:0.76,
+    q:'The museum was closed for renovations, so visitors had to wait until it ____ reopened.', opts:['officially','rarely','nearly','carelessly'], a:0,
+    exp:'Officially means in a formal or announced way. The sentence says visitors waited until the museum reopened.' },
+  { id:'sc2', type:'mc', topic:'sentenceCompletion', diff:'beginner', vs:0.73,
+    q:'Although the instructions were long, they were clear enough for everyone to ____ them.', opts:['ignore','follow','borrow','invent'], a:1,
+    exp:'Follow instructions means act according to them. Clear instructions are easy to follow.' },
+  { id:'sc3', type:'mc', topic:'sentenceCompletion', diff:'beginner', vs:0.70,
+    q:'The new library provides students with a quiet place to study and ____ materials for research.', opts:['access','damage','delay','refuse'], a:0,
+    exp:'Provide access to materials is the natural academic phrase.' },
+  { id:'sc4', type:'mc', topic:'sentenceCompletion', diff:'beginner', vs:0.74,
+    q:'The athlete was tired, but she continued running ____ she reached the finish line.', opts:['until','unless','despite','whether'], a:0,
+    exp:'Until introduces the point in time when an action stops or is completed.' },
+  { id:'sc5', type:'mc', topic:'sentenceCompletion', diff:'intermediate', vs:0.58,
+    q:'The committee decided to ____ the proposal because several important details were missing.', opts:['postpone','decorate','translate','celebrate'], a:0,
+    exp:'Postpone means delay. Missing details are a reason to delay a decision.' },
+  { id:'sc6', type:'mc', topic:'sentenceCompletion', diff:'intermediate', vs:0.56,
+    q:'The scientist repeated the experiment to make sure the results were ____ and not accidental.', opts:['reliable','ordinary','generous','temporary'], a:0,
+    exp:'Reliable results can be trusted. Repeating an experiment checks reliability.' },
+  { id:'sc7', type:'mc', topic:'sentenceCompletion', diff:'intermediate', vs:0.54,
+    q:'Many cities encourage public transportation in order to reduce traffic ____ and air pollution.', opts:['congestion','permission','tradition','translation'], a:0,
+    exp:'Traffic congestion means heavy traffic or traffic jams.' },
+  { id:'sc8', type:'mc', topic:'sentenceCompletion', diff:'intermediate', vs:0.52,
+    q:'The professor gave a brief ____ of the article before asking the students to discuss it.', opts:['summary','warning','expense','journey'], a:0,
+    exp:'A summary is a short presentation of the main ideas.' },
+  { id:'sc9', type:'mc', topic:'sentenceCompletion', diff:'intermediate', vs:0.50,
+    q:'The company changed its policy in response to ____ criticism from customers.', opts:['widespread','fragile','distant','silent'], a:0,
+    exp:'Widespread criticism means criticism by many people.' },
+  { id:'sc10', type:'mc', topic:'sentenceCompletion', diff:'advanced', vs:0.41,
+    q:'The author uses humor to make a serious argument more ____ to readers.', opts:['accessible','reluctant','obsolete','artificial'], a:0,
+    exp:'Accessible means easy to understand or approach.' },
+  { id:'sc11', type:'mc', topic:'sentenceCompletion', diff:'advanced', vs:0.38,
+    q:'The evidence was too ____ to support such a far-reaching conclusion.', opts:['inconclusive','abundant','decisive','transparent'], a:0,
+    exp:'Inconclusive evidence does not prove something clearly.' },
+  { id:'sc12', type:'mc', topic:'sentenceCompletion', diff:'advanced', vs:0.36,
+    q:'The mayor tried to ____ public concerns by promising an independent investigation.', opts:['alleviate','multiply','conceal','imitate'], a:0,
+    exp:'Alleviate means reduce or ease, especially concerns, pain, or pressure.' },
+  { id:'sc13', type:'mc', topic:'sentenceCompletion', diff:'advanced', vs:0.34,
+    q:'The poet’s language is deliberately ____, allowing several different interpretations.', opts:['ambiguous','mechanical','visible','annual'], a:0,
+    exp:'Ambiguous means having more than one possible meaning.' },
+  { id:'sc14', type:'mc', topic:'sentenceCompletion', diff:'expert', vs:0.27,
+    q:'Because the witness gave ____ accounts of the event, the court questioned his reliability.', opts:['contradictory','meticulous','prosperous','inevitable'], a:0,
+    exp:'Contradictory accounts conflict with each other.' },
+  { id:'sc15', type:'mc', topic:'sentenceCompletion', diff:'expert', vs:0.24,
+    q:'The historian warned against drawing ____ conclusions from a single document.', opts:['sweeping','edible','portable','vertical'], a:0,
+    exp:'Sweeping conclusions are broad generalizations, often too broad for limited evidence.' },
+  { id:'sc16', type:'mc', topic:'sentenceCompletion', diff:'expert', vs:0.22,
+    q:'The new theory did not replace the old one entirely; rather, it ____ several of its central claims.', opts:['modified','evaporated','neglected','advertised'], a:0,
+    exp:'Modified means changed or adjusted, which fits a theory that keeps but alters some claims.' },
+
+  { id:'rs1', type:'restatement', topic:'restatement', diff:'beginner', vs:0.70,
+    q:'Choose the sentence that best restates the original sentence: Many people prefer trains because they are usually less stressful than driving.',
+    opts:['Many people find train travel less stressful than driving, and therefore prefer it.','Driving is usually faster than taking the train.','Most people avoid trains because they are stressful.','Train travel and driving cause the same amount of stress.'], a:0,
+    exp:'The correct answer preserves both ideas: trains are less stressful, so many people prefer them.' },
+  { id:'rs2', type:'restatement', topic:'restatement', diff:'beginner', vs:0.68,
+    q:'Choose the best restatement: The lecture was so popular that a second room had to be opened.',
+    opts:['Because many people attended the lecture, another room was needed.','The lecture was moved because the first room was unpopular.','Only people in the second room heard the lecture.','A second lecture was cancelled because the room was full.'], a:0,
+    exp:'So popular that means the number of people required another room.' },
+  { id:'rs3', type:'restatement', topic:'restatement', diff:'intermediate', vs:0.56,
+    q:'Choose the best restatement: Despite its small size, the device can store a large amount of information.',
+    opts:['Although the device is small, it has a large storage capacity.','The device is too small to store much information.','The device stores less information than larger devices.','Because the device is small, it cannot be useful.'], a:0,
+    exp:'Despite means although. The contrast is small size versus large storage capacity.' },
+  { id:'rs4', type:'restatement', topic:'restatement', diff:'intermediate', vs:0.53,
+    q:'Choose the best restatement: The plan was rejected not because it was expensive, but because it was impractical.',
+    opts:['The plan failed because it could not realistically be carried out, not because of its cost.','The plan was accepted because it was inexpensive.','The plan was rejected mainly because it cost too much.','The plan was both expensive and practical.'], a:0,
+    exp:'The sentence emphasizes impracticality as the reason, not expense.' },
+  { id:'rs5', type:'restatement', topic:'restatement', diff:'advanced', vs:0.40,
+    q:'Choose the best restatement: The discovery challenged the assumption that complex tools were used only by humans.',
+    opts:['The discovery cast doubt on the belief that only humans used complex tools.','The discovery proved that humans never used complex tools.','The discovery showed that complex tools were recently invented.','The discovery confirmed that animals cannot use tools.'], a:0,
+    exp:'Challenged the assumption means cast doubt on a belief.' },
+  { id:'rs6', type:'restatement', topic:'restatement', diff:'advanced', vs:0.37,
+    q:'Choose the best restatement: No sooner had the law been passed than critics began calling for its repeal.',
+    opts:['Critics demanded that the law be cancelled almost immediately after it was approved.','Critics supported the law as soon as it was passed.','The law was repealed before anyone criticized it.','The law passed only after critics changed their minds.'], a:0,
+    exp:'No sooner...than means one event happened immediately after another.' },
+  { id:'rs7', type:'restatement', topic:'restatement', diff:'expert', vs:0.30,
+    q:'Choose the best restatement: The findings are less a rejection of earlier research than a refinement of it.',
+    opts:['The findings mainly improve earlier research rather than dismiss it completely.','The findings prove that earlier research was entirely false.','The findings are unrelated to earlier research.','Earlier research refined the new findings.'], a:0,
+    exp:'Less a rejection than a refinement means the new work adjusts or improves the old work.' },
+  { id:'rs8', type:'restatement', topic:'restatement', diff:'expert', vs:0.28,
+    q:'Choose the best restatement: Had the data been collected over a longer period, the researchers might have reached a different conclusion.',
+    opts:['A longer period of data collection could have led to a different conclusion.','The researchers collected data for too long.','The conclusion changed because the data collection period was extended.','The researchers refused to collect more data.'], a:0,
+    exp:'Had...been is a conditional form referring to a possible different outcome.' },
+
+  { id:'rd1', type:'reading', topic:'reading', diff:'intermediate', vs:0.55,
+    passage:'In recent years, many cities have created small parks on streets that were once used only for cars. These parks, often called parklets, usually include benches, plants, and space for pedestrians to rest. Supporters argue that parklets make neighborhoods more pleasant and encourage people to spend time outdoors. Critics, however, claim that removing parking spaces makes life harder for drivers and nearby businesses. Studies of several cities suggest that the effect depends on location: parklets are most successful in areas with many pedestrians and few available green spaces.',
+    q:'What is the main topic of the passage?', opts:['The use and effects of small urban parklets','The history of public transportation','The design of large national parks','The cost of building parking lots'], a:0,
+    exp:'The passage focuses on parklets, their advantages, criticism, and where they work best.' },
+  { id:'rd2', type:'reading', topic:'reading', diff:'intermediate', vs:0.52,
+    passage:'In recent years, many cities have created small parks on streets that were once used only for cars. These parks, often called parklets, usually include benches, plants, and space for pedestrians to rest. Supporters argue that parklets make neighborhoods more pleasant and encourage people to spend time outdoors. Critics, however, claim that removing parking spaces makes life harder for drivers and nearby businesses. Studies of several cities suggest that the effect depends on location: parklets are most successful in areas with many pedestrians and few available green spaces.',
+    q:'According to the passage, critics of parklets are mainly concerned about ____.', opts:['the loss of parking spaces','the number of plants used','the lack of benches','the quality of city studies'], a:0,
+    exp:'The passage says critics claim that removing parking spaces creates problems.' },
+  { id:'rd3', type:'reading', topic:'reading', diff:'advanced', vs:0.43,
+    passage:'In recent years, many cities have created small parks on streets that were once used only for cars. These parks, often called parklets, usually include benches, plants, and space for pedestrians to rest. Supporters argue that parklets make neighborhoods more pleasant and encourage people to spend time outdoors. Critics, however, claim that removing parking spaces makes life harder for drivers and nearby businesses. Studies of several cities suggest that the effect depends on location: parklets are most successful in areas with many pedestrians and few available green spaces.',
+    q:'The phrase “the effect depends on location” means that parklets ____.', opts:['work better in some places than in others','are illegal in most neighborhoods','must be built far from businesses','always increase the number of cars'], a:0,
+    exp:'The following sentence explains that success depends on pedestrian traffic and lack of green space.' },
+  { id:'rd4', type:'reading', topic:'reading', diff:'advanced', vs:0.41,
+    passage:'In recent years, many cities have created small parks on streets that were once used only for cars. These parks, often called parklets, usually include benches, plants, and space for pedestrians to rest. Supporters argue that parklets make neighborhoods more pleasant and encourage people to spend time outdoors. Critics, however, claim that removing parking spaces makes life harder for drivers and nearby businesses. Studies of several cities suggest that the effect depends on location: parklets are most successful in areas with many pedestrians and few available green spaces.',
+    q:'Which area would most likely benefit from a parklet?', opts:['A crowded shopping street with almost no green areas','A rural road with no pedestrians','A neighborhood with many large parks','A highway used mainly by trucks'], a:0,
+    exp:'The passage says parklets work best where there are many pedestrians and few green spaces.' },
+  { id:'rd5', type:'reading', topic:'reading', diff:'expert', vs:0.34,
+    passage:'In recent years, many cities have created small parks on streets that were once used only for cars. These parks, often called parklets, usually include benches, plants, and space for pedestrians to rest. Supporters argue that parklets make neighborhoods more pleasant and encourage people to spend time outdoors. Critics, however, claim that removing parking spaces makes life harder for drivers and nearby businesses. Studies of several cities suggest that the effect depends on location: parklets are most successful in areas with many pedestrians and few available green spaces.',
+    q:'The author’s attitude toward parklets is best described as ____.', opts:['balanced and conditional','strongly negative','unquestionably enthusiastic','unrelated to evidence'], a:0,
+    exp:'The author presents both support and criticism, then states that success depends on context.' },
+  { id:'rd6', type:'reading', topic:'reading', diff:'intermediate', vs:0.50,
+    passage:'For many years, scientists believed that sleep was mainly a period of rest. Today, however, sleep is understood as an active process during which the brain performs several important tasks. It strengthens memories, removes certain waste products, and helps regulate mood. Lack of sleep can therefore affect learning, concentration, and emotional stability. Researchers still disagree about the exact purpose of dreaming, but most agree that sleep itself is essential for both physical and mental health.',
+    q:'What is the main idea of the passage?', opts:['Sleep is an active and essential process','Dreaming is the only purpose of sleep','Scientists no longer study sleep','Memory is not affected by sleep'], a:0,
+    exp:'The passage explains several active functions of sleep and its importance.' },
+  { id:'rd7', type:'reading', topic:'reading', diff:'intermediate', vs:0.49,
+    passage:'For many years, scientists believed that sleep was mainly a period of rest. Today, however, sleep is understood as an active process during which the brain performs several important tasks. It strengthens memories, removes certain waste products, and helps regulate mood. Lack of sleep can therefore affect learning, concentration, and emotional stability. Researchers still disagree about the exact purpose of dreaming, but most agree that sleep itself is essential for both physical and mental health.',
+    q:'According to the passage, lack of sleep may harm ____.', opts:['learning and concentration','the color of dreams','the number of researchers','the need for rest'], a:0,
+    exp:'The passage explicitly says lack of sleep can affect learning and concentration.' },
+  { id:'rd8', type:'reading', topic:'reading', diff:'advanced', vs:0.39,
+    passage:'For many years, scientists believed that sleep was mainly a period of rest. Today, however, sleep is understood as an active process during which the brain performs several important tasks. It strengthens memories, removes certain waste products, and helps regulate mood. Lack of sleep can therefore affect learning, concentration, and emotional stability. Researchers still disagree about the exact purpose of dreaming, but most agree that sleep itself is essential for both physical and mental health.',
+    q:'The word “regulate” in the passage is closest in meaning to ____.', opts:['control','damage','describe','replace'], a:0,
+    exp:'To regulate mood means to control or balance it.' },
+  { id:'rd9', type:'reading', topic:'reading', diff:'advanced', vs:0.38,
+    passage:'For many years, scientists believed that sleep was mainly a period of rest. Today, however, sleep is understood as an active process during which the brain performs several important tasks. It strengthens memories, removes certain waste products, and helps regulate mood. Lack of sleep can therefore affect learning, concentration, and emotional stability. Researchers still disagree about the exact purpose of dreaming, but most agree that sleep itself is essential for both physical and mental health.',
+    q:'What do researchers still disagree about?', opts:['the exact purpose of dreaming','whether sleep is necessary','whether memories exist','the meaning of concentration'], a:0,
+    exp:'The final sentence states that researchers still disagree about the exact purpose of dreaming.' },
+  { id:'rd10', type:'reading', topic:'reading', diff:'expert', vs:0.31,
+    passage:'For many years, scientists believed that sleep was mainly a period of rest. Today, however, sleep is understood as an active process during which the brain performs several important tasks. It strengthens memories, removes certain waste products, and helps regulate mood. Lack of sleep can therefore affect learning, concentration, and emotional stability. Researchers still disagree about the exact purpose of dreaming, but most agree that sleep itself is essential for both physical and mental health.',
+    q:'Which statement would the author most likely agree with?', opts:['Sleep has several important functions beyond simple rest.','Dreams are more important than sleep itself.','Scientists fully understand every aspect of sleep.','Emotional stability is unrelated to sleep.'], a:0,
+    exp:'The passage contrasts the old view of sleep as rest with the modern view of sleep as active and essential.' },
+
+  { id:'vc1', type:'mc', topic:'vocabulary', diff:'beginner', vs:0.68,
+    q:'Which word is closest in meaning to “brief”?', opts:['short','heavy','angry','ancient'], a:0,
+    exp:'Brief means short in time or length.' },
+  { id:'vc2', type:'mc', topic:'vocabulary', diff:'intermediate', vs:0.52,
+    q:'Which word is closest in meaning to “purchase”?', opts:['buy','forget','hide','repair'], a:0,
+    exp:'Purchase is a formal word for buy.' },
+  { id:'vc3', type:'mc', topic:'vocabulary', diff:'advanced', vs:0.39,
+    q:'Which word is closest in meaning to “scarce”?', opts:['rare','simple','loud','fresh'], a:0,
+    exp:'Scarce means not available in large amounts.' },
+  { id:'gc1', type:'mc', topic:'grammarContext', diff:'intermediate', vs:0.54,
+    q:'Choose the correct option: If the weather ____ better tomorrow, we will go hiking.', opts:['is','was','were','has been'], a:0,
+    exp:'In a real future condition, use present simple after if: If the weather is better...' },
+  { id:'gc2', type:'mc', topic:'grammarContext', diff:'advanced', vs:0.40,
+    q:'Choose the correct option: The article, ____ was published last year, changed the debate.', opts:['which','who','where','whose'], a:0,
+    exp:'Which refers to a thing, here the article.' },
 ];
 
 // ─── ADAPTIVE ENGINE ─────────────────────────────────────────────────────────
@@ -355,6 +310,32 @@ function pct(c,t) { return t>0?Math.round(c/t*100):0; }
 function fmtTime(s) { const m=Math.floor(s/60); return `${m}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
 function getQsByTopic(tid) { return QS.filter(q=>q.topic===tid); }
 function getPool(tid,count,allQs=QS) { return shuffle(tid?allQs.filter(q=>q.topic===tid):allQs).slice(0,count); }
+function getAmirnetExam(allQs=QS) {
+  const used = new Set();
+  return AMIRNET_EXAM_PLAN.flatMap(section => {
+    const pool = allQs.filter(q => q.topic === section.topic && !used.has(q.id));
+    const selected = shuffle(pool).slice(0, section.count);
+    selected.forEach(q => used.add(q.id));
+    return selected.map((q, index) => ({
+      ...q,
+      examSection: section.id,
+      examSectionTitle: section.title,
+      sectionQuestion: index + 1,
+      sectionCount: section.count,
+      sectionSeconds: section.seconds,
+    }));
+  });
+}
+function textDirectionStyle(value, base={}) {
+  const text = String(value || '');
+  const hasHebrew = /[\u0590-\u05FF]/.test(text);
+  return {
+    ...base,
+    writingDirection: hasHebrew ? 'rtl' : 'ltr',
+    direction: hasHebrew ? 'rtl' : 'ltr',
+    textAlign: hasHebrew ? 'right' : 'left',
+  };
+}
 
 // ─── SHARED COMPONENTS ───────────────────────────────────────────────────────
 function KAV({children,style}) {
@@ -417,7 +398,7 @@ function AnswerOpt({text,index,selected,correctIdx,studyMode,onPress}) {
         {answered&&studyMode&&isCorrect&&<Icon name="checkmark-circle" size={20} color={C.success}/>}
         {answered&&studyMode&&isWrong&&<Icon name="close-circle" size={20} color={C.danger}/>}
         {(!answered||!studyMode)&&<View style={{width:6,height:6,borderRadius:3,backgroundColor:isSelected?C.primary:C.border,marginLeft:4}}/>}
-        <Text style={{flex:1,textAlign:'right',fontSize:15,color:answered&&studyMode&&isWrong?C.danger:C.text,marginHorizontal:10,lineHeight:23}}>{text}</Text>
+        <Text style={textDirectionStyle(text,{flex:1,fontSize:15,color:answered&&studyMode&&isWrong?C.danger:C.text,marginHorizontal:10,lineHeight:23})}>{text}</Text>
         <View style={[S.optLetter,{backgroundColor:letterBg}]}>
           <Text style={{fontSize:13,fontWeight:'800',color:letterColor}}>{letters[index]}</Text>
         </View>
@@ -437,7 +418,7 @@ function PassageCard({passage}) {
       </TouchableOpacity>
       <Text style={{fontWeight:'700',color:C.primary,fontSize:13}}>📄 קטע קריאה</Text>
     </Row>
-    <Text style={{textAlign:'right',fontSize:13,color:C.text,lineHeight:21}} numberOfLines={expanded?undefined:3}>{passage}</Text>
+    <Text style={textDirectionStyle(passage,{fontSize:13,color:C.text,lineHeight:21})} numberOfLines={expanded?undefined:3}>{passage}</Text>
   </Card>;
 }
 
@@ -471,14 +452,14 @@ function ReviewRow({q,idx,sel}) {
             <Text style={{fontSize:11,fontWeight:'700',color:C.muted}}>{idx+1}</Text>
           </View>
         </Row>
-        <Text style={{flex:1,textAlign:'right',fontSize:13,marginHorizontal:8}} numberOfLines={open?undefined:2}>{q.q}</Text>
+        <Text style={textDirectionStyle(q.q,{flex:1,fontSize:13,marginHorizontal:8})} numberOfLines={open?undefined:2}>{q.q}</Text>
       </Row>
     </TouchableOpacity>
     {open&&<View style={{marginTop:10,paddingTop:10,borderTopWidth:1,borderTopColor:C.border}}>
-      {q.type==='reading'&&<Text style={{textAlign:'right',fontSize:11,color:C.muted,marginBottom:6,fontStyle:'italic'}}>{q.passage}</Text>}
-      {sel!==undefined&&sel!==q.a&&<Text style={{textAlign:'right',fontSize:12,color:C.danger,marginBottom:3}}>תשובתך: {q.opts[sel]}</Text>}
-      <Text style={{textAlign:'right',fontSize:12,fontWeight:'700',color:C.success,marginBottom:3}}>✓ {q.opts[q.a]}</Text>
-      <Text style={{textAlign:'right',fontSize:12,color:C.muted}}>{q.exp}</Text>
+      {q.type==='reading'&&<Text style={textDirectionStyle(q.passage,{fontSize:11,color:C.muted,marginBottom:6,fontStyle:'italic'})}>{q.passage}</Text>}
+      {sel!==undefined&&sel!==q.a&&<Text style={textDirectionStyle(q.opts[sel],{fontSize:12,color:C.danger,marginBottom:3})}>Your answer: {q.opts[sel]}</Text>}
+      <Text style={textDirectionStyle(q.opts[q.a],{fontSize:12,fontWeight:'700',color:C.success,marginBottom:3})}>✓ {q.opts[q.a]}</Text>
+      <Text style={textDirectionStyle(q.exp,{fontSize:12,color:C.muted})}>{q.exp}</Text>
     </View>}
   </Card>;
 }
@@ -514,7 +495,7 @@ function OnboardingScreen({onDone}) {
                 <Text style={{fontSize:58}}>🌐</Text>
               </View>
               <Text style={{fontSize:30,fontWeight:'900',color:'#fff',textAlign:'center',letterSpacing:0.3}}>AmirNet Plus</Text>
-              <Text style={{fontSize:14,color:'#93c5fd',textAlign:'center',marginTop:8,lineHeight:21}}>הכנה מקצועית לבחינת אמירנט IT</Text>
+              <Text style={{fontSize:14,color:'#93c5fd',textAlign:'center',marginTop:8,lineHeight:21}}>הכנה מקצועית לבחינת אמירנט</Text>
             </View>
             <View style={{gap:10,marginBottom:36}}>
               {features.map(f=>(
@@ -578,7 +559,7 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout}) {
         </View>
         <Col>
           <Text style={{fontSize:22,fontWeight:'900',color:'#fff'}}>שלום, {prog.userName||'לומד'} 👋</Text>
-          <Text style={{fontSize:12,color:'#93c5fd',marginTop:2}}>הכנה לבחינת אמירנט IT</Text>
+          <Text style={{fontSize:12,color:'#93c5fd',marginTop:2}}>הכנה לבחינת אמירנט</Text>
         </Col>
       </Row>
       {/* Daily Goal inside header */}
@@ -696,11 +677,12 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout}) {
 
 // ─── QUIZ SETUP ───────────────────────────────────────────────────────────────
 function QuizSetupScreen({onStart}) {
-  const [count,setCount]=useState(10);
+  const [count,setCount]=useState(AMIRNET_FULL_EXAM_COUNT);
   const [topic,setTopic]=useState(null);
   const [mode,setMode]=useState('exam');
-  const [timerMin,setTimerMin]=useState(0);
+  const [timerMin,setTimerMin]=useState(39);
   const [adaptive,setAdaptive]=useState(false);
+  const [realExam,setRealExam]=useState(true);
   return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:USER_PB}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>הגדרות בחינה</Text>
     <View style={{backgroundColor:C.primary,borderRadius:22,padding:18,marginBottom:16,...shadow(1.5)}}>
@@ -710,19 +692,32 @@ function QuizSetupScreen({onStart}) {
         </View>
         <Col style={{alignItems:'flex-end',flex:1,paddingRight:12}}>
           <Text style={{fontSize:20,fontWeight:'900',color:'#fff'}}>בחינת אמירנט</Text>
-          <Text style={{fontSize:12,color:'#93c5fd',marginTop:3}}>הגדר את הבחינה והתחל</Text>
+          <Text style={{fontSize:12,color:'#93c5fd',marginTop:3}}>סימולציה באנגלית לפי מבנה אמירנט</Text>
         </Col>
       </Row>
     </View>
 
-    <Sec title="מספר שאלות"/>
+    <Card style={{marginBottom:14,borderWidth:2,borderColor:realExam?C.primary:C.border,backgroundColor:realExam?'#eff6ff':C.card}}>
+      <Row style={{justifyContent:'space-between'}}>
+        <Switch value={realExam} onValueChange={v=>{setRealExam(v); if(v){setCount(AMIRNET_FULL_EXAM_COUNT);setTimerMin(39);setTopic(null);setAdaptive(false);setMode('exam');}}}
+          trackColor={{false:C.border,true:C.primary}} thumbColor="#fff"/>
+        <Col style={{alignItems:'flex-end',flex:1,paddingRight:12}}>
+          <Text style={{fontSize:15,fontWeight:'900',color:C.primary}}>סימולציית אמירנט מלאה</Text>
+          <Text style={{fontSize:12,color:C.muted,textAlign:'right',lineHeight:19}}>
+            39 דקות · {AMIRNET_FULL_EXAM_COUNT} שאלות · 6 פרקים: השלמת משפטים, ניסוח מחדש והבנת הנקרא
+          </Text>
+        </Col>
+      </Row>
+    </Card>
+
+    {!realExam&&<><Sec title="מספר שאלות"/>
     <Row style={{gap:8,marginBottom:16}}>
-      {[10,20,30,50].map(n=><TouchableOpacity key={n} style={[S.cntBtn,count===n&&S.cntBtnOn]} onPress={()=>setCount(n)}>
+      {[10,20,23,30,50].map(n=><TouchableOpacity key={n} style={[S.cntBtn,count===n&&S.cntBtnOn]} onPress={()=>setCount(n)}>
         <Text style={[S.cntTxt,count===n&&{color:'#fff'}]}>{n}</Text>
       </TouchableOpacity>)}
-    </Row>
+    </Row></>}
 
-    <Sec title="מצב"/>
+    {!realExam&&<><Sec title="מצב"/>
     <Row style={{gap:10,marginBottom:16}}>
       {[{v:'exam',icon:'timer-outline',t:'בחינה',s:'תוצאות בסוף'},
         {v:'study',icon:'bulb-outline',t:'לימוד',s:'הסבר אחרי כל שאלה'}].map(m=>
@@ -732,10 +727,10 @@ function QuizSetupScreen({onStart}) {
           <Text style={{fontSize:11,color:C.muted,textAlign:'center',marginTop:2}}>{m.s}</Text>
         </TouchableOpacity>
       )}
-    </Row>
+    </Row></>}
 
     {/* Adaptive toggle */}
-    <Card style={{marginBottom:12}}>
+    {!realExam&&<Card style={{marginBottom:12}}>
       <Row style={{justifyContent:'space-between'}}>
         <Switch value={adaptive} onValueChange={setAdaptive} trackColor={{false:C.border,true:C.purple}} thumbColor="#fff"/>
         <Col style={{alignItems:'flex-end'}}>
@@ -743,18 +738,18 @@ function QuizSetupScreen({onStart}) {
           <Text style={{fontSize:11,color:C.muted}}>קושי מתאים אוטומטית לרמתך</Text>
         </Col>
       </Row>
-    </Card>
+    </Card>}
 
-    {mode==='exam'&&<>
+    {!realExam&&mode==='exam'&&<>
       <Sec title="טיימר"/>
       <Row style={{gap:8,marginBottom:16}}>
-        {[0,10,20,30,45].map(n=><TouchableOpacity key={n} style={[S.cntBtn,timerMin===n&&S.cntBtnOn]} onPress={()=>setTimerMin(n)}>
+        {[0,10,20,30,39,45].map(n=><TouchableOpacity key={n} style={[S.cntBtn,timerMin===n&&S.cntBtnOn]} onPress={()=>setTimerMin(n)}>
           <Text style={[S.cntTxt,timerMin===n&&{color:'#fff'}]}>{n===0?'ללא':`${n}′`}</Text>
         </TouchableOpacity>)}
       </Row>
     </>}
 
-    <Sec title="נושא"/>
+    {!realExam&&<><Sec title="נושא"/>
     {[null,...TOPICS].map((t,i)=>{
       const isAll=t===null; const sel=topic===(isAll?null:t?.id);
       return <TouchableOpacity key={i} style={[S.topicOpt,sel&&S.topicOptOn]} onPress={()=>setTopic(isAll?null:t.id)}>
@@ -772,16 +767,17 @@ function QuizSetupScreen({onStart}) {
         </Row>
       </TouchableOpacity>;
     })}
-    <TouchableOpacity style={[S.btn,{marginTop:8}]} onPress={()=>onStart({count,topic,mode,timer:mode==='exam'?timerMin*60:0,adaptive})}>
+    </>}
+    <TouchableOpacity style={[S.btn,{marginTop:8}]} onPress={()=>onStart({count,topic,mode,timer:realExam?AMIRNET_FULL_EXAM_SECONDS:(mode==='exam'?timerMin*60:0),adaptive,realExam})}>
       <Icon name="play" size={17} color="#fff"/>
-      <Text style={[S.btnTxt,{marginRight:8}]}>התחל בחינה</Text>
+      <Text style={[S.btnTxt,{marginRight:8}]}>{realExam?'התחל סימולציית אמירנט':'התחל תרגול'}</Text>
     </TouchableOpacity>
   </ScrollView>;
 }
 
 // ─── QUIZ ENGINE SCREEN ───────────────────────────────────────────────────────
 function QuizScreen({config,dispatch,onFinish,allQs=QS,passGrade=70}) {
-  const [questions,setQuestions] = useState(()=>config.adaptive?[AdaptiveEngine.selectNext(0,[],allQs,config.topic)].filter(Boolean):getPool(config.topic,config.count,allQs));
+  const [questions,setQuestions] = useState(()=>config.realExam?getAmirnetExam(allQs):(config.adaptive?[AdaptiveEngine.selectNext(0,[],allQs,config.topic)].filter(Boolean):getPool(config.topic,config.count,allQs)));
   const [idx,setIdx] = useState(0);
   const [answers,setAnswers] = useState({});
   const [selected,setSelected] = useState(null);
@@ -892,7 +888,10 @@ function QuizScreen({config,dispatch,onFinish,allQs=QS,passGrade=70}) {
           {q.type==='restatement'&&<View style={{backgroundColor:C.purpleLight,borderRadius:10,paddingHorizontal:10,paddingVertical:5,marginBottom:8,alignSelf:'flex-end'}}>
             <Text style={{fontSize:11,color:C.purple,fontWeight:'700'}}>🔁 בחר את ההצהרה השקולה</Text>
           </View>}
-          <Text style={{fontSize:17,fontWeight:'700',textAlign:'right',color:C.text,lineHeight:28}}>{q.q}</Text>
+          {q.examSectionTitle&&<Text style={{fontSize:11,color:C.primary,fontWeight:'800',textAlign:'right',marginBottom:8}}>
+            {q.examSectionTitle} · שאלה {q.sectionQuestion}/{q.sectionCount}
+          </Text>}
+          <Text style={textDirectionStyle(q.q,{fontSize:17,fontWeight:'700',color:C.text,lineHeight:28})}>{q.q}</Text>
         </Card>
         {q.opts.map((opt,i)=><AnswerOpt key={i} text={opt} index={i} selected={selected} correctIdx={q.a} studyMode={config.mode==='study'} onPress={handleSelect}/>)}
         {config.mode==='study'&&showExp&&<View style={{backgroundColor:'#fffbeb',borderRadius:16,padding:14,borderWidth:1.5,borderColor:C.warning+'60',marginTop:10,...shadow(0.6)}}>
@@ -900,7 +899,7 @@ function QuizScreen({config,dispatch,onFinish,allQs=QS,passGrade=70}) {
             <Text style={{fontWeight:'800',color:C.warning,fontSize:14}}>הסבר</Text>
             <Text style={{fontSize:16}}>💡</Text>
           </Row>
-          <Text style={{textAlign:'right',fontSize:14,color:C.text,lineHeight:23}}>{q.exp}</Text>
+          <Text style={textDirectionStyle(q.exp,{fontSize:14,color:C.text,lineHeight:23})}>{q.exp}</Text>
         </View>}
       </Animated.View>
     </ScrollView>
@@ -1231,7 +1230,7 @@ function AuthScreen({gsData,onLogin,onRegister}) {
           </View>
         </View>
         <Text style={{fontSize:28,fontWeight:'900',color:'#fff',letterSpacing:0.3}}>AmirNet Plus</Text>
-        <Text style={{fontSize:13,color:'#93c5fd',marginTop:5}}>הכנה מקצועית לבחינת אמירנט IT</Text>
+        <Text style={{fontSize:13,color:'#93c5fd',marginTop:5}}>הכנה מקצועית לבחינת אמירנט</Text>
       </View>
       {/* Form Card */}
       <View style={{flex:1,backgroundColor:C.bg,borderTopLeftRadius:32,borderTopRightRadius:32}}>
@@ -1845,12 +1844,11 @@ function AdminUsers({gsData,setGsData}) {
 
 // ─── AI HELPERS + AUTO-DETECT ────────────────────────────────────────────────
 const TOPIC_KEYWORDS = {
-  networking:       ['רשת','subnet','vlan','router','switch','osi','tcp','udp','dhcp','dns','nat','cidr','bgp','ospf','routing','ip','ping','arp','mac','bandwidth','latency','wan','lan','wifi','ethernet','packet','frame','hub','bridge','firewall','load balance','port','topology','mesh','ring','bus','star'],
-  security:         ['אבטחה','הצפנה','ssl','tls','vpn','ddos','dos','mitm','phishing','malware','ransomware','antivirus','אנטי','hash','md5','sha','rsa','aes','certificate','סיסמה','password','authentication','2fa','mfa','penetration','vulnerability','exploit','patch','cve','waf','ids','ips','siem'],
-  operatingSystems: ['windows','linux','unix','active directory','ad','gpo','group policy','raid','ntfs','fat','registry','powershell','bash','kernel','process','thread','driver','boot','bios','uefi','hypervisor','virtualization','vm','hyper-v','permission','acl','user account','domain','forest','ou','ldap'],
-  cloud:            ['cloud','aws','azure','gcp','google cloud','s3','ec2','iam','fargate','ecs','eks','lambda','serverless','container','docker','kubernetes','k8s','devops','ci/cd','paas','saas','iaas','availability zone','region','cdn','cloudfront','load balancer','auto scaling','blob','bucket'],
-  itManagement:     ['ניהול','helpdesk','sla','ticketing','itil','itsm','change management','incident','problem','cmdb','asset','service desk','kpi','slo','rto','rpo','disaster recovery','bcm','onboarding','offboarding','procurement','license','vendor','budget'],
-  protocols:        ['protocol','http','https','ftp','sftp','smtp','pop3','imap','ssh','telnet','snmp','icmp','ntp','radius','tacacs','kerberos','oauth','saml','ldap','sip','voip','rtp','ppp','frame relay','mpls','bgp','ospf','rip','eigrp'],
+  sentenceCompletion: ['sentence completion','complete','blank','context','although','despite','however','therefore','vocabulary','meaning','collocation','phrase','word'],
+  restatement: ['restatement','rephrase','equivalent','same meaning','best restates','meaning','paraphrase','although','despite','no sooner','rather than'],
+  reading: ['reading','passage','paragraph','main idea','according to','author','infer','imply','purpose','tone','text'],
+  vocabulary: ['synonym','closest meaning','word','vocabulary','definition','meaning','rare','brief','purchase','scarce'],
+  grammarContext: ['grammar','clause','which','who','if','condition','tense','relative','correct option','context'],
 };
 function detectTopic(text) {
   const lower = (text||'').toLowerCase();
@@ -1871,24 +1869,24 @@ function detectDifficulty(questionText, opts=[]) {
 }
 const Q_TEMPLATES = [
   {label:'השוואה',icon:'🔄',q:'מה ההבדל בין {A} ל-{B}?',opts:['{A} מהיר יותר, {B} אמין יותר','{A} פועל בשכבה X; {B} בשכבה Y','{A} ו-{B} זהים','אין הבדל משמעותי'],a:1,exp:''},
-  {label:'הגדרה',icon:'📖',q:'מה הוא {TERM}?',opts:['הגדרה נכונה','הגדרה שגויה א','הגדרה שגויה ב','הגדרה שגויה ג'],a:0,exp:''},
+  {label:'הגדרה',icon:'📖',q:'Choose the best answer for {TERM}?',opts:['הגדרה נכונה','הגדרה שגויה א','הגדרה שגויה ב','הגדרה שגויה ג'],a:0,exp:''},
   {label:'תפקיד',icon:'⚙️',q:'מה תפקידו של {COMPONENT}?',opts:['תפקיד נכון','תפקיד לא נכון א','תפקיד לא נכון ב','תפקיד לא נכון ג'],a:0,exp:''},
   {label:'פורט/מספר',icon:'🔢',q:'באיזה פורט משתמש {PROTOCOL}?',opts:['פורט נכון','פורט שגוי א','פורט שגוי ב','פורט שגוי ג'],a:0,exp:''},
-  {label:'תרחיש',icon:'🏗️',q:'מנהל רשת צריך ל... מה הפתרון הנכון?',opts:['פתרון נכון','פתרון שגוי א','פתרון שגוי ב','פתרון שגוי ג'],a:0,exp:''},
+  {label:'אמירנט',icon:'📘',q:'Choose the word that best completes the sentence: The scientist repeated the experiment to ensure the results were ____.',opts:['reliable','temporary','silent','ordinary'],a:0,exp:'Reliable means trustworthy.'},
 ];
 const AI_AGENTS = [
   { id:'curriculum', icon:'📚', name:'מומחה תכנית לימודים', color:'#1e40af',
     desc:'שאלות מקיפות המכסות מושגי יסוד',
-    sysPrompt:'אתה מומחה לתכנית הלימודים של בחינת אמירנט IT. צור שאלות שמכסות את המושגים החשובים ביותר בצורה ברורה ומדויקת. הדגש הבנת מושגים, לא שינון.' },
+    sysPrompt:'אתה מומחה לתכנית הלימודים של בחינת אמירנט. צור שאלות שמכסות את המושגים החשובים ביותר בצורה ברורה ומדויקת. הדגש הבנת מושגים, לא שינון.' },
   { id:'examwriter', icon:'📝', name:'כותב בחינות', color:'#7c3aed',
     desc:'שאלות בחינה עם הסחות דעת מציאותיות',
-    sysPrompt:'אתה כותב בחינות מקצועי לבחינת הסמכה IT. צור שאלות מאתגרות עם אפשרויות שגיאה מציאותיות ("הסחות דעת") שבוחנות הבנה אמיתית ולא ניחוש. הסחות הדעת חייבות להיות הגיוניות אבל שגויות.' },
+    sysPrompt:'אתה כותב בחינות מקצועי לבחינת אמירנט. צור שאלות מאתגרות עם אפשרויות שגיאה מציאותיות ("הסחות דעת") שבוחנות הבנה אמיתית ולא ניחוש. הסחות הדעת חייבות להיות הגיוניות אבל שגויות.' },
   { id:'scenario', icon:'🏗️', name:'בונה תרחישים', color:'#0891b2',
     desc:'שאלות מבוססות תרחישים ומקרי מבחן',
-    sysPrompt:'אתה מומחה לשאלות מבוססות תרחישים. צור שאלות שמציגות סיטואציה מציאותית מעולם ה-IT ושואלות מה צריך לעשות. השאלות צריכות להיות פרקטיות ורלוונטיות לעבודה אמיתית.' },
+    sysPrompt:'אתה מומחה לשאלות מבוססות תרחישים. צור שאלות שמציגות סיטואציה מציאותית מעולם האנגלית האקדמית והכללית ושואלות מה צריך לעשות. השאלות צריכות להיות פרקטיות ורלוונטיות לעבודה אמיתית.' },
   { id:'difficulty', icon:'🎯', name:'מכייל קושי', color:'#16a34a',
     desc:'שאלות מכוילות במדויק לרמת קושי',
-    sysPrompt:'אתה מומחה לכיול קושי בבחינות IT. צור שאלות שמתאימות בדיוק לרמת הקושי המבוקשת: קל=מושגים בסיסיים, בינוני=יישום, מתקדם=אנליזה, מומחה=סינתזה ופתרון בעיות מורכבות.' },
+    sysPrompt:'אתה מומחה לכיול קושי בבחינות אמירנט. צור שאלות שמתאימות בדיוק לרמת הקושי המבוקשת: קל=מושגים בסיסיים, בינוני=יישום, מתקדם=אנליזה, מומחה=סינתזה ופתרון בעיות מורכבות.' },
 ];
 
 async function callAnthropicAPI(apiKey, messages, maxTokens=3000) {
@@ -1931,7 +1929,7 @@ ${instructions?`הוראות נוספות: ${instructions}`:''}
 פורמט מדויק:
 [
   {
-    "q": "מה הוא... ?",
+    "q": "Choose the best answer for... ?",
     "opts": ["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
     "a": 0,
     "exp": "הסבר קצר לתשובה הנכונה",
@@ -1952,7 +1950,7 @@ function parseImportText(raw) {
       return {ok:true, questions:arr.filter(q=>q.q&&Array.isArray(q.opts)).map((q,i)=>({
         id:`imp_${Date.now()}_${i}`, q:q.q, opts:q.opts.slice(0,4),
         a:Math.min(q.a||0,3), exp:q.exp||'', diff:q.diff||'intermediate',
-        topic:q.topic||'networking', type:q.type||'mc', custom:true, vs:0.5,
+        topic:q.topic||'sentenceCompletion', type:q.type||'mc', custom:true, vs:0.5,
       })), errors:[]};
     } catch(e) { return {ok:false,questions:[],errors:[`JSON שגוי: ${e.message}`]}; }
   }
@@ -1966,13 +1964,13 @@ function parseImportText(raw) {
     const opts=[get('א:')||get('A:'),get('ב:')||get('B:'),get('ג:')||get('C:'),get('ד:')||get('D:')];
     const ansStr=get('תשובה:')||get('Answer:');
     const exp=get('הסבר:')||get('Exp:')||'';
-    const topic=get('נושא:')||get('Topic:')||'networking';
+    const topic=get('נושא:')||get('Topic:')||'sentenceCompletion';
     const diff=get('קושי:')||get('Diff:')||'intermediate';
     if(!q){errors.push(`בלוק ${bi+1}: חסרה שאלה`);return;}
     if(opts.some(o=>!o)){errors.push(`בלוק ${bi+1}: חסרות תשובות`);return;}
     const ansMap={א:0,ב:1,ג:2,ד:3,A:0,B:1,C:2,D:3,'0':0,'1':1,'2':2,'3':3};
     const a=ansStr?ansMap[ansStr.charAt(0)]??0:0;
-    const topicId=TOPICS.find(t=>t.name===topic||t.id===topic)?.id||'networking';
+    const topicId=TOPICS.find(t=>t.name===topic||t.id===topic)?.id||'sentenceCompletion';
     const diffId=['beginner','intermediate','advanced','expert'].includes(diff)?diff:'intermediate';
     questions.push({id:`imp_${Date.now()}_${bi}`,q,opts,a,exp,topic:topicId,diff:diffId,type:'mc',custom:true,vs:0.5});
   });
@@ -1988,12 +1986,12 @@ function AdminQuestions({gsData,setGsData}) {
   const [editingId,setEditingId]=useState(null);
   const [previewQ,setPreviewQ]=useState(null);
   const [search,setSearch]=useState('');
-  const EMPTY={topic:'networking',diff:'intermediate',type:'mc',q:'',opts:['','','',''],a:0,exp:'',passage:''};
+  const EMPTY={topic:'sentenceCompletion',diff:'intermediate',type:'mc',q:'',opts:['','','',''],a:0,exp:'',passage:''};
   const [form,setForm]=useState(EMPTY);
 
   // AI state
   const [aiAgent,setAiAgent]=useState(AI_AGENTS[0]);
-  const [aiTopic,setAiTopic]=useState('networking');
+  const [aiTopic,setAiTopic]=useState('sentenceCompletion');
   const [aiDiff,setAiDiff]=useState('intermediate');
   const [aiCount,setAiCount]=useState(5);
   const [aiInstructions,setAiInstructions]=useState('');
@@ -2010,7 +2008,7 @@ function AdminQuestions({gsData,setGsData}) {
 
   function saveQ(){
     if(!form.q.trim()||form.opts.some(o=>!o.trim())){Alert.alert('שגיאה','מלא את כל השדות');return;}
-    const finalTopic=form.topic||(detectTopic(form.q+' '+form.opts.join(' '))||'networking');
+    const finalTopic=form.topic||(detectTopic(form.q+' '+form.opts.join(' '))||'sentenceCompletion');
     const finalDiff=form.diff||detectDifficulty(form.q,form.opts);
     const finalForm={...form,topic:finalTopic,diff:finalDiff};
     if(editingId){
@@ -2498,8 +2496,8 @@ function AdminQuestions({gsData,setGsData}) {
           <Text style={{textAlign:'right',fontWeight:'700',fontSize:13,color:C.primary,marginBottom:6}}>פורמט {importFormat==='json'?'JSON':'טקסט'}</Text>
           <Text style={{textAlign:'left',fontSize:11,color:C.muted,fontFamily:'monospace',lineHeight:17}}>
             {importFormat==='json'
-              ? `[\n  {\n    "q": "מה הוא VLAN?",\n    "opts": ["תשובה א","תשובה ב","תשובה ג","תשובה ד"],\n    "a": 0,\n    "exp": "הסבר",\n    "topic": "networking",\n    "diff": "intermediate"\n  }\n]`
-              : `שאלה: מה הוא VLAN?\nא: תשובה א\nב: תשובה ב\nג: תשובה ג\nד: תשובה ד\nתשובה: א\nהסבר: הסבר קצר\nנושא: networking\nקושי: intermediate\n---\nשאלה: שאלה נוספת...`}
+              ? `[\n  {\n    "q": "Choose the best answer for sentence completion?",\n    "opts": ["תשובה א","תשובה ב","תשובה ג","תשובה ד"],\n    "a": 0,\n    "exp": "הסבר",\n    "topic": "sentenceCompletion",\n    "diff": "intermediate"\n  }\n]`
+              : `שאלה: Choose the best answer for sentence completion?\nא: תשובה א\nב: תשובה ב\nג: תשובה ג\nד: תשובה ד\nתשובה: א\nהסבר: הסבר קצר\nנושא: sentenceCompletion\nקושי: intermediate\n---\nשאלה: שאלה נוספת...`}
           </Text>
         </Card>
 
@@ -2841,7 +2839,7 @@ function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
     Alert.alert(`דוח ביצועים (${students.length} סטודנטים)`,students.length===0?'אין סטודנטים':students.map(u=>`${u.name}(@${u.username}): ${pct(u.prog?.totalCorrect||0,u.prog?.totalAnswered||1)}% | ${u.prog?.totalAnswered||0} שאלות${u.blocked?' [חסום]':''}`).join('\n'));
   }
 
-  const sections=[{id:'general',label:'כללי',icon:'settings-outline'},{id:'exam',label:'בחינות',icon:'school-outline'},{id:'security',label:'אבטחה',icon:'shield-outline'},{id:'data',label:'נתונים',icon:'server-outline'}];
+  const sections=[{id:'general',label:'כללי',icon:'settings-outline'},{id:'exam',label:'בחינות',icon:'school-outline'},{id:'restatement',label:'הרשאות',icon:'shield-outline'},{id:'data',label:'נתונים',icon:'server-outline'}];
 
   return <KAV style={{flex:1}}>
     <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled">
@@ -2933,7 +2931,7 @@ function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
         </TouchableOpacity>
       </>}
 
-      {sec==='security'&&<>
+      {sec==='restatement'&&<>
         <Sec title="מפתח Anthropic API 🤖"/>
         <Card style={{marginBottom:12}}>
           <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:8,lineHeight:18}}>נדרש ליצירת שאלות אוטומטית. קבל מפתח בכתובת console.anthropic.com</Text>
@@ -3332,7 +3330,7 @@ function AdminReports({gsData}) {
 // ─── ADMIN: AI TOOLS ──────────────────────────────────────────────────────────
 function AdminAITools({gsData,setGsData}) {
   const [agent,setAgent]=useState(AI_AGENTS[0]);
-  const [topic,setTopic]=useState('networking');
+  const [topic,setTopic]=useState('sentenceCompletion');
   const [diff,setDiff]=useState('intermediate');
   const [count,setCount]=useState(5);
   const [instructions,setInstructions]=useState('');
@@ -3566,8 +3564,8 @@ function AdminAITools({gsData,setGsData}) {
         <Text style={{textAlign:'right',fontWeight:'800',fontSize:13,color:C.primary,marginBottom:8}}>פורמט {importFormat==='json'?'JSON':'טקסט'}</Text>
         <Text style={{textAlign:'left',fontSize:10,color:C.muted,lineHeight:16}}>
           {importFormat==='json'
-            ? `[\n  { "q":"שאלה", "opts":["א","ב","ג","ד"],\n    "a":0, "exp":"הסבר",\n    "topic":"networking", "diff":"intermediate" }\n]`
-            : `שאלה: מה הוא ...\nא: ...\nב: ...\nג: ...\nד: ...\nתשובה: א\nהסבר: ...\nנושא: networking\nקושי: intermediate\n---\nשאלה: שאלה נוספת...`}
+            ? `[\n  { "q":"שאלה", "opts":["א","ב","ג","ד"],\n    "a":0, "exp":"הסבר",\n    "topic":"sentenceCompletion", "diff":"intermediate" }\n]`
+            : `שאלה: Choose the best word...\nא: ...\nב: ...\nג: ...\nד: ...\nתשובה: א\nהסבר: ...\nנושא: sentenceCompletion\nקושי: intermediate\n---\nשאלה: שאלה נוספת...`}
         </Text>
       </Card>
       <TextInput style={[S.inp,{height:180,textAlignVertical:'top',marginBottom:10}]}
@@ -3692,7 +3690,14 @@ const LOG_TYPES={
   ai_gen:{icon:'🤖',label:'AI',color:C.purple},
 };
 function AdminExams({gsData,setGsData}) {
-  const TOPICS=[{id:'t1',label:'חשבון',emoji:'🔢'},{id:'t2',label:'אלגברה',emoji:'📐'},{id:'t3',label:'גאומטריה',emoji:'📏'},{id:'t4',label:'סטטיסטיקה',emoji:'📊'},{id:'t5',label:'מילולי',emoji:'💬'},{id:'t6',label:'לוגיקה',emoji:'🧠'}];
+  const TOPICS=[
+    {id:'t1',label:'Sentence Completion',emoji:'✍️'},
+    {id:'t2',label:'Restatement',emoji:'🔁'},
+    {id:'t3',label:'Reading',emoji:'📖'},
+    {id:'t4',label:'Vocabulary',emoji:'🧠'},
+    {id:'t5',label:'Grammar in Context',emoji:'🧩'},
+    {id:'t6',label:'Full Amirnet Simulation',emoji:'🎯'}
+  ];
   const [view,setView]=useState('list'); // list | add | edit
   const [editId,setEditId]=useState(null);
   const [form,setForm]=useState({name:'',desc:'',topics:[],difficulty:'all',count:10,timer:30,passGrade:70,assignedTo:'all',assignedGroup:'',assignedUser:'',active:true});
