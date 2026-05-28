@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useReducer, useCallback, useRef } from 'react';
+import 'react-native-url-polyfill/auto';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
   Dimensions, Platform, Alert, Switch, TextInput, StatusBar, Animated,
   KeyboardAvoidingView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { createClient } from '@supabase/supabase-js';
 
 const { width: W, height: H } = Dimensions.get('window');
 const isIOS = Platform.OS === 'ios';
@@ -21,6 +23,39 @@ const Store = {
   set: (k, v) => {
     if (_AS) return _AS.setItem(k, v);
     try { if (typeof localStorage !== 'undefined') localStorage.setItem(k, v); } catch(_) {}
+  },
+};
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = SUPABASE_URL && SUPABASE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
+  })
+  : null;
+const cloudEnabled = !!supabase;
+const CloudStore = {
+  get: async key => {
+    if(!supabase) return Store.get(key);
+    try {
+      const {data,error} = await supabase.from('app_state').select('data').eq('key',key).maybeSingle();
+      if(error) throw error;
+      if(data?.data) return JSON.stringify(data.data);
+    } catch(err) {
+      console.warn('Supabase load failed, using local cache', err?.message || err);
+    }
+    return Store.get(key);
+  },
+  set: async (key,value) => {
+    Store.set(key,value);
+    if(!supabase) return;
+    try {
+      const parsed=JSON.parse(value);
+      const {error}=await supabase.from('app_state').upsert({key,data:parsed},{onConflict:'key'});
+      if(error) throw error;
+    } catch(err) {
+      console.warn('Supabase save failed, kept local cache', err?.message || err);
+    }
   },
 };
 
@@ -4217,6 +4252,9 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
           <View style={{backgroundColor:'rgba(255,255,255,0.1)',borderRadius:10,paddingHorizontal:8,paddingVertical:3}}>
             <Text style={{color:'#93c5fd',fontSize:10,fontWeight:'700'}}>v3.0</Text>
           </View>
+          <View style={{backgroundColor:cloudEnabled?'rgba(34,197,94,0.18)':'rgba(148,163,184,0.18)',borderRadius:10,paddingHorizontal:8,paddingVertical:3}}>
+            <Text style={{color:cloudEnabled?'#bbf7d0':'#cbd5e1',fontSize:10,fontWeight:'800'}}>{cloudEnabled?'Supabase':'Local'}</Text>
+          </View>
         </Row>
         <Row style={{flex:0,gap:8}}>
           <Text style={{color:'#fde68a',fontSize:13,fontWeight:'800'}}>{currentUser.name}</Text>
@@ -4275,10 +4313,11 @@ export default function App() {
   const [prog,dispatch]=useReducer(reducer,INIT_PROG);
   const [tab,setTab]=useState('home');
   const [quiz,setQuiz]=useState(null);
+  const syncTimer=useRef(null);
   const go=useCallback(a=>dispatch(a),[]);
 
   useEffect(()=>{
-    Store.get('amirnet_v4').then(raw=>{
+    CloudStore.get('amirnet_v4').then(raw=>{
       if(raw){try{
         const saved=JSON.parse(raw);
         if(saved.gsData)setGsData(gd=>({...gd,...saved.gsData,groups:saved.gsData.groups||[],exams:saved.gsData.exams||[],settings:normalizeSettings(saved.gsData.settings)}));
@@ -4294,7 +4333,10 @@ export default function App() {
   useEffect(()=>{
     if(!loaded)return;
     const updatedGs=currentUser?{...gsData,users:gsData.users.map(u=>u.id===currentUser.id?{...u,prog}:u)}:gsData;
-    Store.set('amirnet_v4',JSON.stringify({gsData:updatedGs,currentUserId:currentUser?.id}));
+    const payload=JSON.stringify({gsData:updatedGs,currentUserId:currentUser?.id});
+    if(syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current=setTimeout(()=>CloudStore.set('amirnet_v4',payload),500);
+    return ()=>{if(syncTimer.current) clearTimeout(syncTimer.current);};
   },[gsData,prog,currentUser,loaded]);
 
   function handleLogin(username,password){

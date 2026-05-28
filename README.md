@@ -14,6 +14,20 @@ The admin Control Center also provides quick system locks, group broadcasts,
 at-risk student nudges, global daily-goal updates, and shortcuts into the main
 management screens.
 
+## Supabase
+
+This repo is linked to the `amirnetplus` Supabase project. Runtime cloud sync
+uses the `app_state` table created by the migration in `supabase/migrations`.
+
+Create a local `.env` from `.env.example`:
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-or-publishable-key
+```
+
+If these values are missing, the app falls back to local device storage.
+
 ## Run
 
 ```bash

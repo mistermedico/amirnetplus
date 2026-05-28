@@ -6,6 +6,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 expo-web.*.log
+.env
+.env.*
+!.env.example
+.supabase-db-password.tmp
 .DS_Store
 *.jks
 *.p8
