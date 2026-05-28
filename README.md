@@ -7,6 +7,10 @@ Reading Comprehension, vocabulary, and grammar in context. The full simulation
 mode is built as a 39-minute, 6-section exam with English prompts shown LTR and
 Hebrew interface text shown RTL.
 
+Admin controls include student registration, maintenance mode, pass grade,
+default daily goal, default timer/question count, and whether students may use
+free practice, adaptive practice, or only the full Amirnet simulation.
+
 ## Run
 
 ```bash

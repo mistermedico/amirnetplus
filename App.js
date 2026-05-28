@@ -63,6 +63,22 @@ const AMIRNET_EXAM_PLAN = [
 const AMIRNET_FULL_EXAM_SECONDS = AMIRNET_EXAM_PLAN.reduce((sum, p) => sum + p.seconds, 0);
 const AMIRNET_FULL_EXAM_COUNT = AMIRNET_EXAM_PLAN.reduce((sum, p) => sum + p.count, 0);
 
+const DEFAULT_SETTINGS = {
+  passGrade:70,
+  regEnabled:true,
+  aiApiKey:'',
+  maintenanceMode:false,
+  welcomeMsg:'',
+  defaultCount:AMIRNET_FULL_EXAM_COUNT,
+  defaultTimerMin:39,
+  defaultRealExam:true,
+  forceRealExam:false,
+  allowPractice:true,
+  studentCanUseAdaptive:true,
+  dailyGoalDefault:20,
+};
+const normalizeSettings = settings => ({...DEFAULT_SETTINGS,...(settings||{})});
+
 // type: 'mc' = sentence completion / vocabulary, 'reading' = passage + question, 'restatement' = equivalent sentence
 const QS = [
   { id:'sc1', type:'mc', topic:'sentenceCompletion', diff:'beginner', vs:0.76,
@@ -465,10 +481,10 @@ function ReviewRow({q,idx,sel}) {
 }
 
 // ─── ONBOARDING ──────────────────────────────────────────────────────────────
-function OnboardingScreen({onDone}) {
+function OnboardingScreen({onDone,settings=DEFAULT_SETTINGS}) {
   const [step,setStep]=useState(0);
   const [name,setName]=useState('');
-  const [goal,setGoal]=useState('20');
+  const [goal,setGoal]=useState(String(settings.dailyGoalDefault||20));
   const slideAnim=useRef(new Animated.Value(0)).current;
   function goStep(s){
     Animated.timing(slideAnim,{toValue:-W*(s),duration:260,useNativeDriver:true}).start();
@@ -540,8 +556,11 @@ function OnboardingScreen({onDone}) {
 }
 
 // ─── HOME SCREEN ─────────────────────────────────────────────────────────────
-function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout}) {
+function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout,settings=DEFAULT_SETTINGS}) {
   const tp = prog.topicProgress||{};
+  const appSettings = normalizeSettings(settings);
+  const allowPractice = appSettings.allowPractice !== false;
+  const allowAdaptive = allowPractice && appSettings.studentCanUseAdaptive !== false;
   const overall = pct(prog.totalCorrect,prog.totalAnswered);
   const todayAns = (prog.quizHistory||[]).filter(h=>new Date(h.date).toDateString()===new Date().toDateString()).reduce((s,h)=>s+h.total,0);
   const goalDone = todayAns>=prog.dailyGoal;
@@ -610,28 +629,28 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout}) {
     <Sec title="התחל עכשיו"/>
     <Row style={{gap:10,marginBottom:4}}>
       <TouchableOpacity style={{flex:1,backgroundColor:'#eff6ff',borderRadius:18,padding:14,alignItems:'center',borderWidth:1.5,borderColor:C.primary+'30',...shadow(0.8)}}
-        onPress={()=>onQuiz({count:10,topic:null,mode:'exam',timer:0,adaptive:false})} activeOpacity={0.8}>
+        onPress={()=>onQuiz({count:appSettings.defaultCount||AMIRNET_FULL_EXAM_COUNT,topic:null,mode:'exam',timer:(appSettings.defaultTimerMin||0)*60,adaptive:false,realExam:!allowPractice||appSettings.defaultRealExam})} activeOpacity={0.8}>
         <View style={{width:44,height:44,borderRadius:22,backgroundColor:C.primary,alignItems:'center',justifyContent:'center',marginBottom:8}}>
           <Icon name="play" size={22} color="#fff"/>
         </View>
-        <Text style={{fontWeight:'800',color:C.primary,fontSize:13}}>מהיר</Text>
-        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>10 שאלות</Text>
+        <Text style={{fontWeight:'800',color:C.primary,fontSize:13}}>{allowPractice?'מהיר':'סימולציה'}</Text>
+        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>{allowPractice?`${appSettings.defaultCount||10} שאלות`:'אמירנט מלא'}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={{flex:1,backgroundColor:'#fef2f2',borderRadius:18,padding:14,alignItems:'center',borderWidth:1.5,borderColor:C.danger+'30',...shadow(0.8)}}
-        onPress={()=>onQuiz({count:40,topic:null,mode:'exam',timer:45*60,adaptive:false})} activeOpacity={0.8}>
+        onPress={()=>onQuiz({count:AMIRNET_FULL_EXAM_COUNT,topic:null,mode:'exam',timer:AMIRNET_FULL_EXAM_SECONDS,adaptive:false,realExam:true})} activeOpacity={0.8}>
         <View style={{width:44,height:44,borderRadius:22,backgroundColor:C.danger,alignItems:'center',justifyContent:'center',marginBottom:8}}>
           <Icon name="school" size={22} color="#fff"/>
         </View>
         <Text style={{fontWeight:'800',color:C.danger,fontSize:13}}>מלא</Text>
-        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>40 שאלות • 45′</Text>
+        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>{AMIRNET_FULL_EXAM_COUNT} שאלות • 39′</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={{flex:1,backgroundColor:C.purpleLight,borderRadius:18,padding:14,alignItems:'center',borderWidth:1.5,borderColor:C.purple+'30',...shadow(0.8)}}
-        onPress={()=>onQuiz({count:20,topic:null,mode:'exam',timer:0,adaptive:true})} activeOpacity={0.8}>
+      <TouchableOpacity style={{flex:1,backgroundColor:allowAdaptive?C.purpleLight:C.fill,borderRadius:18,padding:14,alignItems:'center',borderWidth:1.5,borderColor:(allowAdaptive?C.purple:C.border)+'30',...shadow(0.8),opacity:allowAdaptive?1:0.55}}
+        onPress={()=>allowAdaptive?onQuiz({count:appSettings.defaultCount||20,topic:null,mode:'exam',timer:0,adaptive:true,realExam:false}):Alert.alert('נעול','המנהל כיבה תרגול אדפטיבי כרגע')} activeOpacity={0.8}>
         <View style={{width:44,height:44,borderRadius:22,backgroundColor:C.purple,alignItems:'center',justifyContent:'center',marginBottom:8}}>
           <Icon name="analytics" size={22} color="#fff"/>
         </View>
         <Text style={{fontWeight:'800',color:C.purple,fontSize:13}}>אדפטיבי</Text>
-        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>מתאים לרמה</Text>
+        <Text style={{fontSize:11,color:C.muted,marginTop:2}}>{allowAdaptive?'מתאים לרמה':'כבוי ע"י מנהל'}</Text>
       </TouchableOpacity>
     </Row>
 
@@ -676,13 +695,18 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout}) {
 }
 
 // ─── QUIZ SETUP ───────────────────────────────────────────────────────────────
-function QuizSetupScreen({onStart}) {
-  const [count,setCount]=useState(AMIRNET_FULL_EXAM_COUNT);
+function QuizSetupScreen({onStart,settings=DEFAULT_SETTINGS}) {
+  const appSettings = normalizeSettings(settings);
+  const allowPractice = appSettings.allowPractice !== false;
+  const forceRealExam = appSettings.forceRealExam || !allowPractice;
+  const allowAdaptive = allowPractice && appSettings.studentCanUseAdaptive !== false;
+  const defaultRealExam = forceRealExam || appSettings.defaultRealExam !== false;
+  const [count,setCount]=useState(defaultRealExam ? AMIRNET_FULL_EXAM_COUNT : (appSettings.defaultCount||10));
   const [topic,setTopic]=useState(null);
   const [mode,setMode]=useState('exam');
-  const [timerMin,setTimerMin]=useState(39);
+  const [timerMin,setTimerMin]=useState(appSettings.defaultTimerMin ?? 39);
   const [adaptive,setAdaptive]=useState(false);
-  const [realExam,setRealExam]=useState(true);
+  const [realExam,setRealExam]=useState(defaultRealExam);
   return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:USER_PB}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
     <Text style={S.pgTitle}>הגדרות בחינה</Text>
     <View style={{backgroundColor:C.primary,borderRadius:22,padding:18,marginBottom:16,...shadow(1.5)}}>
@@ -699,12 +723,13 @@ function QuizSetupScreen({onStart}) {
 
     <Card style={{marginBottom:14,borderWidth:2,borderColor:realExam?C.primary:C.border,backgroundColor:realExam?'#eff6ff':C.card}}>
       <Row style={{justifyContent:'space-between'}}>
-        <Switch value={realExam} onValueChange={v=>{setRealExam(v); if(v){setCount(AMIRNET_FULL_EXAM_COUNT);setTimerMin(39);setTopic(null);setAdaptive(false);setMode('exam');}}}
+        <Switch value={realExam} disabled={forceRealExam} onValueChange={v=>{setRealExam(v); if(v){setCount(AMIRNET_FULL_EXAM_COUNT);setTimerMin(39);setTopic(null);setAdaptive(false);setMode('exam');}else{setCount(appSettings.defaultCount||10);setTimerMin(appSettings.defaultTimerMin ?? 39);}}}
           trackColor={{false:C.border,true:C.primary}} thumbColor="#fff"/>
         <Col style={{alignItems:'flex-end',flex:1,paddingRight:12}}>
           <Text style={{fontSize:15,fontWeight:'900',color:C.primary}}>סימולציית אמירנט מלאה</Text>
           <Text style={{fontSize:12,color:C.muted,textAlign:'right',lineHeight:19}}>
             39 דקות · {AMIRNET_FULL_EXAM_COUNT} שאלות · 6 פרקים: השלמת משפטים, ניסוח מחדש והבנת הנקרא
+            {forceRealExam ? '\nהמנהל הגדיר שרק סימולציה מלאה זמינה כרגע' : ''}
           </Text>
         </Col>
       </Row>
@@ -712,7 +737,7 @@ function QuizSetupScreen({onStart}) {
 
     {!realExam&&<><Sec title="מספר שאלות"/>
     <Row style={{gap:8,marginBottom:16}}>
-      {[10,20,23,30,50].map(n=><TouchableOpacity key={n} style={[S.cntBtn,count===n&&S.cntBtnOn]} onPress={()=>setCount(n)}>
+      {[appSettings.defaultCount||10,10,20,23,30,50].filter((n,i,a)=>a.indexOf(n)===i).map(n=><TouchableOpacity key={n} style={[S.cntBtn,count===n&&S.cntBtnOn]} onPress={()=>setCount(n)}>
         <Text style={[S.cntTxt,count===n&&{color:'#fff'}]}>{n}</Text>
       </TouchableOpacity>)}
     </Row></>}
@@ -730,7 +755,7 @@ function QuizSetupScreen({onStart}) {
     </Row></>}
 
     {/* Adaptive toggle */}
-    {!realExam&&<Card style={{marginBottom:12}}>
+    {!realExam&&allowAdaptive&&<Card style={{marginBottom:12}}>
       <Row style={{justifyContent:'space-between'}}>
         <Switch value={adaptive} onValueChange={setAdaptive} trackColor={{false:C.border,true:C.purple}} thumbColor="#fff"/>
         <Col style={{alignItems:'flex-end'}}>
@@ -743,7 +768,7 @@ function QuizSetupScreen({onStart}) {
     {!realExam&&mode==='exam'&&<>
       <Sec title="טיימר"/>
       <Row style={{gap:8,marginBottom:16}}>
-        {[0,10,20,30,39,45].map(n=><TouchableOpacity key={n} style={[S.cntBtn,timerMin===n&&S.cntBtnOn]} onPress={()=>setTimerMin(n)}>
+        {[0,10,20,30,39,45,appSettings.defaultTimerMin ?? 39].filter((n,i,a)=>a.indexOf(n)===i).map(n=><TouchableOpacity key={n} style={[S.cntBtn,timerMin===n&&S.cntBtnOn]} onPress={()=>setTimerMin(n)}>
           <Text style={[S.cntTxt,timerMin===n&&{color:'#fff'}]}>{n===0?'ללא':`${n}′`}</Text>
         </TouchableOpacity>)}
       </Row>
@@ -995,10 +1020,15 @@ function ResultsScreen({questions,answers,result,theta,onDismiss}) {
 }
 
 // ─── TOPICS SCREEN ────────────────────────────────────────────────────────────
-function TopicsScreen({prog,onQuiz}) {
+function TopicsScreen({prog,onQuiz,settings=DEFAULT_SETTINGS}) {
   const tp = prog.topicProgress||{};
+  const allowPractice = normalizeSettings(settings).allowPractice !== false;
   return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:USER_PB}} showsVerticalScrollIndicator={false}>
     <Text style={S.pgTitle}>נושאים</Text>
+    {!allowPractice&&<Card style={{backgroundColor:C.warningLight,borderWidth:1,borderColor:C.warning+'40'}}>
+      <Text style={{textAlign:'right',fontWeight:'800',color:C.warning,marginBottom:4}}>תרגול לפי נושא נעול כרגע</Text>
+      <Text style={{textAlign:'right',fontSize:12,color:C.muted,lineHeight:18}}>המנהל הגדיר עבודה רק דרך סימולציית אמירנט מלאה.</Text>
+    </Card>}
     {TOPICS.map(t=>{
       const p=tp[t.id], p2=p?pct(p.correct,p.answered):0;
       const total=getQsByTopic(t.id).length;
@@ -1006,8 +1036,8 @@ function TopicsScreen({prog,onQuiz}) {
       const med=QS.filter(q=>q.topic===t.id&&q.diff==='intermediate').length;
       const adv=QS.filter(q=>q.topic===t.id&&q.diff==='advanced').length;
       const exp=QS.filter(q=>q.topic===t.id&&q.diff==='expert').length;
-      return <TouchableOpacity key={t.id} style={{backgroundColor:C.card,borderRadius:20,marginBottom:14,overflow:'hidden',...shadow(1)}}
-        onPress={()=>onQuiz({count:total,topic:t.id,mode:'exam',timer:0,adaptive:false})} activeOpacity={0.82}>
+      return <TouchableOpacity key={t.id} style={{backgroundColor:C.card,borderRadius:20,marginBottom:14,overflow:'hidden',...shadow(1),opacity:allowPractice?1:0.56}}
+        onPress={()=>allowPractice?onQuiz({count:total,topic:t.id,mode:'exam',timer:0,adaptive:false,realExam:false}):Alert.alert('נעול','המנהל מאפשר כרגע רק סימולציית אמירנט מלאה')} activeOpacity={0.82}>
         <View style={{height:5,backgroundColor:t.color}}/>
         <View style={{padding:14}}>
           <Row style={{justifyContent:'space-between',marginBottom:10}}>
@@ -2804,23 +2834,36 @@ function AdminLeaderboard({gsData}) {
 // ─── ADMIN: SETTINGS ──────────────────────────────────────────────────────────
 function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
   const [sec,setSec]=useState('general');
-  const [passGrade,setPassGrade]=useState(String(gsData.settings.passGrade));
+  const settings = normalizeSettings(gsData.settings);
+  const [passGrade,setPassGrade]=useState(String(settings.passGrade));
   const [customPg,setCustomPg]=useState('');
-  const [regEnabled,setRegEnabled]=useState(gsData.settings.regEnabled);
-  const [maintenanceMode,setMaintenanceMode]=useState(gsData.settings.maintenanceMode||false);
-  const [welcomeMsg,setWelcomeMsg]=useState(gsData.settings.welcomeMsg||'');
-  const [defaultCount,setDefaultCount]=useState(String(gsData.settings.defaultCount||10));
+  const [regEnabled,setRegEnabled]=useState(settings.regEnabled);
+  const [maintenanceMode,setMaintenanceMode]=useState(settings.maintenanceMode||false);
+  const [welcomeMsg,setWelcomeMsg]=useState(settings.welcomeMsg||'');
+  const [defaultCount,setDefaultCount]=useState(String(settings.defaultCount||AMIRNET_FULL_EXAM_COUNT));
+  const [defaultTimerMin,setDefaultTimerMin]=useState(String(settings.defaultTimerMin||39));
+  const [defaultRealExam,setDefaultRealExam]=useState(settings.defaultRealExam!==false);
+  const [forceRealExam,setForceRealExam]=useState(!!settings.forceRealExam);
+  const [allowPractice,setAllowPractice]=useState(settings.allowPractice!==false);
+  const [studentCanUseAdaptive,setStudentCanUseAdaptive]=useState(settings.studentCanUseAdaptive!==false);
+  const [dailyGoalDefault,setDailyGoalDefault]=useState(String(settings.dailyGoalDefault||20));
   const [oldPwd,setOldPwd]=useState('');
   const [newPwd,setNewPwd]=useState('');
   const [confPwd,setConfPwd]=useState('');
-  const [aiKey,setAiKey]=useState(gsData.settings.aiApiKey||'');
+  const [aiKey,setAiKey]=useState(settings.aiApiKey||'');
   const [showKey,setShowKey]=useState(false);
 
   function saveSettings(){
     const pg=parseInt(customPg||passGrade);
     if(isNaN(pg)||pg<50||pg>95){Alert.alert('שגיאה','ציון עובר חייב להיות 50–95');return;}
     const cnt=parseInt(defaultCount)||10;
-    setGsData(gd=>({...gd,settings:{...gd.settings,passGrade:pg,regEnabled,maintenanceMode,welcomeMsg:welcomeMsg.trim(),defaultCount:cnt,aiApiKey:aiKey.trim()},activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'settings',user:'admin',detail:`הגדרות נשמרו — ציון עובר: ${pg}%, הרשמה: ${regEnabled?'פתוחה':'סגורה'}, תחזוקה: ${maintenanceMode?'פעיל':'כבוי'}`}].slice(-500)}));
+    const parsedTimer=parseInt(defaultTimerMin);
+    const timer=isNaN(parsedTimer)?39:parsedTimer;
+    const dailyGoal=parseInt(dailyGoalDefault)||20;
+    if(cnt<1||cnt>80){Alert.alert('שגיאה','מספר שאלות ברירת מחדל חייב להיות 1–80');return;}
+    if(timer<0||timer>180){Alert.alert('שגיאה','טיימר ברירת מחדל חייב להיות 0–180 דקות');return;}
+    if(dailyGoal<1||dailyGoal>200){Alert.alert('שגיאה','יעד יומי חייב להיות 1–200 שאלות');return;}
+    setGsData(gd=>({...gd,settings:{...normalizeSettings(gd.settings),passGrade:pg,regEnabled,maintenanceMode,welcomeMsg:welcomeMsg.trim(),defaultCount:cnt,defaultTimerMin:timer,defaultRealExam,forceRealExam,allowPractice,studentCanUseAdaptive,dailyGoalDefault:dailyGoal,aiApiKey:aiKey.trim()},activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'settings',user:'admin',detail:`הגדרות נשמרו — ציון עובר: ${pg}%, הרשמה: ${regEnabled?'פתוחה':'סגורה'}, סימולציה מלאה: ${forceRealExam?'חובה':'לבחירת תלמיד'}, תרגול: ${allowPractice?'פעיל':'כבוי'}`}].slice(-500)}));
     Alert.alert('✓','הגדרות נשמרו');
   }
   function changePwd(){
@@ -2917,13 +2960,39 @@ function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
         <Sec title="מספר שאלות ברירת מחדל"/>
         <Card style={{marginBottom:12}}>
           <Row style={{gap:7,flexWrap:'wrap'}}>
-            {['5','10','15','20','30','50'].map(v=>(
+            {['10','20','23','30','50'].map(v=>(
               <TouchableOpacity key={v} style={[S.cntBtn,defaultCount===v&&S.cntBtnOn,{flex:0,minWidth:42,paddingHorizontal:8}]}
                 onPress={()=>setDefaultCount(v)}>
                 <Text style={[{fontSize:12,fontWeight:'700',color:C.text},defaultCount===v&&{color:'#fff'}]}>{v}</Text>
               </TouchableOpacity>
             ))}
           </Row>
+        </Card>
+        <Sec title="שליטת סטודנטים בבחינה"/>
+        <Card style={{marginBottom:12}}>
+          {[
+            {value:defaultRealExam,setter:setDefaultRealExam,title:'ברירת מחדל: סימולציית אמירנט',desc:'מסך הבחינה ייפתח קודם על מבחן מלא של 39 דקות'},
+            {value:forceRealExam,setter:v=>{setForceRealExam(v); if(v){setDefaultRealExam(true);setAllowPractice(false);}else{setAllowPractice(true);}},title:'חייב סימולציה מלאה',desc:'סטודנטים לא יוכלו לעבור לתרגול חופשי'},
+            {value:allowPractice,setter:v=>{setAllowPractice(v); if(!v){setForceRealExam(true);setDefaultRealExam(true);setStudentCanUseAdaptive(false);}},title:'אפשר תרגול חופשי',desc:'פותח בחירת נושא, מצב לימוד, מספר שאלות וטיימר'},
+            {value:studentCanUseAdaptive,setter:setStudentCanUseAdaptive,title:'אפשר מצב אדפטיבי',desc:'נותן לסטודנט תרגול שמתאים את הקושי לרמה שלו'},
+          ].map((row,i)=>(
+            <Row key={row.title} style={{justifyContent:'space-between',alignItems:'center',marginBottom:i===3?0:14}}>
+              <Switch value={row.value} onValueChange={row.setter} trackColor={{false:C.border,true:C.primary}} thumbColor="#fff"/>
+              <Col style={{alignItems:'flex-end',flex:1,paddingRight:12}}>
+                <Text style={{fontWeight:'800',fontSize:14,color:C.text}}>{row.title}</Text>
+                <Text style={{fontSize:12,color:C.muted,textAlign:'right',lineHeight:17}}>{row.desc}</Text>
+              </Col>
+            </Row>
+          ))}
+        </Card>
+        <Sec title="טיימר ויעד יומי ברירת מחדל"/>
+        <Card style={{marginBottom:12}}>
+          <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:6}}>טיימר לתרגול בחינה רגיל (בדקות, 0 = ללא)</Text>
+          <TextInput style={S.inp} value={defaultTimerMin} onChangeText={setDefaultTimerMin}
+            placeholder="39" placeholderTextColor={C.muted} textAlign="right" keyboardType="numeric"/>
+          <Text style={{textAlign:'right',fontSize:12,color:C.muted,marginBottom:6}}>יעד יומי לסטודנטים חדשים</Text>
+          <TextInput style={[S.inp,{marginBottom:0}]} value={dailyGoalDefault} onChangeText={setDailyGoalDefault}
+            placeholder="20" placeholderTextColor={C.muted} textAlign="right" keyboardType="numeric"/>
         </Card>
         <TouchableOpacity style={S.btn} onPress={saveSettings}>
           <Icon name="save-outline" size={16} color="#fff"/>
@@ -4068,7 +4137,7 @@ export default function App() {
   const [loaded,setLoaded]=useState(false);
   const [gsData,setGsData]=useState({
     users:[{id:'admin',username:'admin',password:'admin123',role:'admin',name:'מנהל',blocked:false,createdAt:Date.now()}],
-    announcements:[],customQs:[],groups:[],activityLog:[],exams:[],settings:{passGrade:70,regEnabled:true,aiApiKey:''},
+    announcements:[],customQs:[],groups:[],activityLog:[],exams:[],settings:DEFAULT_SETTINGS,
   });
   const [prog,dispatch]=useReducer(reducer,INIT_PROG);
   const [tab,setTab]=useState('home');
@@ -4079,7 +4148,7 @@ export default function App() {
     Store.get('amirnet_v4').then(raw=>{
       if(raw){try{
         const saved=JSON.parse(raw);
-        if(saved.gsData)setGsData(gd=>({...gd,...saved.gsData,groups:saved.gsData.groups||[],exams:saved.gsData.exams||[]}));
+        if(saved.gsData)setGsData(gd=>({...gd,...saved.gsData,groups:saved.gsData.groups||[],exams:saved.gsData.exams||[],settings:normalizeSettings(saved.gsData.settings)}));
         if(saved.currentUserId&&saved.gsData){
           const user=saved.gsData.users?.find(u=>u.id===saved.currentUserId);
           if(user&&!user.blocked){setCurrentUser(user);if(user.prog)dispatch({type:'LOAD',payload:user.prog});}
@@ -4099,6 +4168,7 @@ export default function App() {
     const user=gsData.users.find(u=>u.username===username&&u.password===password);
     if(!user){Alert.alert('שגיאה','שם משתמש או סיסמה שגויים');return;}
     if(user.blocked){Alert.alert('חסום','החשבון שלך חסום. צור קשר עם המנהל.');return;}
+    if(user.role!=='admin'&&gsData.settings.maintenanceMode){Alert.alert('תחזוקה','המנהל עצר זמנית כניסת סטודנטים. נסה שוב מאוחר יותר.');return;}
     addLog(setGsData,'login',user.username,`התחברות — ${user.role==='admin'?'מנהל':'סטודנט'}`);
     setCurrentUser(user);
     if(user.prog)dispatch({type:'LOAD',payload:user.prog});else dispatch({type:'RESET'});
@@ -4108,7 +4178,7 @@ export default function App() {
     if(!name||!username||!password){Alert.alert('שגיאה','מלא את כל השדות');return;}
     if(password.length<4){Alert.alert('שגיאה','סיסמה קצרה מדי (מינימום 4 תווים)');return;}
     if(gsData.users.find(u=>u.username===username)){Alert.alert('שגיאה','שם משתמש כבר קיים');return;}
-    const newUser={id:Date.now().toString(),username,password,name,role:'student',blocked:false,createdAt:Date.now(),prog:INIT_PROG,onboarded:false};
+    const newUser={id:Date.now().toString(),username,password,name,role:'student',blocked:false,createdAt:Date.now(),prog:{...INIT_PROG,dailyGoal:normalizeSettings(gsData.settings).dailyGoalDefault},onboarded:false};
     setGsData(gd=>({...gd,users:[...gd.users,newUser],activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'user_reg',user:username,detail:`הרשמה חדשה — ${name}`}].slice(-500)}));
     setCurrentUser(newUser);dispatch({type:'RESET'});
   }
@@ -4130,14 +4200,22 @@ export default function App() {
   </SafeAreaView>;
   if(!currentUser)return <AuthScreen gsData={gsData} onLogin={handleLogin} onRegister={handleRegister}/>;
   if(currentUser.role==='admin')return <AdminPanel gsData={gsData} setGsData={setGsData} currentUser={currentUser} onLogout={handleLogout}/>;
-  if(!prog.onboarded)return <OnboardingScreen onDone={p=>{dispatch({type:'SETTINGS',payload:{...p,onboarded:true}});setCurrentUser(u=>({...u,onboarded:true}));setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===currentUser.id?{...u,onboarded:true}:u)}));}}/>;
+  if(gsData.settings.maintenanceMode)return <SafeAreaView style={S.center}>
+    <Icon name="construct-outline" size={46} color={C.warning}/>
+    <Text style={[S.pgTitle,{marginTop:12,marginBottom:6}]}>המערכת בתחזוקה</Text>
+    <Text style={{fontSize:13,color:C.muted,textAlign:'center',lineHeight:20,marginBottom:16,paddingHorizontal:28}}>המנהל עצר זמנית כניסת סטודנטים. אפשר לחזור ברגע שהתחזוקה תסתיים.</Text>
+    <TouchableOpacity style={[S.outBtn,{paddingHorizontal:24}]} onPress={handleLogout}>
+      <Text style={{fontWeight:'800',color:C.primary}}>התנתק</Text>
+    </TouchableOpacity>
+  </SafeAreaView>;
+  if(!prog.onboarded)return <OnboardingScreen settings={gsData.settings} onDone={p=>{dispatch({type:'SETTINGS',payload:{...p,onboarded:true}});setCurrentUser(u=>({...u,onboarded:true}));setGsData(gd=>({...gd,users:gd.users.map(u=>u.id===currentUser.id?{...u,onboarded:true}:u)}));}}/>;
   if(quiz)return <QuizScreen config={quiz} dispatch={go} onFinish={()=>setQuiz(null)} allQs={[...QS,...gsData.customQs]} passGrade={gsData.settings.passGrade||70}/>;
   const activeAnn=gsData.announcements.filter(a=>!a.expiresAt||a.expiresAt>Date.now());
   return <SafeAreaView style={{flex:1,backgroundColor:C.bg}}>
     <StatusBar barStyle="dark-content"/>
-    {tab==='home'&&<HomeScreen prog={prog} onQuiz={setQuiz} announcements={activeAnn} currentUser={currentUser} onLogout={handleLogout}/>}
-    {tab==='topics'&&<TopicsScreen prog={prog} onQuiz={setQuiz}/>}
-    {tab==='quiz'&&<QuizSetupScreen onStart={setQuiz}/>}
+    {tab==='home'&&<HomeScreen prog={prog} onQuiz={setQuiz} announcements={activeAnn} currentUser={currentUser} onLogout={handleLogout} settings={gsData.settings}/>}
+    {tab==='topics'&&<TopicsScreen prog={prog} onQuiz={setQuiz} settings={gsData.settings}/>}
+    {tab==='quiz'&&<QuizSetupScreen onStart={setQuiz} settings={gsData.settings}/>}
     {tab==='progress'&&<ProgressScreen prog={prog} dispatch={go} currentUser={currentUser} onLogout={handleLogout}/>}
     <TabBar tab={tab} setTab={setTab}/>
   </SafeAreaView>;
