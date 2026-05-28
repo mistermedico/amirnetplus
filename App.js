@@ -34,13 +34,54 @@ const supabase = SUPABASE_URL && SUPABASE_KEY
   })
   : null;
 const cloudEnabled = !!supabase;
+const CLOUD_TABLES = {
+  users:'app_users',
+  customQs:'app_custom_questions',
+  groups:'app_groups',
+  announcements:'app_announcements',
+  exams:'app_exams',
+  activityLog:'app_activity_log',
+};
+const tableFields = Object.keys(CLOUD_TABLES);
+const asId = (item, field, index) => String(item?.id || `${field}_${Date.now()}_${index}`);
+const readJsonRows = async table => {
+  const {data,error} = await supabase.from(table).select('id,data,updated_at');
+  if(error) throw error;
+  return (data||[]).map(row=>({id:row.id,...(row.data||{})}));
+};
+const syncJsonRows = async (table, field, rows=[]) => {
+  const normalized = rows.map((row,index)=>({...row,id:asId(row,field,index)}));
+  const keepIds = normalized.map(row=>row.id);
+  if(normalized.length) {
+    const {error}=await supabase.from(table).upsert(
+      normalized.map(row=>({id:row.id,data:row})),
+      {onConflict:'id'}
+    );
+    if(error) throw error;
+  }
+  const {data:existing,error:existingError}=await supabase.from(table).select('id');
+  if(existingError) throw existingError;
+  const stale=(existing||[]).map(row=>row.id).filter(id=>!keepIds.includes(id));
+  if(stale.length) {
+    const {error}=await supabase.from(table).delete().in('id',stale);
+    if(error) throw error;
+  }
+};
 const CloudStore = {
   get: async key => {
     if(!supabase) return Store.get(key);
     try {
-      const {data,error} = await supabase.from('app_state').select('data').eq('key',key).maybeSingle();
-      if(error) throw error;
-      if(data?.data) return JSON.stringify(data.data);
+      const localRaw = await Store.get(key);
+      let localCurrentUserId = null;
+      if(localRaw) { try { localCurrentUserId = JSON.parse(localRaw)?.currentUserId || null; } catch(_) {} }
+      const {data:settingsRow,error:settingsError}=await supabase.from('app_settings').select('data').eq('id','global').maybeSingle();
+      if(settingsError) throw settingsError;
+      const gsData = {settings:settingsRow?.data || {}};
+      for(const field of tableFields) gsData[field] = await readJsonRows(CLOUD_TABLES[field]);
+      const hasCloudRows = !!settingsRow || tableFields.some(field=>(gsData[field]||[]).length>0);
+      if(hasCloudRows) return JSON.stringify({gsData,currentUserId:localCurrentUserId});
+      const {data:legacy,error:legacyError} = await supabase.from('app_state').select('data').eq('key',key).maybeSingle();
+      if(!legacyError && legacy?.data) return JSON.stringify(legacy.data);
     } catch(err) {
       console.warn('Supabase load failed, using local cache', err?.message || err);
     }
@@ -51,11 +92,29 @@ const CloudStore = {
     if(!supabase) return;
     try {
       const parsed=JSON.parse(value);
-      const {error}=await supabase.from('app_state').upsert({key,data:parsed},{onConflict:'key'});
-      if(error) throw error;
+      const gsData=parsed.gsData||{};
+      const {error:settingsError}=await supabase.from('app_settings').upsert(
+        {id:'global',data:gsData.settings||{}},
+        {onConflict:'id'}
+      );
+      if(settingsError) throw settingsError;
+      for(const field of tableFields) await syncJsonRows(CLOUD_TABLES[field],field,gsData[field]||[]);
+      await supabase.from('app_state').upsert({key,data:parsed},{onConflict:'key'});
     } catch(err) {
       console.warn('Supabase save failed, kept local cache', err?.message || err);
     }
+  },
+  onRemoteChange: cb => {
+    if(!supabase) return ()=>{};
+    let timer=null;
+    const schedule=()=>{clearTimeout(timer);timer=setTimeout(cb,350);};
+    const channel=supabase.channel('amirnetplus-table-sync');
+    channel.on('postgres_changes',{event:'*',schema:'public',table:'app_settings'},schedule);
+    Object.values(CLOUD_TABLES).forEach(table=>{
+      channel.on('postgres_changes',{event:'*',schema:'public',table},schedule);
+    });
+    channel.subscribe();
+    return ()=>{clearTimeout(timer);supabase.removeChannel(channel);};
   },
 };
 
@@ -4314,10 +4373,13 @@ export default function App() {
   const [tab,setTab]=useState('home');
   const [quiz,setQuiz]=useState(null);
   const syncTimer=useRef(null);
+  const latestPayload=useRef('');
+  const applyingRemote=useRef(false);
   const go=useCallback(a=>dispatch(a),[]);
 
   useEffect(()=>{
     CloudStore.get('amirnet_v4').then(raw=>{
+      latestPayload.current=raw || '';
       if(raw){try{
         const saved=JSON.parse(raw);
         if(saved.gsData)setGsData(gd=>({...gd,...saved.gsData,groups:saved.gsData.groups||[],exams:saved.gsData.exams||[],settings:normalizeSettings(saved.gsData.settings)}));
@@ -4334,10 +4396,41 @@ export default function App() {
     if(!loaded)return;
     const updatedGs=currentUser?{...gsData,users:gsData.users.map(u=>u.id===currentUser.id?{...u,prog}:u)}:gsData;
     const payload=JSON.stringify({gsData:updatedGs,currentUserId:currentUser?.id});
+    if(applyingRemote.current){
+      applyingRemote.current=false;
+      latestPayload.current=payload;
+      Store.set('amirnet_v4',payload);
+      return;
+    }
+    if(payload===latestPayload.current)return;
+    latestPayload.current=payload;
     if(syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current=setTimeout(()=>CloudStore.set('amirnet_v4',payload),500);
     return ()=>{if(syncTimer.current) clearTimeout(syncTimer.current);};
   },[gsData,prog,currentUser,loaded]);
+
+  useEffect(()=>{
+    if(!loaded||!cloudEnabled)return undefined;
+    return CloudStore.onRemoteChange(async ()=>{
+      const raw=await CloudStore.get('amirnet_v4');
+      if(!raw||raw===latestPayload.current)return;
+      try{
+        const saved=JSON.parse(raw);
+        if(!saved.gsData)return;
+        applyingRemote.current=true;
+        latestPayload.current=raw;
+        setGsData(gd=>({...gd,...saved.gsData,groups:saved.gsData.groups||[],exams:saved.gsData.exams||[],settings:normalizeSettings(saved.gsData.settings)}));
+        setCurrentUser(cur=>{
+          if(!cur)return cur;
+          const fresh=saved.gsData.users?.find(u=>u.id===cur.id);
+          if(fresh?.prog)dispatch({type:'LOAD',payload:fresh.prog});
+          return fresh?{...cur,...fresh}:cur;
+        });
+      }catch(err){
+        console.warn('Supabase realtime apply failed',err?.message||err);
+      }
+    });
+  },[loaded]);
 
   function handleLogin(username,password){
     const user=gsData.users.find(u=>u.username===username&&u.password===password);
