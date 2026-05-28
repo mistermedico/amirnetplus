@@ -659,7 +659,7 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout,settings=
       {weak.slice(0,2).map(t=>{
         const p=tp[t.id], p2=pct(p.correct,p.answered);
         return <Card key={t.id} style={{marginBottom:8,borderWidth:1,borderColor:C.warning+'44'}}
-          onPress={()=>onQuiz({count:10,topic:t.id,mode:'study',timer:0,adaptive:false})}>
+          onPress={()=>allowPractice?onQuiz({count:10,topic:t.id,mode:'study',timer:0,adaptive:false,realExam:false}):Alert.alert('נעול','המנהל מאפשר כרגע רק סימולציית אמירנט מלאה')}>
           <Row style={{justifyContent:'space-between',marginBottom:6}}>
             <Pill label={`${p2}%`} color={C.warning}/>
             <Row style={{flex:0,gap:6}}><Text style={{fontWeight:'700',fontSize:14}}>{t.name}</Text><Text style={{fontSize:20}}>{t.icon}</Text></Row>
@@ -671,7 +671,7 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout,settings=
 
     {lastTopic&&<>
       <Sec title="המשך מאיפה שהפסקת"/>
-      <Card onPress={()=>onQuiz({count:10,topic:lastTopic.id,mode:'study',timer:0,adaptive:false})}>
+      <Card onPress={()=>allowPractice?onQuiz({count:10,topic:lastTopic.id,mode:'study',timer:0,adaptive:false,realExam:false}):Alert.alert('נעול','המנהל מאפשר כרגע רק סימולציית אמירנט מלאה')}>
         <Row style={{justifyContent:'space-between'}}>
           <Row style={{flex:0,gap:4}}><Icon name="arrow-forward-circle" size={18} color={C.primary}/><Text style={{color:C.primary,fontWeight:'700',fontSize:13}}>המשך</Text></Row>
           <Row style={{flex:0,gap:6}}><Text style={{fontWeight:'700',fontSize:15}}>{lastTopic.name}</Text><Text style={{fontSize:22}}>{lastTopic.icon}</Text></Row>
@@ -682,7 +682,7 @@ function HomeScreen({prog,onQuiz,announcements=[],currentUser,onLogout,settings=
     <Sec title="נושאים"/>
     {TOPICS.map(t=>{
       const p=tp[t.id], p2=p?pct(p.correct,p.answered):0;
-      return <Card key={t.id} style={{marginBottom:8}} onPress={()=>onQuiz({count:getQsByTopic(t.id).length,topic:t.id,mode:'exam',timer:0,adaptive:false})}>
+      return <Card key={t.id} style={{marginBottom:8,opacity:allowPractice?1:0.56}} onPress={()=>allowPractice?onQuiz({count:getQsByTopic(t.id).length,topic:t.id,mode:'exam',timer:0,adaptive:false,realExam:false}):Alert.alert('נעול','המנהל מאפשר כרגע רק סימולציית אמירנט מלאה')}>
         <Row style={{justifyContent:'space-between',marginBottom:6}}>
           <Text style={{fontSize:12,color:C.muted}}>{p?.answered||0} שאלות</Text>
           <Row style={{flex:0,gap:6}}>{p2>0&&<Pill label={`${p2}%`} color={p2>=70?C.success:C.warning} small/>}
@@ -1418,7 +1418,7 @@ function AdminDashboard({gsData,setGsData,onNav}) {
     <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:10,marginBottom:8}}>
       {[{l:'הוסף שאלה',i:'add-circle',c:C.success,t:'questions'},{l:'הודעה חדשה',i:'megaphone',c:C.orange,t:'announcements'},
         {l:'משתמשים',i:'people',c:C.primary,t:'users'},{l:'קבוצות',i:'people-circle',c:C.cyan,t:'groups'},
-        {l:'דוחות',i:'document-text',c:C.purple,t:'reports'},{l:'אנליטיקה',i:'bar-chart',c:C.warning,t:'analytics'}]
+        {l:'דוחות',i:'document-text',c:C.purple,t:'reports'},{l:'שליטה',i:'settings',c:C.warning,t:'control'}]
         .map(a=>(
         <TouchableOpacity key={a.t} style={[S.card,{width:(W-52)/3,alignItems:'center',padding:14,marginBottom:0}]} onPress={()=>onNav(a.t)}>
           <View style={{width:40,height:40,borderRadius:20,backgroundColor:a.c+'15',alignItems:'center',justifyContent:'center',marginBottom:6}}>
@@ -2831,6 +2831,137 @@ function AdminLeaderboard({gsData}) {
   </ScrollView>;
 }
 
+// ─── ADMIN: CONTROL CENTER ───────────────────────────────────────────────────
+function AdminControlCenter({gsData,setGsData,onNav}) {
+  const settings=normalizeSettings(gsData.settings);
+  const [broadcast,setBroadcast]=useState('');
+  const [goal,setGoal]=useState(String(settings.dailyGoalDefault||20));
+  const students=gsData.users.filter(u=>u.role==='student');
+  const atRisk=students.filter(u=>(u.prog?.totalAnswered||0)>=10&&pct(u.prog.totalCorrect,u.prog.totalAnswered)<(settings.passGrade||70));
+  const unreadNotifications=students.reduce((sum,u)=>sum+(u.notifications||[]).filter(n=>!n.read).length,0);
+  const activeAnnouncements=(gsData.announcements||[]).filter(a=>!a.expiresAt||a.expiresAt>Date.now()).length;
+
+  function patchSettings(patch, detail){
+    setGsData(gd=>({...gd,
+      settings:{...normalizeSettings(gd.settings),...patch},
+      activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'settings',user:'admin',detail}].slice(-500)
+    }));
+  }
+  function sendToUsers(users,msg,type='admin_broadcast'){
+    if(!msg.trim()){Alert.alert('שגיאה','כתוב הודעה לשליחה');return;}
+    const note={id:`n_${Date.now()}`,msg:msg.trim(),ts:Date.now(),read:false};
+    const ids=new Set(users.map(u=>u.id));
+    setGsData(gd=>({...gd,
+      users:gd.users.map(u=>ids.has(u.id)?{...u,notifications:[...((u.notifications||[]).slice(-19)),note]}:u),
+      activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type,user:'admin',detail:`נשלחה הודעה ל-${ids.size} סטודנטים`}].slice(-500)
+    }));
+    setBroadcast('');
+    Alert.alert('✓',`נשלחה הודעה ל-${ids.size} סטודנטים`);
+  }
+  function applyDailyGoal(){
+    const n=parseInt(goal);
+    if(isNaN(n)||n<1||n>200){Alert.alert('שגיאה','יעד יומי חייב להיות 1–200');return;}
+    setGsData(gd=>({...gd,
+      settings:{...normalizeSettings(gd.settings),dailyGoalDefault:n},
+      users:gd.users.map(u=>u.role==='student'?{...u,prog:{...(u.prog||INIT_PROG),dailyGoal:n}}:u),
+      activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'settings',user:'admin',detail:`יעד יומי עודכן לכל הסטודנטים: ${n}`}].slice(-500)
+    }));
+    Alert.alert('✓',`יעד יומי עודכן ל-${students.length} סטודנטים`);
+  }
+  function clearReadNotifications(){
+    setGsData(gd=>({...gd,
+      users:gd.users.map(u=>({...u,notifications:(u.notifications||[]).filter(n=>!n.read)})),
+      activityLog:[...(gd.activityLog||[]),{id:`log_${Date.now()}`,ts:Date.now(),type:'settings',user:'admin',detail:'נוקו התראות שנקראו'}].slice(-500)
+    }));
+    Alert.alert('✓','התראות שנקראו נוקו');
+  }
+
+  const toggles=[
+    {key:'maintenanceMode',title:'מצב תחזוקה',desc:'חוסם כניסת סטודנטים ומציג הודעת תחזוקה',value:!!settings.maintenanceMode,color:C.danger,icon:'construct-outline',onChange:v=>patchSettings({maintenanceMode:v},`מצב תחזוקה: ${v?'פעיל':'כבוי'}`)},
+    {key:'regEnabled',title:'הרשמה פתוחה',desc:'מאפשר לסטודנטים חדשים להירשם לבד',value:settings.regEnabled!==false,color:C.success,icon:'person-add-outline',onChange:v=>patchSettings({regEnabled:v},`הרשמה: ${v?'פתוחה':'סגורה'}`)},
+    {key:'forceRealExam',title:'חייב סימולציית אמירנט',desc:'נועל את הסטודנטים למבחן מלא בלבד',value:!!settings.forceRealExam,color:C.primary,icon:'lock-closed-outline',onChange:v=>patchSettings({forceRealExam:v,defaultRealExam:v?true:settings.defaultRealExam,allowPractice:v?false:true,studentCanUseAdaptive:v?false:settings.studentCanUseAdaptive},`סימולציה מלאה: ${v?'חובה':'לבחירת תלמיד'}`)},
+    {key:'allowPractice',title:'תרגול חופשי',desc:'בחירת נושא, מצב לימוד, מספר שאלות וטיימר',value:settings.allowPractice!==false,color:C.cyan,icon:'list-outline',onChange:v=>patchSettings({allowPractice:v,forceRealExam:v?settings.forceRealExam:true,defaultRealExam:v?settings.defaultRealExam:true,studentCanUseAdaptive:v?settings.studentCanUseAdaptive:false},`תרגול חופשי: ${v?'פעיל':'כבוי'}`)},
+    {key:'studentCanUseAdaptive',title:'תרגול אדפטיבי',desc:'מאפשר תרגול שמתאים את רמת הקושי לתלמיד',value:settings.studentCanUseAdaptive!==false,color:C.purple,icon:'analytics-outline',onChange:v=>patchSettings({studentCanUseAdaptive:v},`תרגול אדפטיבי: ${v?'פעיל':'כבוי'}`)},
+  ];
+
+  return <ScrollView style={S.scr} contentContainerStyle={{paddingBottom:ADMIN_PB}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <Text style={S.pgTitle}>מרכז שליטה 🎛️</Text>
+    <Card style={{backgroundColor:C.primary,marginBottom:12}}>
+      <Row style={{gap:0}}>
+        {[{v:students.length,l:'סטודנטים'},{v:atRisk.length,l:'בסיכון'},{v:activeAnnouncements,l:'הודעות'},{v:unreadNotifications,l:'התראות'}].map((s,i,arr)=>(
+          <View key={s.l} style={[{flex:1,alignItems:'center',paddingVertical:8},i<arr.length-1&&{borderRightWidth:1,borderRightColor:'rgba(255,255,255,0.2)'}]}>
+            <Text style={{fontSize:21,fontWeight:'900',color:'#fff'}}>{s.v}</Text>
+            <Text style={{fontSize:10,color:'#bfdbfe'}}>{s.l}</Text>
+          </View>
+        ))}
+      </Row>
+    </Card>
+
+    <Sec title="נעילות מערכת"/>
+    {toggles.map(t=>(
+      <Card key={t.key} style={{marginBottom:8,borderRightWidth:4,borderRightColor:t.value?t.color:C.border}}>
+        <Row style={{justifyContent:'space-between',alignItems:'center'}}>
+          <Switch value={t.value} onValueChange={t.onChange} trackColor={{false:C.border,true:t.color}} thumbColor="#fff"/>
+          <Row style={{flex:1,gap:10,justifyContent:'flex-end'}}>
+            <Col style={{alignItems:'flex-end',flex:1}}>
+              <Text style={{fontSize:15,fontWeight:'900',color:t.value?t.color:C.text}}>{t.title}</Text>
+              <Text style={{fontSize:12,color:C.muted,textAlign:'right',lineHeight:18}}>{t.desc}</Text>
+            </Col>
+            <View style={{width:42,height:42,borderRadius:21,backgroundColor:t.color+'16',alignItems:'center',justifyContent:'center'}}>
+              <Icon name={t.icon} size={20} color={t.color}/>
+            </View>
+          </Row>
+        </Row>
+      </Card>
+    ))}
+
+    <Sec title="פעולות קבוצתיות"/>
+    <Card style={{marginBottom:12}}>
+      <Text style={{textAlign:'right',fontWeight:'800',fontSize:14,marginBottom:8}}>שליחת הודעה פנימית</Text>
+      <TextInput style={[S.inp,{height:78,textAlignVertical:'top'}]} value={broadcast} onChangeText={setBroadcast}
+        placeholder="לדוגמה: מחר נפתח מקבץ Restatement חדש..." placeholderTextColor={C.muted} textAlign="right" multiline/>
+      <Row style={{gap:8}}>
+        <TouchableOpacity style={[S.btn,{flex:1,marginBottom:0,backgroundColor:C.danger}]} onPress={()=>sendToUsers(atRisk,broadcast,'risk_nudge')}>
+          <Icon name="warning-outline" size={15} color="#fff"/>
+          <Text style={[S.btnTxt,{fontSize:13,marginRight:6}]}>לסטודנטים בסיכון</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[S.btn,{flex:1,marginBottom:0}]} onPress={()=>sendToUsers(students,broadcast)}>
+          <Icon name="send-outline" size={15} color="#fff"/>
+          <Text style={[S.btnTxt,{fontSize:13,marginRight:6}]}>לכולם</Text>
+        </TouchableOpacity>
+      </Row>
+    </Card>
+
+    <Card style={{marginBottom:12}}>
+      <Text style={{textAlign:'right',fontWeight:'800',fontSize:14,marginBottom:8}}>יעד יומי לכל הסטודנטים</Text>
+      <TextInput style={S.inp} value={goal} onChangeText={setGoal} placeholder="20" placeholderTextColor={C.muted} textAlign="right" keyboardType="numeric"/>
+      <TouchableOpacity style={[S.btn,{marginBottom:0}]} onPress={applyDailyGoal}>
+        <Icon name="today-outline" size={15} color="#fff"/>
+        <Text style={[S.btnTxt,{fontSize:14,marginRight:6}]}>עדכן יעד יומי לכולם</Text>
+      </TouchableOpacity>
+    </Card>
+
+    <Sec title="קיצורי מנהל"/>
+    <Row style={{gap:8,flexWrap:'wrap'}}>
+      {[
+        {l:'משתמשים',i:'people-outline',c:C.primary,t:'users'},
+        {l:'שאלות',i:'help-circle-outline',c:C.success,t:'questions'},
+        {l:'מבחנים',i:'school-outline',c:C.orange,t:'exams'},
+        {l:'דוחות',i:'document-text-outline',c:C.purple,t:'reports'},
+      ].map(a=>(
+        <TouchableOpacity key={a.t} style={[S.cntBtn,{minWidth:(W-56)/2,flex:0,borderColor:a.c+'50'}]} onPress={()=>onNav(a.t)}>
+          <Icon name={a.i} size={18} color={a.c}/>
+          <Text style={{fontWeight:'800',fontSize:13,color:a.c,marginTop:4}}>{a.l}</Text>
+        </TouchableOpacity>
+      ))}
+    </Row>
+    <TouchableOpacity style={[S.outBtn,{borderColor:C.muted+'60',marginTop:12}]} onPress={clearReadNotifications}>
+      <Icon name="notifications-off-outline" size={16} color={C.muted}/>
+      <Text style={{fontWeight:'800',fontSize:13,color:C.muted,marginRight:6}}>נקה התראות שנקראו</Text>
+    </TouchableOpacity>
+  </ScrollView>;
+}
+
 // ─── ADMIN: SETTINGS ──────────────────────────────────────────────────────────
 function AdminSettings({gsData,setGsData,onLogout,adminUser}) {
   const [sec,setSec]=useState('general');
@@ -4059,6 +4190,7 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
   const [adminTab,setAdminTab]=useState('dashboard');
   const adminTabs=[
     {id:'dashboard',label:'בית',icon:'grid-outline',active:'grid'},
+    {id:'control',label:'שליטה',icon:'options-outline',active:'options'},
     {id:'users',label:'משתמשים',icon:'people-outline',active:'people'},
     {id:'questions',label:'שאלות',icon:'help-circle-outline',active:'help-circle'},
     {id:'analytics',label:'אנליטיקה',icon:'bar-chart-outline',active:'bar-chart'},
@@ -4096,6 +4228,7 @@ function AdminPanel({gsData,setGsData,currentUser,onLogout}) {
     </View>
     <View style={{flex:1}}>
       {adminTab==='dashboard'&&<AdminDashboard gsData={gsData} setGsData={setGsData} onNav={setAdminTab}/>}
+      {adminTab==='control'&&<AdminControlCenter gsData={gsData} setGsData={setGsData} onNav={setAdminTab}/>}
       {adminTab==='users'&&<AdminUsers gsData={gsData} setGsData={setGsData}/>}
       {adminTab==='questions'&&<AdminQuestions gsData={gsData} setGsData={setGsData}/>}
       {adminTab==='analytics'&&<AdminAnalytics gsData={gsData}/>}

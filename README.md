@@ -10,6 +10,9 @@ Hebrew interface text shown RTL.
 Admin controls include student registration, maintenance mode, pass grade,
 default daily goal, default timer/question count, and whether students may use
 free practice, adaptive practice, or only the full Amirnet simulation.
+The admin Control Center also provides quick system locks, group broadcasts,
+at-risk student nudges, global daily-goal updates, and shortcuts into the main
+management screens.
 
 ## Run
 
