@@ -41,16 +41,19 @@ export default function HomeScreen({ navigation }: any) {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>שלום, {user?.displayName || 'לומד'} 👋</Text>
-            <Text style={styles.subGreeting}>הכנה לבחינת אמירנט</Text>
-          </View>
-          <View style={styles.avatarWrap}>
-            <Text style={styles.avatarText}>{user?.displayName?.[0]?.toUpperCase() || 'U'}</Text>
+        <View style={styles.headerWrap}>
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.greeting}>שלום, {user?.displayName || 'לומד'} 👋</Text>
+              <Text style={styles.subGreeting}>הכנה לבחינת אמירנט</Text>
+            </View>
+            <View style={styles.avatarWrap}>
+              <Text style={styles.avatarText}>{user?.displayName?.[0]?.toUpperCase() || 'U'}</Text>
+            </View>
           </View>
         </View>
 
+        <View style={styles.innerScroll}>
         {/* Announcements */}
         {state.announcements.length > 0 && (
           <View style={styles.announcementsWrap}>
@@ -128,15 +131,18 @@ export default function HomeScreen({ navigation }: any) {
         <SectionHeader title="פעולות מהירות" />
         <View style={styles.quickGrid}>
           {[
-            { icon: '▶️', label: 'בחינה מהירה', sub: '10 שאלות', color: COLORS.primary, onPress: () => navigation.navigate('QuizSetup', { quick: true }) },
-            { icon: '🧠', label: 'אדפטיבי', sub: 'מותאם לרמתך', color: COLORS.secondary, onPress: () => navigation.navigate('AdaptiveSetup') },
-            { icon: '🔖', label: 'שמורות', sub: `${progress.bookmarkedQuestionIDs.length}`, color: COLORS.orange, onPress: () => navigation.navigate('Bookmarks') },
-            { icon: '📈', label: 'התקדמות', sub: 'גרפים ונתונים', color: COLORS.success, onPress: () => navigation.navigate('Progress') },
+            { icon: '▶️', label: 'בחינה מהירה', sub: '10 שאלות', color: COLORS.primary,    onPress: () => navigation.navigate('QuizSetup', { quick: true }) },
+            { icon: '🧠', label: 'אדפטיבי',     sub: 'מותאם לרמתך', color: COLORS.secondary, onPress: () => navigation.navigate('AdaptiveSetup') },
+            { icon: '🔖', label: 'שמורות',      sub: `${progress.bookmarkedQuestionIDs.length} שאלות`, color: COLORS.orange,    onPress: () => navigation.navigate('Bookmarks') },
+            { icon: '📈', label: 'התקדמות',     sub: 'גרפים ונתונים', color: COLORS.success,   onPress: () => navigation.navigate('Progress') },
           ].map(a => (
-            <TouchableOpacity key={a.label} style={[styles.quickCard, { borderTopColor: a.color }]} onPress={a.onPress} activeOpacity={0.75}>
-              <Text style={styles.quickIcon}>{a.icon}</Text>
+            <TouchableOpacity key={a.label} style={styles.quickCard} onPress={a.onPress} activeOpacity={0.75}>
+              <View style={[styles.quickIconWrap, { backgroundColor: a.color + '18' }]}>
+                <Text style={styles.quickIcon}>{a.icon}</Text>
+              </View>
               <Text style={styles.quickLabel}>{a.label}</Text>
               <Text style={styles.quickSub}>{a.sub}</Text>
+              <View style={[styles.quickAccent, { backgroundColor: a.color }]} />
             </TouchableOpacity>
           ))}
         </View>
@@ -190,6 +196,7 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         <View style={{ height: 32 }} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -197,15 +204,17 @@ export default function HomeScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { padding: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
+  scroll: { paddingBottom: 20 },
+  headerWrap: { backgroundColor: COLORS.surface, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 16, marginBottom: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   greeting: { fontSize: 22, fontWeight: '800', color: COLORS.text, textAlign: 'right' },
-  subGreeting: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'right' },
+  subGreeting: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'right', marginTop: 2 },
   avatarWrap: {
-    width: 46, height: 46, borderRadius: 23,
+    width: 48, height: 48, borderRadius: 16,
     backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center',
   },
-  avatarText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  avatarText: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  innerScroll: { padding: 16, paddingTop: 0 },
   announcementsWrap: { gap: 8, marginBottom: 14 },
   annBanner: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 10,
@@ -230,13 +239,15 @@ const styles = StyleSheet.create({
   weakPracticeTxt: { color: '#fff', fontSize: 11, fontWeight: '700' },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 },
   quickCard: {
-    width: '47%', backgroundColor: COLORS.surface, borderRadius: 16, padding: 14,
-    borderTopWidth: 3, alignItems: 'flex-end',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+    width: '47%', backgroundColor: COLORS.surface, borderRadius: 18, padding: 16,
+    alignItems: 'flex-end', overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 3,
   },
-  quickIcon: { fontSize: 28, marginBottom: 6 },
+  quickIconWrap: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  quickIcon: { fontSize: 26 },
   quickLabel: { fontSize: 14, fontWeight: '700', color: COLORS.text, textAlign: 'right' },
-  quickSub: { fontSize: 12, color: COLORS.textSecondary, textAlign: 'right' },
+  quickSub: { fontSize: 12, color: COLORS.textSecondary, textAlign: 'right', marginTop: 2 },
+  quickAccent: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 },
   topicRow: {
     backgroundColor: COLORS.surface, borderRadius: 14, padding: 14,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

@@ -10,13 +10,15 @@ import { Question, QuizMode, QuizHistoryEntry, TopicID } from '../../types';
 import { generateId } from '../../utils/hashUtils';
 
 const TOPIC_INFO: Record<string, { name: string; icon: string }> = {
-  networking: { name: 'רשתות', icon: '🌐' },
-  security: { name: 'אבטחה', icon: '🔒' },
-  operatingSystems: { name: 'מערכות הפעלה', icon: '💻' },
-  cloud: { name: 'ענן', icon: '☁️' },
-  itManagement: { name: 'ניהול IT', icon: '📋' },
-  protocols: { name: 'פרוטוקולים', icon: '🔄' },
+  networking:       { name: 'רשתות',          icon: '🌐' },
+  security:         { name: 'אבטחה',           icon: '🔒' },
+  operatingSystems: { name: 'מערכות הפעלה',    icon: '💻' },
+  cloud:            { name: 'ענן',              icon: '☁️' },
+  itManagement:     { name: 'ניהול IT',         icon: '📋' },
+  protocols:        { name: 'פרוטוקולים',       icon: '🔄' },
 };
+
+const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
 interface Props {
   navigation: any;
@@ -24,7 +26,7 @@ interface Props {
 }
 
 export default function QuizScreen({ navigation, route }: Props) {
-  const { questions, mode, chapterTitle } = route.params;
+  const { questions, mode } = route.params;
   const { dispatch, state } = useApp();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -43,8 +45,7 @@ export default function QuizScreen({ navigation, route }: Props) {
   function handleSelect(idx: number) {
     if (selected !== null) return;
     setSelected(idx);
-    const newAnswers = { ...answers, [currentIndex]: idx };
-    setAnswers(newAnswers);
+    setAnswers(prev => ({ ...prev, [currentIndex]: idx }));
     if (mode === 'study') setShowExplanation(true);
   }
 
@@ -53,8 +54,8 @@ export default function QuizScreen({ navigation, route }: Props) {
       finishQuiz();
     } else {
       Animated.sequence([
-        Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-        Animated.timing(fadeAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 140, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 140, useNativeDriver: true }),
       ]).start();
       setCurrentIndex(i => i + 1);
       setSelected(null);
@@ -63,7 +64,8 @@ export default function QuizScreen({ navigation, route }: Props) {
   }
 
   function finishQuiz() {
-    const score = questions.filter((q, i) => answers[i] === q.correctIndex).length;
+    const finalAnswers = { ...answers };
+    const score = questions.filter((q, i) => finalAnswers[i] === q.correctIndex).length;
     const duration = (Date.now() - startTime) / 1000;
 
     const entry: QuizHistoryEntry = {
@@ -77,16 +79,16 @@ export default function QuizScreen({ navigation, route }: Props) {
 
     const topicAnswers = questions.map((q, i) => ({
       topicID: q.topic,
-      correct: answers[i] === q.correctIndex,
+      correct: finalAnswers[i] === q.correctIndex,
     }));
 
     const questionAnswers = questions.map((q, i) => ({
       id: q.id,
-      correct: answers[i] === q.correctIndex,
+      correct: finalAnswers[i] === q.correctIndex,
     }));
 
     dispatch({ type: 'RECORD_QUIZ', payload: { entry, topicAnswers, questionAnswers } });
-    navigation.replace('QuizResults', { questions, answers, score, duration, mode });
+    navigation.replace('QuizResults', { questions, answers: finalAnswers, score, duration, mode });
   }
 
   function handleExit() {
@@ -96,28 +98,33 @@ export default function QuizScreen({ navigation, route }: Props) {
     ]);
   }
 
-  const optionBg = (idx: number) => {
-    if (selected === null) return COLORS.surface;
-    if (idx === question.correctIndex) return COLORS.successLight;
-    if (idx === selected) return COLORS.dangerLight;
-    return COLORS.surface;
+  const getOptionStyle = (idx: number) => {
+    if (selected === null) return {};
+    if (idx === question.correctIndex) return { backgroundColor: COLORS.successLight, borderColor: COLORS.success };
+    if (idx === selected) return { backgroundColor: COLORS.dangerLight, borderColor: COLORS.danger };
+    return { opacity: 0.5 };
   };
 
-  const optionBorder = (idx: number) => {
-    if (selected === null) return COLORS.border;
-    if (idx === question.correctIndex) return COLORS.success;
-    if (idx === selected) return COLORS.danger;
-    return COLORS.border;
+  const getCircleStyle = (idx: number) => {
+    if (selected === null) return {};
+    if (idx === question.correctIndex) return { backgroundColor: COLORS.success };
+    if (idx === selected) return { backgroundColor: COLORS.danger };
+    return {};
   };
+
+  const isBookmarked = state.progress.bookmarkedQuestionIDs.includes(question.id);
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={handleExit} style={styles.exitBtn}>
-          <Text style={styles.exitText}>✕ יציאה</Text>
+          <Text style={styles.exitText}>✕</Text>
         </TouchableOpacity>
-        <Text style={styles.counter}>{currentIndex + 1} / {questions.length}</Text>
+        <View style={styles.counterWrap}>
+          <Text style={styles.counter}>{currentIndex + 1}</Text>
+          <Text style={styles.counterTotal}> / {questions.length}</Text>
+        </View>
         <View style={styles.modeBadge}>
           <Text style={styles.modeText}>{mode === 'study' ? '💡 לימוד' : '📋 בחינה'}</Text>
         </View>
@@ -134,9 +141,11 @@ export default function QuizScreen({ navigation, route }: Props) {
           <View style={styles.questionCard}>
             <View style={styles.questionMeta}>
               <DifficultyBadge difficulty={question.difficulty} />
-              <Text style={styles.topicTag}>
-                {TOPIC_INFO[question.topic]?.icon} {TOPIC_INFO[question.topic]?.name}
-              </Text>
+              <View style={styles.topicChip}>
+                <Text style={styles.topicChipTxt}>
+                  {TOPIC_INFO[question.topic]?.icon} {TOPIC_INFO[question.topic]?.name}
+                </Text>
+              </View>
             </View>
             <Text style={styles.questionText}>{question.questionText}</Text>
           </View>
@@ -146,21 +155,19 @@ export default function QuizScreen({ navigation, route }: Props) {
             {question.options.map((opt, idx) => (
               <TouchableOpacity
                 key={idx}
-                style={[styles.option, { backgroundColor: optionBg(idx), borderColor: optionBorder(idx) }]}
+                style={[styles.option, getOptionStyle(idx)]}
                 onPress={() => handleSelect(idx)}
                 disabled={selected !== null}
-                activeOpacity={0.7}
+                activeOpacity={0.72}
               >
-                <View style={[styles.optionCircle, selected !== null && idx === question.correctIndex && styles.optionCircleCorrect, selected !== null && idx === selected && idx !== question.correctIndex && styles.optionCircleWrong]}>
-                  <Text style={styles.optionLetter}>{String.fromCharCode(65 + idx)}</Text>
+                <View style={[styles.optionCircle, getCircleStyle(idx)]}>
+                  <Text style={[styles.optionLetter, selected !== null && (idx === question.correctIndex || idx === selected) && { color: '#fff' }]}>
+                    {OPTION_LABELS[idx]}
+                  </Text>
                 </View>
                 <Text style={styles.optionText}>{opt}</Text>
-                {selected !== null && idx === question.correctIndex && (
-                  <Text style={styles.resultIcon}>✅</Text>
-                )}
-                {selected !== null && idx === selected && idx !== question.correctIndex && (
-                  <Text style={styles.resultIcon}>❌</Text>
-                )}
+                {selected !== null && idx === question.correctIndex && <Text style={styles.resultIcon}>✅</Text>}
+                {selected !== null && idx === selected && idx !== question.correctIndex && <Text style={styles.resultIcon}>❌</Text>}
               </TouchableOpacity>
             ))}
           </View>
@@ -178,8 +185,8 @@ export default function QuizScreen({ navigation, route }: Props) {
             style={styles.bookmarkBtn}
             onPress={() => dispatch({ type: 'TOGGLE_BOOKMARK', payload: question.id })}
           >
-            <Text style={styles.bookmarkText}>
-              {state.progress.bookmarkedQuestionIDs.includes(question.id) ? '🔖 שמור' : '📎 שמור שאלה'}
+            <Text style={[styles.bookmarkText, isBookmarked && styles.bookmarkTextActive]}>
+              {isBookmarked ? '🔖 שמור' : '📎 שמור שאלה'}
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -189,7 +196,7 @@ export default function QuizScreen({ navigation, route }: Props) {
       {selected !== null && (
         <View style={styles.bottomBar}>
           <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
-            <Text style={styles.nextBtnText}>{isLast ? '📊 ראה תוצאות' : 'הבא ›'}</Text>
+            <Text style={styles.nextBtnText}>{isLast ? '📊 ראה תוצאות' : 'שאלה הבאה ›'}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -199,50 +206,62 @@ export default function QuizScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 },
-  exitBtn: { padding: 6 },
-  exitText: { color: COLORS.danger, fontSize: 14, fontWeight: '600' },
-  counter: { fontSize: 16, fontWeight: '700', color: COLORS.text },
-  modeBadge: { backgroundColor: COLORS.primaryLight, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
-  modeText: { fontSize: 12, color: COLORS.primary, fontWeight: '600' },
-  progressBg: { height: 5, backgroundColor: COLORS.border, marginHorizontal: 0 },
-  progressFill: { height: 5, backgroundColor: COLORS.primary },
-  scroll: { padding: 16, paddingBottom: 100 },
-  questionCard: {
-    backgroundColor: COLORS.surface, borderRadius: 18, padding: 20, marginBottom: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12,
   },
-  questionMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  topicTag: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '500' },
-  questionText: { fontSize: 17, fontWeight: '700', color: COLORS.text, textAlign: 'right', lineHeight: 26 },
+  exitBtn: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: COLORS.dangerLight, justifyContent: 'center', alignItems: 'center',
+  },
+  exitText: { color: COLORS.danger, fontSize: 16, fontWeight: '700' },
+  counterWrap: { flexDirection: 'row', alignItems: 'baseline' },
+  counter: { fontSize: 22, fontWeight: '800', color: COLORS.text },
+  counterTotal: { fontSize: 15, color: COLORS.textSecondary, fontWeight: '600' },
+  modeBadge: { backgroundColor: COLORS.primaryLight, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  modeText: { fontSize: 12, color: COLORS.primary, fontWeight: '700' },
+  progressBg: { height: 4, backgroundColor: COLORS.border },
+  progressFill: { height: 4, backgroundColor: COLORS.primary },
+  scroll: { padding: 16, paddingBottom: 110 },
+  questionCard: {
+    backgroundColor: COLORS.surface, borderRadius: 20, padding: 20, marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.09, shadowRadius: 10, elevation: 5,
+  },
+  questionMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  topicChip: {
+    backgroundColor: COLORS.background, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  topicChipTxt: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
+  questionText: { fontSize: 17, fontWeight: '700', color: COLORS.text, textAlign: 'right', lineHeight: 27 },
   optionsWrap: { gap: 10, marginBottom: 16 },
   option: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: COLORS.surface, borderRadius: 14, padding: 14,
-    borderWidth: 1.5,
+    backgroundColor: COLORS.surface, borderRadius: 16, padding: 16,
+    borderWidth: 1.5, borderColor: COLORS.border,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
   optionCircle: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: COLORS.border, justifyContent: 'center', alignItems: 'center',
+    width: 36, height: 36, borderRadius: 12,
+    backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.border,
   },
-  optionCircleCorrect: { backgroundColor: COLORS.success },
-  optionCircleWrong: { backgroundColor: COLORS.danger },
-  optionLetter: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  optionLetter: { fontSize: 15, fontWeight: '800', color: COLORS.textSecondary },
   optionText: { flex: 1, fontSize: 15, color: COLORS.text, textAlign: 'right', lineHeight: 22 },
   resultIcon: { fontSize: 20 },
   explanation: {
-    backgroundColor: '#FFF7ED', borderRadius: 14, padding: 16, marginBottom: 14,
-    borderLeftWidth: 4, borderLeftColor: COLORS.warning,
+    backgroundColor: '#FFFBEB', borderRadius: 16, padding: 16, marginBottom: 14,
+    borderWidth: 1, borderColor: COLORS.warning + '40',
   },
-  explanationTitle: { fontSize: 14, fontWeight: '700', color: COLORS.warning, marginBottom: 6, textAlign: 'right' },
+  explanationTitle: { fontSize: 14, fontWeight: '800', color: COLORS.warning, marginBottom: 8, textAlign: 'right' },
   explanationText: { fontSize: 14, color: COLORS.text, lineHeight: 22, textAlign: 'right' },
-  bookmarkBtn: { alignItems: 'flex-end', paddingVertical: 8 },
-  bookmarkText: { fontSize: 14, color: COLORS.textSecondary },
+  bookmarkBtn: { alignSelf: 'flex-end', paddingVertical: 8, paddingHorizontal: 12 },
+  bookmarkText: { fontSize: 14, color: COLORS.textSecondary, fontWeight: '600' },
+  bookmarkTextActive: { color: COLORS.primary },
   bottomBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: COLORS.surface, padding: 16,
+    backgroundColor: COLORS.surface, padding: 16, paddingBottom: 24,
     shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 10,
   },
-  nextBtn: { backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  nextBtn: { backgroundColor: COLORS.primary, borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   nextBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
 });

@@ -1,15 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useApp } from '../../store/AppContext';
 import { COLORS } from '../../utils/colors';
 
-const { width } = Dimensions.get('window');
-
 const FEATURES = [
-  { icon: '📚', text: 'בנק שאלות מקיף לבחינת אמירנט' },
-  { icon: '🧠', text: 'מבחן אדפטיבי המתאים לרמתך' },
-  { icon: '📊', text: 'מעקב התקדמות ואנליטיקס מפורט' },
-  { icon: '👑', text: 'ניהול מלא למנהלים: ייבוא, פרקים ובחינות' },
+  { icon: '📚', text: 'בנק שאלות מקיף לבחינת אמירנט', color: '#DBEAFE' },
+  { icon: '🧠', text: 'מבחן אדפטיבי המתאים לרמתך', color: '#F3E8FF' },
+  { icon: '📊', text: 'מעקב התקדמות ואנליטיקס מפורט', color: '#DCFCE7' },
+  { icon: '👑', text: 'ניהול מלא: ייבוא, פרקים ובחינות', color: '#FEF3C7' },
 ];
 
 export default function LandingScreen({ navigation }: any) {
@@ -22,18 +20,24 @@ export default function LandingScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Decorative blobs */}
+      <View style={styles.blobTop} />
+      <View style={styles.blobBottom} />
+
       <View style={styles.heroSection}>
         <View style={styles.logoWrap}>
           <Text style={styles.logoIcon}>🌐</Text>
         </View>
         <Text style={styles.title}>AmirNet Plus</Text>
         <Text style={styles.subtitle}>הכנה חכמה לבחינת אמירנט</Text>
-        <Text style={styles.version}>גרסה 2.0</Text>
+        <View style={styles.versionBadge}>
+          <Text style={styles.versionText}>גרסה 2.0</Text>
+        </View>
       </View>
 
       <View style={styles.featuresSection}>
         {FEATURES.map((f, i) => (
-          <View key={i} style={styles.featureRow}>
+          <View key={i} style={[styles.featureCard, { backgroundColor: f.color }]}>
             <Text style={styles.featureText}>{f.text}</Text>
             <Text style={styles.featureIcon}>{f.icon}</Text>
           </View>
@@ -42,12 +46,12 @@ export default function LandingScreen({ navigation }: any) {
 
       <View style={styles.footer}>
         <TouchableOpacity style={styles.startBtn} onPress={handleGetStarted} activeOpacity={0.85}>
-          <Text style={styles.startBtnText}>התחל עכשיו</Text>
+          <Text style={styles.startBtnText}>התחל עכשיו ›</Text>
         </TouchableOpacity>
 
         <View style={styles.credentialHint}>
-          <Text style={styles.hintText}>כניסה ראשונה:</Text>
-          <Text style={styles.hintCode}>  admin / admin123</Text>
+          <Text style={styles.hintCode}>admin / admin123</Text>
+          <Text style={styles.hintText}>כניסה ראשונה: </Text>
         </View>
       </View>
     </SafeAreaView>
@@ -59,6 +63,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.primary,
   },
+  blobTop: {
+    position: 'absolute', top: -60, right: -60,
+    width: 200, height: 200, borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  blobBottom: {
+    position: 'absolute', bottom: 100, left: -80,
+    width: 220, height: 220, borderRadius: 110,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
   heroSection: {
     flex: 1,
     justifyContent: 'center',
@@ -66,65 +80,73 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   logoWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 100,
+    height: 100,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 22,
   },
-  logoIcon: {
-    fontSize: 52,
-  },
+  logoIcon: { fontSize: 54 },
   title: {
-    fontSize: 36,
+    fontSize: 38,
     fontWeight: '800',
     color: '#fff',
     marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.85)',
+    fontSize: 17,
+    color: 'rgba(255,255,255,0.82)',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  version: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
-  },
-  featuresSection: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginHorizontal: 20,
+  versionBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 20,
-    padding: 20,
-    gap: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
-  featureRow: {
+  versionText: { fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: '600' },
+  featuresSection: {
+    marginHorizontal: 20,
+    gap: 8,
+  },
+  featureCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 12,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  featureIcon: {
-    fontSize: 24,
-  },
+  featureIcon: { fontSize: 22 },
   featureText: {
-    fontSize: 15,
-    color: '#fff',
+    fontSize: 14,
+    color: COLORS.text,
     textAlign: 'right',
     flex: 1,
+    fontWeight: '500',
   },
   footer: {
     padding: 24,
-    gap: 16,
+    gap: 14,
   },
   startBtn: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 17,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   startBtnText: {
     fontSize: 18,
@@ -135,15 +157,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 4,
   },
-  hintText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 13,
-  },
+  hintText: { color: 'rgba(255,255,255,0.65)', fontSize: 13 },
   hintCode: {
     color: '#fff',
     fontSize: 13,
     fontFamily: 'monospace',
-    fontWeight: '600',
+    fontWeight: '700',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
 });

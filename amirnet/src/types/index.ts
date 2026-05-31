@@ -155,3 +155,10 @@ export interface Announcement {
   type: 'info' | 'warning' | 'success';
   createdAt: string;
 }
+
+export interface SystemSettings {
+  defaultQuestionCount: number;
+  defaultPassingScore: number;
+  defaultMode: 'exam' | 'study';
+  defaultDifficulty: string;
+}

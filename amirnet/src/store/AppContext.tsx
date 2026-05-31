@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useReducer, useCallback } 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AppUser, UserRole, UserProgress, Question, Chapter, ExamTemplate,
-  TopicID, Difficulty, QuizHistoryEntry, StudyPlan, QuestionPerformance, Announcement,
+  TopicID, Difficulty, QuizHistoryEntry, StudyPlan, QuestionPerformance, Announcement, SystemSettings,
 } from '../types';
 import { hashPassword, generateId } from '../utils/hashUtils';
 import { BUILT_IN_QUESTIONS } from '../data/questions';
@@ -25,6 +25,7 @@ interface AppState {
   chapters: Chapter[];
   examTemplates: ExamTemplate[];
   announcements: Announcement[];
+  systemSettings: SystemSettings;
   isLoaded: boolean;
 }
 
@@ -45,6 +46,13 @@ const defaultProgress: UserProgress = {
   questionPerformance: {},
 };
 
+const defaultSystemSettings: SystemSettings = {
+  defaultQuestionCount: 20,
+  defaultPassingScore: 70,
+  defaultMode: 'exam',
+  defaultDifficulty: 'all',
+};
+
 const initialState: AppState = {
   auth: {
     users: [],
@@ -57,6 +65,7 @@ const initialState: AppState = {
   chapters: [],
   examTemplates: [],
   announcements: [],
+  systemSettings: defaultSystemSettings,
   isLoaded: false,
 };
 
@@ -92,7 +101,8 @@ type Action =
   | { type: 'ASSIGN_QUESTION_CHAPTER'; payload: { questionID: string; chapterID: string } }
   | { type: 'REMOVE_QUESTION_CHAPTER'; payload: { questionID: string; chapterID: string } }
   | { type: 'ADD_ANNOUNCEMENT'; payload: Announcement }
-  | { type: 'DELETE_ANNOUNCEMENT'; payload: string };
+  | { type: 'DELETE_ANNOUNCEMENT'; payload: string }
+  | { type: 'UPDATE_SYSTEM_SETTINGS'; payload: Partial<SystemSettings> };
 
 function recalcWeakTopics(topicProgress: Record<string, { answeredCount: number; correctCount: number }>): string[] {
   return Object.entries(topicProgress)
@@ -310,6 +320,9 @@ function reducer(state: AppState, action: Action): AppState {
     case 'DELETE_ANNOUNCEMENT':
       return { ...state, announcements: state.announcements.filter(a => a.id !== action.payload) };
 
+    case 'UPDATE_SYSTEM_SETTINGS':
+      return { ...state, systemSettings: { ...state.systemSettings, ...action.payload } };
+
     default:
       return state;
   }
@@ -376,6 +389,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         chapters: state.chapters,
         examTemplates: state.examTemplates,
         announcements: state.announcements,
+        systemSettings: state.systemSettings,
       };
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toSave)).catch(() => {});
     }, 500);

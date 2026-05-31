@@ -4,16 +4,34 @@ import { useApp } from '../../store/AppContext';
 import { COLORS } from '../../utils/colors';
 import { BUILT_IN_QUESTIONS } from '../../data/questions';
 
-const ADMIN_ITEMS = [
-  { icon: '❓', label: 'ניהול שאלות',       sub: (c: any) => `${BUILT_IN_QUESTIONS.length} מובנות · ${c.customQuestions.length} מותאמות`, screen: 'QuestionManager', color: COLORS.primary },
-  { icon: '📥', label: 'ייבוא שאלות',       sub: () => 'CSV / JSON',                                                                         screen: 'ImportQuestions',  color: COLORS.success },
-  { icon: '📤', label: 'ייצוא שאלות',       sub: (c: any) => `${c.customQuestions.length} מותאמות לייצוא`,                                     screen: 'ExportQuestions',  color: COLORS.info },
-  { icon: '📚', label: 'ניהול פרקים',       sub: (c: any) => `${c.chapters.length} פרקים`,                                                    screen: 'ChapterManager',   color: COLORS.orange },
-  { icon: '📋', label: 'ניהול בחינות',      sub: (c: any) => `${c.examTemplates.length} תבניות`,                                              screen: 'ExamManager',      color: COLORS.secondary },
-  { icon: '👥', label: 'ניהול משתמשים',     sub: (c: any) => `${c.auth.users.length} משתמשים`,                                                screen: 'UserManager',      color: COLORS.info },
-  { icon: '📢', label: 'הכרזות',            sub: (c: any) => `${c.announcements.length} פעילות`,                                              screen: 'Announcements',    color: COLORS.warning },
-  { icon: '📊', label: 'סטטיסטיקות מתקדמות', sub: () => 'ניתוח ביצועים ונתונים',                                                              screen: 'SystemStats',      color: COLORS.purple },
-  { icon: '💾', label: 'גיבוי ושחזור',      sub: () => 'ייצוא / ייבוא נתונים',                                                                screen: 'BackupRestore',    color: COLORS.success },
+const SECTIONS = [
+  {
+    title: 'ניהול תוכן',
+    items: [
+      { icon: '❓', label: 'ניהול שאלות',       sub: (c: any) => `${BUILT_IN_QUESTIONS.length + c.customQuestions.length} שאלות סה"כ`, screen: 'QuestionManager',   color: COLORS.primary },
+      { icon: '📥', label: 'ייבוא שאלות',       sub: () => 'CSV / JSON',                                                                  screen: 'ImportQuestions',  color: COLORS.success },
+      { icon: '📤', label: 'ייצוא שאלות',       sub: (c: any) => `${c.customQuestions.length} מותאמות לייצוא`,                           screen: 'ExportQuestions',  color: COLORS.info },
+      { icon: '📚', label: 'ניהול פרקים',       sub: (c: any) => `${c.chapters.length} פרקים`,                                           screen: 'ChapterManager',   color: COLORS.orange },
+      { icon: '📋', label: 'ניהול בחינות',      sub: (c: any) => `${c.examTemplates.length} תבניות`,                                     screen: 'ExamManager',      color: COLORS.secondary },
+      { icon: '🏷️', label: 'ניהול תגיות',       sub: () => 'ארגון ועיון תגיות שאלות',                                                    screen: 'TagManager',        color: COLORS.primary },
+      { icon: '⚡', label: 'בנאי בחינה מהיר',   sub: () => 'בניית בחינה 3 שלבים',                                                       screen: 'QuickExamBuilder', color: COLORS.success },
+    ],
+  },
+  {
+    title: 'משתמשים ותקשורת',
+    items: [
+      { icon: '👥', label: 'ניהול משתמשים',     sub: (c: any) => `${c.auth.users.length} משתמשים`,                                       screen: 'UserManager',      color: COLORS.info },
+      { icon: '📢', label: 'הכרזות',            sub: (c: any) => `${c.announcements.length} פעילות`,                                     screen: 'Announcements',    color: COLORS.warning },
+    ],
+  },
+  {
+    title: 'ניתוח ומערכת',
+    items: [
+      { icon: '📊', label: 'סטטיסטיקות מתקדמות', sub: () => 'ניתוח ביצועים ונתונים',                                                    screen: 'SystemStats',      color: COLORS.purple },
+      { icon: '⚙️', label: 'הגדרות מערכת',       sub: () => 'ברירות מחדל לבחינה',                                                        screen: 'SystemSettings',   color: COLORS.secondary },
+      { icon: '💾', label: 'גיבוי ושחזור',       sub: () => 'ייצוא / ייבוא נתונים',                                                      screen: 'BackupRestore',    color: COLORS.success },
+    ],
+  },
 ];
 
 export default function AdminScreen({ navigation }: any) {
@@ -45,44 +63,44 @@ export default function AdminScreen({ navigation }: any) {
 
         {/* Stats summary */}
         <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statVal}>{BUILT_IN_QUESTIONS.length + state.customQuestions.length}</Text>
-            <Text style={styles.statLbl}>שאלות</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statVal}>{state.chapters.length}</Text>
-            <Text style={styles.statLbl}>פרקים</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statVal}>{state.examTemplates.length}</Text>
-            <Text style={styles.statLbl}>בחינות</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statVal}>{state.auth.users.length}</Text>
-            <Text style={styles.statLbl}>משתמשים</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statVal}>{state.announcements.length}</Text>
-            <Text style={styles.statLbl}>הכרזות</Text>
-          </View>
+          {[
+            { val: BUILT_IN_QUESTIONS.length + state.customQuestions.length, lbl: 'שאלות' },
+            { val: state.chapters.length, lbl: 'פרקים' },
+            { val: state.examTemplates.length, lbl: 'בחינות' },
+            { val: state.auth.users.length, lbl: 'משתמשים' },
+            { val: state.announcements.length, lbl: 'הכרזות' },
+          ].map(s => (
+            <View key={s.lbl} style={styles.statBox}>
+              <Text style={styles.statVal}>{s.val}</Text>
+              <Text style={styles.statLbl}>{s.lbl}</Text>
+            </View>
+          ))}
         </View>
 
-        {ADMIN_ITEMS.map(item => (
-          <TouchableOpacity
-            key={item.screen}
-            style={styles.menuItem}
-            onPress={() => navigation.navigate(item.screen)}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.menuChevron}>›</Text>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Text style={styles.menuSub}>{item.sub(state)}</Text>
+        {SECTIONS.map(section => (
+          <View key={section.title}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionAccent} />
+              <Text style={styles.sectionTitle}>{section.title}</Text>
             </View>
-            <View style={[styles.menuIconWrap, { backgroundColor: item.color + '20' }]}>
-              <Text style={styles.menuIcon}>{item.icon}</Text>
-            </View>
-          </TouchableOpacity>
+            {section.items.map(item => (
+              <TouchableOpacity
+                key={item.screen}
+                style={styles.menuItem}
+                onPress={() => navigation.navigate(item.screen)}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.menuChevron}>›</Text>
+                <View style={styles.menuContent}>
+                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  <Text style={styles.menuSub}>{item.sub(state)}</Text>
+                </View>
+                <View style={[styles.menuIconWrap, { backgroundColor: item.color + '20' }]}>
+                  <Text style={styles.menuIcon}>{item.icon}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         ))}
 
         <View style={{ height: 30 }} />
@@ -105,18 +123,21 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3,
   },
   statBox: { flex: 1, alignItems: 'center' },
-  statVal: { fontSize: 22, fontWeight: '800', color: COLORS.primary },
-  statLbl: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+  statVal: { fontSize: 20, fontWeight: '800', color: COLORS.primary },
+  statLbl: { fontSize: 10, color: COLORS.textSecondary, marginTop: 2, textAlign: 'center' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginBottom: 10, marginTop: 8 },
+  sectionAccent: { width: 3, height: 16, borderRadius: 2, backgroundColor: COLORS.primary },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   menuItem: {
-    backgroundColor: COLORS.surface, borderRadius: 16, padding: 16, marginBottom: 10,
+    backgroundColor: COLORS.surface, borderRadius: 16, padding: 16, marginBottom: 8,
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2,
   },
   menuIconWrap: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   menuIcon: { fontSize: 26 },
   menuContent: { flex: 1, alignItems: 'flex-end' },
   menuLabel: { fontSize: 16, fontWeight: '700', color: COLORS.text, textAlign: 'right' },
-  menuSub: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'right', marginTop: 2 },
+  menuSub: { fontSize: 12, color: COLORS.textSecondary, textAlign: 'right', marginTop: 2 },
   menuChevron: { fontSize: 22, color: COLORS.textTertiary },
   noAccess: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   noAccessIcon: { fontSize: 60 },
