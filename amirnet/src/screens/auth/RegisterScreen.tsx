@@ -16,22 +16,16 @@ export default function RegisterScreen({ navigation }: any) {
 
   function handleRegister() {
     if (!displayName.trim() || !username.trim() || !password.trim()) {
-      Alert.alert('שגיאה', 'יש למלא את כל השדות');
-      return;
+      Alert.alert('שגיאה', 'יש למלא את כל השדות'); return;
     }
     if (password !== confirmPass) {
-      Alert.alert('שגיאה', 'הסיסמאות אינן תואמות');
-      return;
+      Alert.alert('שגיאה', 'הסיסמאות אינן תואמות'); return;
     }
     if (password.length < 6) {
-      Alert.alert('שגיאה', 'הסיסמה חייבת להיות לפחות 6 תווים');
-      return;
+      Alert.alert('שגיאה', 'הסיסמה חייבת להיות לפחות 6 תווים'); return;
     }
     const ok = createUser(username.trim(), password, 'student', displayName.trim());
-    if (!ok) {
-      Alert.alert('שגיאה', 'שם המשתמש כבר קיים');
-      return;
-    }
+    if (!ok) { Alert.alert('שגיאה', 'שם המשתמש כבר קיים'); return; }
     Alert.alert('הצלחה', 'החשבון נוצר! כנס/י לחשבון', [
       { text: 'כניסה', onPress: () => navigation.navigate('Login') },
     ]);
@@ -40,32 +34,39 @@ export default function RegisterScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-            <Text style={styles.backText}>← חזרה</Text>
-          </TouchableOpacity>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-          <View style={styles.header}>
-            <Text style={styles.title}>יצירת חשבון</Text>
-            <Text style={styles.subtitle}>הצטרף לAmirNet Plus</Text>
+          {/* Hero */}
+          <View style={styles.hero}>
+            <View style={styles.blob} />
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+              <Text style={styles.backTxt}>‹ חזרה</Text>
+            </TouchableOpacity>
+            <View style={styles.heroIcon}><Text style={styles.heroIconTxt}>🎓</Text></View>
+            <Text style={styles.heroTitle}>יצירת חשבון</Text>
+            <Text style={styles.heroSub}>הצטרף ל-AmirNet Plus</Text>
           </View>
 
-          <View style={styles.form}>
+          {/* Form card */}
+          <View style={styles.formCard}>
             {[
-              { label: 'שם מלא', value: displayName, setter: setDisplayName, placeholder: 'השם שלך', autoCapitalize: 'words' as const },
-              { label: 'שם משתמש', value: username, setter: setUsername, placeholder: 'לדוגמה: user123', autoCapitalize: 'none' as const },
+              { label: 'שם מלא', value: displayName, setter: setDisplayName, placeholder: 'הזן שם מלא', autoCapitalize: 'words' as const, icon: '👤' },
+              { label: 'שם משתמש', value: username, setter: setUsername, placeholder: 'לדוגמה: user123', autoCapitalize: 'none' as const, icon: '🏷️' },
             ].map(f => (
               <View key={f.label} style={styles.fieldWrap}>
                 <Text style={styles.label}>{f.label}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={f.value}
-                  onChangeText={f.setter}
-                  placeholder={f.placeholder}
-                  placeholderTextColor={COLORS.textTertiary}
-                  autoCapitalize={f.autoCapitalize}
-                  textAlign="right"
-                />
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0 }]}
+                    value={f.value}
+                    onChangeText={f.setter}
+                    placeholder={f.placeholder}
+                    placeholderTextColor={COLORS.textTertiary}
+                    autoCapitalize={f.autoCapitalize}
+                    textAlign="right"
+                  />
+                  <Text style={styles.inputIcon}>{f.icon}</Text>
+                </View>
               </View>
             ))}
 
@@ -75,7 +76,7 @@ export default function RegisterScreen({ navigation }: any) {
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="הכנס סיסמה"
+                placeholder="הזן סיסמה"
                 placeholderTextColor={COLORS.textTertiary}
                 secureTextEntry={!showPass}
                 textAlign="right"
@@ -94,18 +95,19 @@ export default function RegisterScreen({ navigation }: any) {
                 textAlign="right"
               />
               {confirmPass.length > 0 && password !== confirmPass && (
-                <Text style={{ color: COLORS.danger, fontSize: 12, textAlign: 'right' }}>הסיסמאות אינן תואמות</Text>
+                <Text style={styles.passError}>הסיסמאות אינן תואמות</Text>
               )}
             </View>
 
             <TouchableOpacity onPress={() => setShowPass(v => !v)} style={styles.showPassRow}>
-              <Text style={styles.showPassText}>{showPass ? '🙈 הסתר סיסמה' : '👁️ הצג סיסמה'}</Text>
+              <Text style={styles.showPassTxt}>{showPass ? '🙈 הסתר סיסמה' : '👁️ הצג סיסמה'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.registerBtn} onPress={handleRegister} activeOpacity={0.85}>
-              <Text style={styles.registerBtnText}>צור חשבון</Text>
+              <Text style={styles.registerBtnTxt}>צור חשבון →</Text>
             </TouchableOpacity>
           </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -114,43 +116,38 @@ export default function RegisterScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { flexGrow: 1, padding: 24 },
-  back: { marginBottom: 8 },
-  backText: { color: COLORS.primary, fontSize: 15 },
-  header: { alignItems: 'center', marginBottom: 28 },
-  title: { fontSize: 26, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
-  subtitle: { fontSize: 15, color: COLORS.textSecondary },
-  form: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: 24,
-    gap: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+  scroll: { flexGrow: 1 },
+  hero: {
+    backgroundColor: COLORS.secondary, paddingTop: 40, paddingBottom: 52,
+    paddingHorizontal: 32, alignItems: 'center', overflow: 'hidden',
+    borderBottomLeftRadius: 32, borderBottomRightRadius: 32,
   },
-  fieldWrap: { gap: 5 },
-  label: { fontSize: 14, fontWeight: '600', color: COLORS.text, textAlign: 'right' },
+  blob: { position: 'absolute', top: -30, left: -40, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.08)' },
+  backBtn: { alignSelf: 'flex-start', marginBottom: 16 },
+  backTxt: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '600' },
+  heroIcon: { width: 72, height: 72, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  heroIconTxt: { fontSize: 38 },
+  heroTitle: { fontSize: 26, fontWeight: '800', color: '#fff', marginBottom: 6 },
+  heroSub: { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
+  formCard: {
+    backgroundColor: COLORS.surface, margin: 20, borderRadius: 22, padding: 22, gap: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 16, elevation: 6,
+    marginTop: -20,
+  },
+  fieldWrap: { gap: 7 },
+  label: { fontSize: 14, fontWeight: '700', color: COLORS.text, textAlign: 'right' },
+  inputRow: { flexDirection: 'row', alignItems: 'center' },
+  inputIcon: { fontSize: 18, paddingHorizontal: 10, backgroundColor: COLORS.background, borderWidth: 1.5, borderColor: COLORS.border, borderTopRightRadius: 12, borderBottomRightRadius: 12, height: 48, textAlignVertical: 'center', lineHeight: 48 },
   input: {
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: COLORS.text,
-    backgroundColor: COLORS.background,
+    borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 12,
+    paddingHorizontal: 14, height: 48, fontSize: 15, color: COLORS.text, backgroundColor: COLORS.background,
   },
+  passError: { color: COLORS.danger, fontSize: 12, textAlign: 'right' },
   showPassRow: { alignItems: 'flex-end' },
-  showPassText: { color: COLORS.textSecondary, fontSize: 13 },
+  showPassTxt: { color: COLORS.textSecondary, fontSize: 13 },
   registerBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 4,
+    backgroundColor: COLORS.secondary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 4,
+    shadowColor: COLORS.secondary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
-  registerBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  registerBtnTxt: { color: '#fff', fontSize: 17, fontWeight: '800' },
 });

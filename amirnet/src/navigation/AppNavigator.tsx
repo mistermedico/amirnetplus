@@ -33,6 +33,9 @@ import BackupRestoreScreen from '../screens/admin/BackupRestoreScreen';
 import TagManagerScreen from '../screens/admin/TagManagerScreen';
 import QuickExamBuilderScreen from '../screens/admin/QuickExamBuilderScreen';
 import SystemSettingsScreen from '../screens/admin/SystemSettingsScreen';
+import StudyPlanManagerScreen from '../screens/admin/StudyPlanManagerScreen';
+import QuestionPerformanceScreen from '../screens/admin/QuestionPerformanceScreen';
+import ActivityCalendarScreen from '../screens/admin/ActivityCalendarScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -130,6 +133,9 @@ function AdminStack() {
       <Stack.Screen name="TagManager" component={TagManagerScreen} />
       <Stack.Screen name="QuickExamBuilder" component={QuickExamBuilderScreen} />
       <Stack.Screen name="SystemSettings" component={SystemSettingsScreen} />
+      <Stack.Screen name="StudyPlanManager" component={StudyPlanManagerScreen} />
+      <Stack.Screen name="QuestionPerformance" component={QuestionPerformanceScreen} />
+      <Stack.Screen name="ActivityCalendar" component={ActivityCalendarScreen} />
       <Stack.Screen name="QuizSetup" component={QuizSetupScreen} />
       <Stack.Screen name="Quiz" component={QuizScreen} />
       <Stack.Screen name="QuizResults" component={QuizResultsScreen} />

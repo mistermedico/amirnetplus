@@ -11,10 +11,11 @@ const SECTIONS = [
       { icon: '❓', label: 'ניהול שאלות',       sub: (c: any) => `${BUILT_IN_QUESTIONS.length + c.customQuestions.length} שאלות סה"כ`, screen: 'QuestionManager',   color: COLORS.primary },
       { icon: '📥', label: 'ייבוא שאלות',       sub: () => 'CSV / JSON',                                                                  screen: 'ImportQuestions',  color: COLORS.success },
       { icon: '📤', label: 'ייצוא שאלות',       sub: (c: any) => `${c.customQuestions.length} מותאמות לייצוא`,                           screen: 'ExportQuestions',  color: COLORS.info },
-      { icon: '📚', label: 'ניהול פרקים',       sub: (c: any) => `${c.chapters.length} פרקים`,                                           screen: 'ChapterManager',   color: COLORS.orange },
-      { icon: '📋', label: 'ניהול בחינות',      sub: (c: any) => `${c.examTemplates.length} תבניות`,                                     screen: 'ExamManager',      color: COLORS.secondary },
-      { icon: '🏷️', label: 'ניהול תגיות',       sub: () => 'ארגון ועיון תגיות שאלות',                                                    screen: 'TagManager',        color: COLORS.primary },
-      { icon: '⚡', label: 'בנאי בחינה מהיר',   sub: () => 'בניית בחינה 3 שלבים',                                                       screen: 'QuickExamBuilder', color: COLORS.success },
+      { icon: '📚', label: 'ניהול פרקים',        sub: (c: any) => `${c.chapters.length} פרקים`,                                           screen: 'ChapterManager',     color: COLORS.orange },
+      { icon: '📋', label: 'ניהול בחינות',      sub: (c: any) => `${c.examTemplates.length} תבניות`,                                     screen: 'ExamManager',        color: COLORS.secondary },
+      { icon: '🏷️', label: 'ניהול תגיות',       sub: () => 'ארגון ועיון תגיות שאלות',                                                    screen: 'TagManager',          color: COLORS.primary },
+      { icon: '⚡', label: 'בנאי בחינה מהיר',   sub: () => 'בניית בחינה 3 שלבים',                                                       screen: 'QuickExamBuilder',   color: COLORS.success },
+      { icon: '📅', label: 'תוכניות לימוד',      sub: (c: any) => `${c.progress?.studyPlans?.length ?? 0} תוכניות`,                     screen: 'StudyPlanManager',   color: COLORS.info },
     ],
   },
   {
@@ -27,9 +28,11 @@ const SECTIONS = [
   {
     title: 'ניתוח ומערכת',
     items: [
-      { icon: '📊', label: 'סטטיסטיקות מתקדמות', sub: () => 'ניתוח ביצועים ונתונים',                                                    screen: 'SystemStats',      color: COLORS.purple },
-      { icon: '⚙️', label: 'הגדרות מערכת',       sub: () => 'ברירות מחדל לבחינה',                                                        screen: 'SystemSettings',   color: COLORS.secondary },
-      { icon: '💾', label: 'גיבוי ושחזור',       sub: () => 'ייצוא / ייבוא נתונים',                                                      screen: 'BackupRestore',    color: COLORS.success },
+      { icon: '📊', label: 'סטטיסטיקות מתקדמות', sub: () => 'ניתוח ביצועים ונתונים',                                                    screen: 'SystemStats',           color: COLORS.purple },
+      { icon: '🎯', label: 'ביצועי שאלות',        sub: () => 'דיוק וקושי לפי שאלה',                                                     screen: 'QuestionPerformance',   color: COLORS.danger },
+      { icon: '📆', label: 'לוח פעילות',          sub: () => 'לוח פעילות חודשי',                                                         screen: 'ActivityCalendar',      color: COLORS.info },
+      { icon: '⚙️', label: 'הגדרות מערכת',        sub: () => 'ברירות מחדל לבחינה',                                                        screen: 'SystemSettings',        color: COLORS.secondary },
+      { icon: '💾', label: 'גיבוי ושחזור',        sub: () => 'ייצוא / ייבוא נתונים',                                                      screen: 'BackupRestore',         color: COLORS.success },
     ],
   },
 ];
