@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, SafeAreaView as RNSafeAreaView } from 'react-native';
+import { DifficultyBadge } from '../components/common';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -37,6 +38,7 @@ import StudyPlanManagerScreen from '../screens/admin/StudyPlanManagerScreen';
 import QuestionPerformanceScreen from '../screens/admin/QuestionPerformanceScreen';
 import ActivityCalendarScreen from '../screens/admin/ActivityCalendarScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
+import { BUILT_IN_QUESTIONS } from '../data/questions';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -109,6 +111,7 @@ function QuizStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="QuizSetupMain" component={QuizSetupScreen} />
+      <Stack.Screen name="QuizSetup" component={QuizSetupScreen} />
       <Stack.Screen name="Quiz" component={QuizScreen} />
       <Stack.Screen name="QuizResults" component={QuizResultsScreen} />
       <Stack.Screen name="AdaptiveSetup" component={AdaptiveSetupScreen} />
@@ -145,24 +148,22 @@ function AdminStack() {
 
 // Simple bookmarks screen inline
 function BookmarksScreen({ navigation }: any) {
-  const { state, dispatch } = useApp();
-  const { FlatList, SafeAreaView } = require('react-native');
-  const { DifficultyBadge } = require('../components/common');
-  const bookmarked = [...require('../data/questions').BUILT_IN_QUESTIONS, ...state.customQuestions]
+  const { state } = useApp();
+  const bookmarked = [...BUILT_IN_QUESTIONS, ...state.customQuestions]
     .filter(q => state.progress.bookmarkedQuestionIDs.includes(q.id));
 
   if (bookmarked.length === 0) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' }}>
+      <RNSafeAreaView style={{ flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ fontSize: 48 }}>🔖</Text>
         <Text style={{ fontSize: 16, color: COLORS.textSecondary, marginTop: 10 }}>אין שאלות שמורות</Text>
         <Text style={{ fontSize: 13, color: COLORS.textTertiary, marginTop: 4 }}>לחץ על 📎 בזמן בחינה כדי לשמור</Text>
-      </SafeAreaView>
+      </RNSafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+    <RNSafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
       <View style={{ padding: 16 }}>
         <Text style={{ fontSize: 22, fontWeight: '800', color: COLORS.text, textAlign: 'right' }}>
           🔖 שאלות שמורות ({bookmarked.length})
@@ -186,7 +187,7 @@ function BookmarksScreen({ navigation }: any) {
           </View>
         )}
       />
-    </SafeAreaView>
+    </RNSafeAreaView>
   );
 }
 

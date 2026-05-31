@@ -48,7 +48,7 @@ export default function ExamManagerScreen({ navigation }: any) {
         chapterIDs: selectedChapters, additionalQuestionIDs: [],
         questionCount: parseInt(qCount) || 30, durationMinutes: parseInt(duration) || 60,
         passingScore: parseInt(passingScore) || 70, isActive: true,
-        allowAllTopics: selectedChapters.length === 0, topicIDs: [],
+        topicIDs: [],
         createdAt: new Date().toISOString(),
       };
       dispatch({ type: 'ADD_EXAM', payload: exam });
