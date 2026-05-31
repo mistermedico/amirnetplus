@@ -4,6 +4,13 @@ import { useApp } from '../../store/AppContext';
 import { COLORS, TOPIC_COLORS } from '../../utils/colors';
 import { Card, StatCard, ProgressBar, SectionHeader, EmptyState } from '../../components/common';
 import { BUILT_IN_QUESTIONS } from '../../data/questions';
+import { Announcement } from '../../types';
+
+const ANN_STYLE: Record<Announcement['type'], { bg: string; border: string; color: string; icon: string }> = {
+  info:    { bg: COLORS.infoLight,    border: COLORS.info,    color: COLORS.info,    icon: 'ℹ️' },
+  success: { bg: COLORS.successLight, border: COLORS.success, color: COLORS.success, icon: '✅' },
+  warning: { bg: COLORS.warningLight, border: COLORS.warning, color: COLORS.warning, icon: '⚠️' },
+};
 
 const TOPIC_INFO: Record<string, { name: string; icon: string }> = {
   networking:       { name: 'רשתות תקשורת', icon: '🌐' },
@@ -43,6 +50,24 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.avatarText}>{user?.displayName?.[0]?.toUpperCase() || 'U'}</Text>
           </View>
         </View>
+
+        {/* Announcements */}
+        {state.announcements.length > 0 && (
+          <View style={styles.announcementsWrap}>
+            {state.announcements.map(ann => {
+              const s = ANN_STYLE[ann.type];
+              return (
+                <View key={ann.id} style={[styles.annBanner, { backgroundColor: s.bg, borderLeftColor: s.border }]}>
+                  <Text style={styles.annIcon}>{s.icon}</Text>
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <Text style={[styles.annTitle, { color: s.color }]}>{ann.title}</Text>
+                    {ann.body ? <Text style={styles.annBody}>{ann.body}</Text> : null}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* Daily Goal */}
         <Card style={[styles.goalCard, goalDone && styles.goalCardDone]}>
@@ -181,6 +206,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center',
   },
   avatarText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  announcementsWrap: { gap: 8, marginBottom: 14 },
+  annBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    borderRadius: 12, padding: 12, borderLeftWidth: 4,
+  },
+  annIcon: { fontSize: 18, marginTop: 1 },
+  annTitle: { fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  annBody: { fontSize: 12, color: COLORS.textSecondary, textAlign: 'right', marginTop: 2, lineHeight: 17 },
   goalCard: { marginBottom: 14, gap: 10 },
   goalCardDone: { borderColor: COLORS.success, borderWidth: 1.5 },
   goalRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

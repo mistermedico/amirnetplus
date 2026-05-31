@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useReducer, useCallback } 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AppUser, UserRole, UserProgress, Question, Chapter, ExamTemplate,
-  TopicID, Difficulty, QuizHistoryEntry, StudyPlan, QuestionPerformance,
+  TopicID, Difficulty, QuizHistoryEntry, StudyPlan, QuestionPerformance, Announcement,
 } from '../types';
 import { hashPassword, generateId } from '../utils/hashUtils';
 import { BUILT_IN_QUESTIONS } from '../data/questions';
@@ -24,6 +24,7 @@ interface AppState {
   customQuestions: Question[];
   chapters: Chapter[];
   examTemplates: ExamTemplate[];
+  announcements: Announcement[];
   isLoaded: boolean;
 }
 
@@ -55,6 +56,7 @@ const initialState: AppState = {
   customQuestions: [],
   chapters: [],
   examTemplates: [],
+  announcements: [],
   isLoaded: false,
 };
 
@@ -88,7 +90,9 @@ type Action =
   | { type: 'UPDATE_SETTINGS'; payload: Partial<UserProgress> }
   | { type: 'RESET_PROGRESS' }
   | { type: 'ASSIGN_QUESTION_CHAPTER'; payload: { questionID: string; chapterID: string } }
-  | { type: 'REMOVE_QUESTION_CHAPTER'; payload: { questionID: string; chapterID: string } };
+  | { type: 'REMOVE_QUESTION_CHAPTER'; payload: { questionID: string; chapterID: string } }
+  | { type: 'ADD_ANNOUNCEMENT'; payload: Announcement }
+  | { type: 'DELETE_ANNOUNCEMENT'; payload: string };
 
 function recalcWeakTopics(topicProgress: Record<string, { answeredCount: number; correctCount: number }>): string[] {
   return Object.entries(topicProgress)
@@ -300,6 +304,12 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, chapters };
     }
 
+    case 'ADD_ANNOUNCEMENT':
+      return { ...state, announcements: [action.payload, ...state.announcements] };
+
+    case 'DELETE_ANNOUNCEMENT':
+      return { ...state, announcements: state.announcements.filter(a => a.id !== action.payload) };
+
     default:
       return state;
   }
@@ -365,6 +375,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         customQuestions: state.customQuestions,
         chapters: state.chapters,
         examTemplates: state.examTemplates,
+        announcements: state.announcements,
       };
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toSave)).catch(() => {});
     }, 500);

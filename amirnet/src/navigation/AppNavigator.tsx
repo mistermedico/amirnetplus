@@ -23,9 +23,13 @@ import ProgressScreen from '../screens/progress/ProgressScreen';
 import AdminScreen from '../screens/admin/AdminScreen';
 import QuestionManagerScreen from '../screens/admin/QuestionManagerScreen';
 import ImportQuestionsScreen from '../screens/admin/ImportQuestionsScreen';
+import ExportQuestionsScreen from '../screens/admin/ExportQuestionsScreen';
 import ChapterManagerScreen from '../screens/admin/ChapterManagerScreen';
 import ExamManagerScreen from '../screens/admin/ExamManagerScreen';
 import UserManagerScreen from '../screens/admin/UserManagerScreen';
+import AnnouncementsScreen from '../screens/admin/AnnouncementsScreen';
+import SystemStatsScreen from '../screens/admin/SystemStatsScreen';
+import BackupRestoreScreen from '../screens/admin/BackupRestoreScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -113,9 +117,13 @@ function AdminStack() {
       <Stack.Screen name="AdminMain" component={AdminScreen} />
       <Stack.Screen name="QuestionManager" component={QuestionManagerScreen} />
       <Stack.Screen name="ImportQuestions" component={ImportQuestionsScreen} />
+      <Stack.Screen name="ExportQuestions" component={ExportQuestionsScreen} />
       <Stack.Screen name="ChapterManager" component={ChapterManagerScreen} />
       <Stack.Screen name="ExamManager" component={ExamManagerScreen} />
       <Stack.Screen name="UserManager" component={UserManagerScreen} />
+      <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
+      <Stack.Screen name="SystemStats" component={SystemStatsScreen} />
+      <Stack.Screen name="BackupRestore" component={BackupRestoreScreen} />
       <Stack.Screen name="QuizSetup" component={QuizSetupScreen} />
       <Stack.Screen name="Quiz" component={QuizScreen} />
       <Stack.Screen name="QuizResults" component={QuizResultsScreen} />

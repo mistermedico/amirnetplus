@@ -147,3 +147,11 @@ export interface Achievement {
   icon: string;
   color: string;
 }
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  type: 'info' | 'warning' | 'success';
+  createdAt: string;
+}

@@ -5,11 +5,15 @@ import { COLORS } from '../../utils/colors';
 import { BUILT_IN_QUESTIONS } from '../../data/questions';
 
 const ADMIN_ITEMS = [
-  { icon: '❓', label: 'ניהול שאלות', sub: (c: any) => `${BUILT_IN_QUESTIONS.length} מובנות · ${c.customQuestions.length} מותאמות`, screen: 'QuestionManager', color: COLORS.primary },
-  { icon: '📥', label: 'ייבוא שאלות', sub: () => 'CSV / JSON', screen: 'ImportQuestions', color: COLORS.success },
-  { icon: '📚', label: 'ניהול פרקים', sub: (c: any) => `${c.chapters.length} פרקים`, screen: 'ChapterManager', color: COLORS.orange },
-  { icon: '📋', label: 'ניהול בחינות', sub: (c: any) => `${c.examTemplates.length} תבניות`, screen: 'ExamManager', color: COLORS.secondary },
-  { icon: '👥', label: 'ניהול משתמשים', sub: (c: any) => `${c.auth.users.length} משתמשים`, screen: 'UserManager', color: COLORS.info },
+  { icon: '❓', label: 'ניהול שאלות',       sub: (c: any) => `${BUILT_IN_QUESTIONS.length} מובנות · ${c.customQuestions.length} מותאמות`, screen: 'QuestionManager', color: COLORS.primary },
+  { icon: '📥', label: 'ייבוא שאלות',       sub: () => 'CSV / JSON',                                                                         screen: 'ImportQuestions',  color: COLORS.success },
+  { icon: '📤', label: 'ייצוא שאלות',       sub: (c: any) => `${c.customQuestions.length} מותאמות לייצוא`,                                     screen: 'ExportQuestions',  color: COLORS.info },
+  { icon: '📚', label: 'ניהול פרקים',       sub: (c: any) => `${c.chapters.length} פרקים`,                                                    screen: 'ChapterManager',   color: COLORS.orange },
+  { icon: '📋', label: 'ניהול בחינות',      sub: (c: any) => `${c.examTemplates.length} תבניות`,                                              screen: 'ExamManager',      color: COLORS.secondary },
+  { icon: '👥', label: 'ניהול משתמשים',     sub: (c: any) => `${c.auth.users.length} משתמשים`,                                                screen: 'UserManager',      color: COLORS.info },
+  { icon: '📢', label: 'הכרזות',            sub: (c: any) => `${c.announcements.length} פעילות`,                                              screen: 'Announcements',    color: COLORS.warning },
+  { icon: '📊', label: 'סטטיסטיקות מתקדמות', sub: () => 'ניתוח ביצועים ונתונים',                                                              screen: 'SystemStats',      color: COLORS.purple },
+  { icon: '💾', label: 'גיבוי ושחזור',      sub: () => 'ייצוא / ייבוא נתונים',                                                                screen: 'BackupRestore',    color: COLORS.success },
 ];
 
 export default function AdminScreen({ navigation }: any) {
@@ -56,6 +60,10 @@ export default function AdminScreen({ navigation }: any) {
           <View style={styles.statBox}>
             <Text style={styles.statVal}>{state.auth.users.length}</Text>
             <Text style={styles.statLbl}>משתמשים</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statVal}>{state.announcements.length}</Text>
+            <Text style={styles.statLbl}>הכרזות</Text>
           </View>
         </View>
 
