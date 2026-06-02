@@ -44,7 +44,7 @@ export default function RegisterScreen({ navigation }: any) {
             </TouchableOpacity>
             <View style={styles.heroIcon}><Text style={styles.heroIconTxt}>🎓</Text></View>
             <Text style={styles.heroTitle}>יצירת חשבון</Text>
-            <Text style={styles.heroSub}>הצטרף ל-AmirNet Plus</Text>
+            <Text style={styles.heroSub}>הצטרף ל-amirnet</Text>
           </View>
 
           {/* Form card */}

@@ -62,7 +62,7 @@ export default function AdminScreen({ navigation }: any) {
             <Text style={styles.adminBadgeTxt}>מנהל</Text>
           </View>
         </View>
-        <Text style={styles.sub}>ניהול מערכת AmirNet Plus</Text>
+        <Text style={styles.sub}>ניהול מערכת amirnet</Text>
 
         {/* Stats summary */}
         <View style={styles.statsRow}>

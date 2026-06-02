@@ -37,7 +37,7 @@ export default function SettingsScreen() {
   async function exportData() {
     const pct = progress.totalAnswered > 0 ? Math.round((progress.totalCorrect / progress.totalAnswered) * 100) : 0;
     const lines = [
-      'AmirNet Plus - דוח התקדמות',
+      'amirnet - דוח התקדמות',
       `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
       `משתמש: ${user?.displayName} (@${user?.username})`,
       '', '=== סטטיסטיקות ===',

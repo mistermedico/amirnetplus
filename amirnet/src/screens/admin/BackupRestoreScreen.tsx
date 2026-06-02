@@ -25,6 +25,7 @@ export default function BackupRestoreScreen({ navigation }: any) {
         chapters: state.chapters,
         examTemplates: state.examTemplates,
         announcements: state.announcements,
+        systemSettings: state.systemSettings,
       };
       const json = JSON.stringify(backup, null, 2);
       const filename = `amirnet_backup_${new Date().toISOString().slice(0, 10)}.json`;
@@ -80,6 +81,7 @@ export default function BackupRestoreScreen({ navigation }: any) {
                   chapters: backup.chapters ?? [],
                   examTemplates: backup.examTemplates ?? [],
                   announcements: backup.announcements ?? [],
+                  systemSettings: backup.systemSettings,
                 },
               });
               setLastAction('✅ גיבוי שוחזר בהצלחה');

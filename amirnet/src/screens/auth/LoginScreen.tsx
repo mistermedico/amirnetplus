@@ -38,7 +38,7 @@ export default function LoginScreen({ navigation }: any) {
             <View style={styles.logoWrap}>
               <Text style={styles.logoIcon}>🌐</Text>
             </View>
-            <Text style={styles.heroTitle}>AmirNet Plus</Text>
+            <Text style={styles.heroTitle}>amirnet</Text>
             <Text style={styles.heroSub}>ברוך הבא! התחבר לחשבונך</Text>
           </View>
 

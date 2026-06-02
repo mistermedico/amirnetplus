@@ -199,7 +199,7 @@ export default function AppNavigator() {
       <View style={styles.loading}>
         <Text style={styles.loadingIcon}>🌐</Text>
         <ActivityIndicator color={COLORS.primary} size="large" style={{ marginTop: 16 }} />
-        <Text style={styles.loadingText}>AmirNet Plus</Text>
+        <Text style={styles.loadingText}>amirnet</Text>
       </View>
     );
   }

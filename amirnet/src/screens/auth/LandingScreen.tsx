@@ -28,7 +28,7 @@ export default function LandingScreen({ navigation }: any) {
         <View style={styles.logoWrap}>
           <Text style={styles.logoIcon}>🌐</Text>
         </View>
-        <Text style={styles.title}>AmirNet Plus</Text>
+        <Text style={styles.title}>amirnet</Text>
         <Text style={styles.subtitle}>הכנה חכמה לבחינת אמירנט</Text>
         <View style={styles.versionBadge}>
           <Text style={styles.versionText}>גרסה 2.0</Text>
