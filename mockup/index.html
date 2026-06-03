@@ -1,0 +1,2032 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>amirnet – הדמיית מסכים</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    background: #1a1a2e;
+    color: #111827;
+    min-height: 100vh;
+    direction: rtl;
+  }
+
+  /* ===== LAYOUT ===== */
+  .page-header {
+    background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
+    padding: 24px 32px;
+    text-align: center;
+    color: white;
+  }
+  .page-header h1 { font-size: 28px; font-weight: 900; letter-spacing: -0.5px; }
+  .page-header p { opacity: 0.8; margin-top: 4px; font-size: 14px; }
+
+  .screens-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+    padding: 32px;
+    justify-content: center;
+  }
+
+  /* ===== PHONE FRAME ===== */
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .screen-label {
+    color: #9CA3AF;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .phone {
+    width: 320px;
+    height: 640px;
+    background: #fff;
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 10px #1e293b,
+      0 0 0 11px #334155,
+      0 25px 50px rgba(0,0,0,0.5);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .phone-notch {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 26px;
+    background: #1e293b;
+    border-radius: 0 0 16px 16px;
+    z-index: 100;
+  }
+  .phone-screen {
+    flex: 1;
+    overflow: hidden;
+    padding-top: 26px;
+    position: relative;
+    background: #F3F4F6;
+  }
+
+  /* ===== COLORS ===== */
+  :root {
+    --primary: #2563EB;
+    --primary-light: #DBEAFE;
+    --secondary: #7C3AED;
+    --success: #16A34A;
+    --success-light: #DCFCE7;
+    --warning: #D97706;
+    --warning-light: #FEF3C7;
+    --danger: #DC2626;
+    --danger-light: #FEE2E2;
+    --info: #0891B2;
+    --info-light: #CFFAFE;
+    --orange: #EA580C;
+    --background: #F3F4F6;
+    --surface: #FFFFFF;
+    --border: #E5E7EB;
+    --text: #111827;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+  }
+
+  /* ===== COMMON COMPONENTS ===== */
+  .safe-area {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--background);
+    overflow: hidden;
+  }
+  .scroll-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  .scroll-content::-webkit-scrollbar { display: none; }
+
+  .bottom-tabs {
+    display: flex;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    padding: 6px 0 10px;
+    flex-shrink: 0;
+  }
+  .tab-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+  }
+  .tab-item .tab-icon { font-size: 22px; opacity: 0.45; }
+  .tab-item .tab-label { font-size: 9px; color: var(--text-tertiary); font-weight: 400; }
+  .tab-item.active .tab-icon { opacity: 1; }
+  .tab-item.active .tab-label { color: var(--primary); font-weight: 700; }
+
+  .screen-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .header-title { font-size: 18px; font-weight: 800; color: var(--text); }
+  .header-back { color: var(--primary); font-size: 15px; cursor: pointer; }
+
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    padding: 0 16px;
+    margin: 14px 0 8px;
+    text-align: right;
+  }
+
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px;
+    margin: 0 16px 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .btn {
+    border: none;
+    border-radius: 14px;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    direction: rtl;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-secondary { background: var(--secondary); color: #fff; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-success { background: var(--success); color: #fff; }
+
+  /* ===== SCREEN 1: LANDING ===== */
+  #s-landing .safe-area { background: var(--primary); }
+  .landing-hero {
+    background: linear-gradient(160deg, #1D4ED8 0%, #2563EB 50%, #3B82F6 100%);
+    padding: 48px 24px 32px;
+    align-items: center;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .landing-blob {
+    position: absolute;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    top: -60px; right: -40px;
+  }
+  .landing-logo {
+    width: 72px; height: 72px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    margin-bottom: 8px;
+  }
+  .landing-title { font-size: 32px; font-weight: 900; color: #fff; letter-spacing: -1px; }
+  .landing-sub { font-size: 14px; color: rgba(255,255,255,0.75); line-height: 1.5; }
+  .landing-features {
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    overflow: hidden;
+  }
+  .feature-card {
+    background: rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    direction: rtl;
+    text-align: right;
+  }
+  .feature-icon { font-size: 22px; flex-shrink: 0; }
+  .feature-title { color: #fff; font-size: 13px; font-weight: 700; }
+  .feature-sub { color: rgba(255,255,255,0.7); font-size: 11px; }
+  .landing-cta {
+    padding: 16px;
+    background: rgba(255,255,255,0.08);
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+  .landing-cta-btn {
+    background: #fff;
+    color: var(--primary);
+    border: none;
+    border-radius: 16px;
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 800;
+    width: 100%;
+    cursor: pointer;
+  }
+  .landing-login-link {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+  }
+
+  /* ===== SCREEN 2: LOGIN ===== */
+  .login-hero {
+    background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 100%);
+    padding: 36px 24px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+  }
+  .login-logo {
+    width: 68px; height: 68px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    margin-bottom: 4px;
+  }
+  .login-hero-title { color: #fff; font-size: 26px; font-weight: 800; }
+  .login-hero-sub { color: rgba(255,255,255,0.75); font-size: 13px; }
+  .form-card {
+    background: #fff;
+    margin: -20px 16px 0;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    position: relative;
+    z-index: 1;
+  }
+  .form-field { display: flex; flex-direction: column; gap: 6px; }
+  .form-label { font-size: 13px; font-weight: 700; color: var(--text); text-align: right; }
+  .form-input {
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: var(--text);
+    text-align: right;
+    background: var(--background);
+  }
+  .credentials-hint {
+    background: var(--primary-light);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--primary);
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  /* ===== SCREEN 3: REGISTER ===== */
+  .register-hero {
+    background: linear-gradient(135deg, #6D28D9 0%, #7C3AED 100%);
+    padding: 36px 24px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+  }
+  .back-btn-hero { align-self: flex-start; color: rgba(255,255,255,0.85); font-size: 14px; margin-bottom: 8px; }
+
+  /* ===== SCREEN 4: HOME ===== */
+  .home-top {
+    background: #fff;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .home-greeting { font-size: 13px; color: var(--text-secondary); }
+  .home-name { font-size: 20px; font-weight: 800; color: var(--text); }
+  .home-avatar {
+    width: 42px; height: 42px;
+    background: var(--primary-light);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+  .stats-row {
+    display: flex;
+    gap: 8px;
+    margin: 12px 16px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .stat-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .stat-val { font-size: 20px; font-weight: 800; color: var(--primary); }
+  .stat-lbl { font-size: 9px; color: var(--text-secondary); text-align: center; }
+  .quick-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 0 16px 12px;
+  }
+  .quick-action-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .qa-icon { font-size: 26px; }
+  .qa-title { font-size: 13px; font-weight: 700; color: var(--text); text-align: right; }
+  .qa-sub { font-size: 10px; color: var(--text-secondary); text-align: right; }
+  .qa-accent {
+    position: absolute;
+    bottom: -8px; left: -8px;
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    opacity: 0.08;
+  }
+  .topic-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    gap: 10px;
+  }
+  .topic-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .topic-name { flex: 1; font-size: 13px; font-weight: 600; color: var(--text); text-align: right; }
+  .topic-pct { font-size: 12px; color: var(--text-secondary); }
+  .progress-bar-wrap {
+    width: 60px;
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--primary);
+  }
+
+  /* ===== SCREEN 5: TOPICS ===== */
+  .topics-search {
+    margin: 12px 16px;
+    background: #fff;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-align: right;
+  }
+  .topic-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin: 0 16px 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  }
+  .topic-icon-wrap {
+    width: 46px; height: 46px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .topic-info { flex: 1; text-align: right; }
+  .topic-card-name { font-size: 14px; font-weight: 700; color: var(--text); }
+  .topic-card-count { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .topic-card-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  .topic-card-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+  .topic-chevron { color: var(--text-tertiary); font-size: 18px; }
+
+  /* ===== SCREEN 6: TOPIC DETAIL ===== */
+  .topic-detail-hero {
+    padding: 36px 16px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    position: relative;
+  }
+  .topic-detail-back { position: absolute; top: 12px; right: 16px; color: rgba(255,255,255,0.85); font-size: 14px; }
+  .topic-detail-icon { font-size: 40px; }
+  .topic-detail-title { font-size: 22px; font-weight: 800; color: #fff; }
+  .topic-detail-sub { font-size: 12px; color: rgba(255,255,255,0.75); }
+  .difficulty-pills {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-direction: row-reverse;
+  }
+  .diff-pill {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .diff-easy { background: rgba(22,163,74,0.2); color: #fff; }
+  .diff-medium { background: rgba(215,119,6,0.25); color: #fff; }
+  .diff-hard { background: rgba(220,38,38,0.25); color: #fff; }
+
+  .question-preview {
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px;
+    margin: 0 16px 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    border-right: 4px solid var(--primary);
+  }
+  .q-text { font-size: 13px; color: var(--text); text-align: right; line-height: 1.5; }
+  .q-meta { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; }
+  .q-badge {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  /* ===== SCREEN 7: QUIZ SETUP ===== */
+  .quiz-setup-hero {
+    background: linear-gradient(135deg, #1D4ED8, #2563EB);
+    padding: 28px 20px 48px;
+    text-align: center;
+    position: relative;
+  }
+  .quiz-setup-title { color: #fff; font-size: 22px; font-weight: 800; }
+  .quiz-setup-sub { color: rgba(255,255,255,0.75); font-size: 13px; margin-top: 4px; }
+  .setup-card {
+    background: #fff;
+    margin: -20px 16px 10px;
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    position: relative;
+    z-index: 1;
+  }
+  .setup-card-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-align: right; margin-bottom: 10px; }
+  .topic-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .topic-chip {
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    text-align: center;
+    cursor: pointer;
+    background: var(--background);
+  }
+  .topic-chip.selected {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+  .mode-cards {
+    display: flex;
+    gap: 8px;
+  }
+  .mode-card {
+    flex: 1;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 8px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .mode-card.selected {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+  .mode-icon { font-size: 20px; }
+  .mode-name { font-size: 10px; font-weight: 700; color: var(--text); margin-top: 4px; }
+
+  /* ===== SCREEN 8: QUIZ ===== */
+  .quiz-top {
+    background: #fff;
+    padding: 10px 16px 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .quiz-progress-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .quiz-q-num { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+  .quiz-timer { font-size: 13px; color: var(--primary); font-weight: 700; }
+  .quiz-progress-bar {
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .quiz-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), #60A5FA);
+    border-radius: 3px;
+  }
+  .question-card {
+    background: #fff;
+    border-radius: 18px;
+    padding: 18px;
+    margin: 12px 16px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+  }
+  .question-number-badge {
+    display: inline-block;
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    float: right;
+  }
+  .question-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+    line-height: 1.6;
+    clear: both;
+  }
+  .options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 12px 16px;
+  }
+  .option-item {
+    background: #fff;
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    direction: rtl;
+  }
+  .option-item.selected {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+  .option-item.correct {
+    border-color: var(--success);
+    background: var(--success-light);
+  }
+  .option-badge {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .option-badge.selected { background: var(--primary); color: #fff; }
+  .option-badge.correct { background: var(--success); color: #fff; }
+  .option-text { font-size: 13px; color: var(--text); flex: 1; text-align: right; }
+
+  /* ===== SCREEN 9: QUIZ RESULTS ===== */
+  .results-hero {
+    padding: 28px 20px 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .results-ring {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid rgba(255,255,255,0.4);
+    margin-bottom: 8px;
+  }
+  .results-pct { font-size: 26px; font-weight: 900; color: #fff; }
+  .results-title { font-size: 18px; font-weight: 800; color: #fff; }
+  .results-sub { font-size: 12px; color: rgba(255,255,255,0.75); }
+  .results-stats-row {
+    display: flex;
+    background: #fff;
+    border-radius: 16px;
+    margin: -20px 16px 12px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    position: relative;
+    z-index: 1;
+  }
+  .r-stat { flex: 1; text-align: center; }
+  .r-stat-val { font-size: 20px; font-weight: 800; color: var(--primary); }
+  .r-stat-lbl { font-size: 9px; color: var(--text-secondary); margin-top: 2px; }
+  .r-divider { width: 1px; background: var(--border); }
+  .answer-review-item {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin: 0 16px 6px;
+    border-right: 4px solid;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .ar-q { font-size: 12px; color: var(--text); text-align: right; line-height: 1.5; }
+  .ar-a { font-size: 11px; margin-top: 6px; text-align: right; font-weight: 600; }
+
+  /* ===== SCREEN 10: PROGRESS ===== */
+  .progress-hero {
+    background: linear-gradient(135deg, #16A34A, #22C55E);
+    padding: 28px 16px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .progress-hero-title { font-size: 22px; font-weight: 800; color: #fff; }
+  .progress-hero-sub { font-size: 12px; color: rgba(255,255,255,0.75); }
+  .big-stats-card {
+    background: #fff;
+    border-radius: 16px;
+    margin: -20px 16px 12px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+  .big-stat { text-align: center; }
+  .big-stat-val { font-size: 22px; font-weight: 900; color: var(--primary); }
+  .big-stat-lbl { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+  .history-item {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin: 0 16px 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    direction: rtl;
+  }
+  .history-info { text-align: right; }
+  .history-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .history-date { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .history-score {
+    font-size: 18px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 10px;
+  }
+
+  /* ===== SCREEN 11: ADMIN ===== */
+  .admin-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 16px 4px;
+    background: var(--background);
+    flex-shrink: 0;
+  }
+  .admin-title { font-size: 24px; font-weight: 800; color: var(--text); }
+  .admin-badge {
+    background: #FEF3C7;
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: #D97706;
+    font-weight: 700;
+  }
+  .admin-sub { font-size: 12px; color: var(--text-secondary); text-align: right; padding: 0 16px 10px; }
+  .admin-stats-row {
+    display: flex;
+    gap: 6px;
+    margin: 0 16px 12px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  }
+  .admin-stat { flex: 1; text-align: center; }
+  .admin-stat-val { font-size: 16px; font-weight: 800; color: var(--primary); }
+  .admin-stat-lbl { font-size: 9px; color: var(--text-secondary); }
+  .section-accent-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px 6px;
+    justify-content: flex-end;
+  }
+  .section-accent-bar { width: 3px; height: 14px; border-radius: 2px; background: var(--primary); }
+  .section-accent-lbl { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.5px; }
+  .menu-item {
+    background: #fff;
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin: 0 16px 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    cursor: pointer;
+    direction: rtl;
+  }
+  .menu-icon-wrap {
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .menu-content { flex: 1; text-align: right; }
+  .menu-label { font-size: 14px; font-weight: 700; color: var(--text); }
+  .menu-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .menu-chevron { color: var(--text-tertiary); font-size: 18px; }
+
+  /* ===== SCREEN 12: SETTINGS ===== */
+  .settings-hero {
+    background: linear-gradient(135deg, #6D28D9, #7C3AED);
+    padding: 28px 20px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .settings-avatar {
+    width: 72px; height: 72px;
+    border-radius: 22px;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    margin-bottom: 6px;
+  }
+  .settings-name { font-size: 20px; font-weight: 800; color: #fff; }
+  .settings-role {
+    background: rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.9);
+    font-weight: 600;
+  }
+  .settings-quick-stats {
+    display: flex;
+    background: #fff;
+    border-radius: 16px;
+    margin: -20px 16px 12px;
+    padding: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    position: relative;
+    z-index: 1;
+    gap: 0;
+  }
+  .sq-stat { flex: 1; text-align: center; }
+  .sq-stat-val { font-size: 20px; font-weight: 800; color: var(--primary); }
+  .sq-stat-lbl { font-size: 9px; color: var(--text-secondary); }
+  .sq-divider { width: 1px; background: var(--border); }
+  .settings-row {
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px;
+    margin: 0 16px 10px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+  }
+  .settings-row-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-align: right; margin-bottom: 10px; }
+  .settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    direction: rtl;
+  }
+  .settings-item:last-child { border-bottom: none; }
+  .si-label { font-size: 14px; color: var(--text); font-weight: 600; }
+  .si-value { font-size: 13px; color: var(--text-secondary); }
+  .si-toggle {
+    width: 40px; height: 22px;
+    border-radius: 11px;
+    background: var(--primary);
+    position: relative;
+    cursor: pointer;
+  }
+  .si-toggle::after {
+    content: '';
+    position: absolute;
+    right: 2px; top: 2px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #fff;
+  }
+
+  /* ===== SCREEN 13: STUDY PLAN ===== */
+  .plan-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px;
+    margin: 0 16px 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-right: 4px solid var(--primary);
+    direction: rtl;
+  }
+  .plan-title { font-size: 15px; font-weight: 800; color: var(--text); text-align: right; }
+  .plan-meta { font-size: 11px; color: var(--text-secondary); text-align: right; margin-top: 3px; }
+  .plan-progress-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .plan-progress-bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-left: 10px; }
+  .plan-progress-fill { height: 100%; border-radius: 3px; background: var(--primary); }
+  .plan-pct { font-size: 12px; font-weight: 700; color: var(--primary); }
+  .plan-tags { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .plan-tag {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+
+  /* ===== SCREEN 14: QUESTION PERFORMANCE ===== */
+  .perf-tabs {
+    display: flex;
+    margin: 10px 16px;
+    background: var(--border);
+    border-radius: 10px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .perf-tab {
+    flex: 1;
+    padding: 7px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+  .perf-tab.active { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .perf-question-row {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin: 0 16px 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    direction: rtl;
+  }
+  .pq-text { font-size: 12px; color: var(--text); text-align: right; margin-bottom: 6px; line-height: 1.4; }
+  .pq-bar-row { display: flex; align-items: center; gap: 8px; }
+  .pq-bar { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .pq-fill { height: 100%; border-radius: 4px; }
+  .pq-pct { font-size: 12px; font-weight: 700; min-width: 34px; text-align: left; }
+
+  /* ===== SCREEN 15: ACTIVITY CALENDAR ===== */
+  .cal-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    direction: rtl;
+  }
+  .cal-month { font-size: 16px; font-weight: 800; color: var(--text); }
+  .cal-arrow { font-size: 20px; color: var(--text-secondary); cursor: pointer; }
+  .cal-grid {
+    margin: 0 16px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 6px;
+  }
+  .cal-weekday { text-align: center; font-size: 10px; color: var(--text-secondary); font-weight: 600; }
+  .cal-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--text);
+  }
+  .cal-day.empty { background: transparent; }
+  .cal-day.level-0 { background: var(--border); color: var(--text-secondary); }
+  .cal-day.level-1 { background: #BFDBFE; color: var(--primary); font-weight: 600; }
+  .cal-day.level-2 { background: #60A5FA; color: #fff; font-weight: 700; }
+  .cal-day.level-3 { background: var(--primary); color: #fff; font-weight: 700; }
+  .cal-day.today { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .activity-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: #fff;
+    border-radius: 10px;
+    margin: 0 16px 6px;
+    direction: rtl;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .al-info { text-align: right; }
+  .al-date { font-size: 12px; font-weight: 700; color: var(--text); }
+  .al-count { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .al-score { font-size: 14px; font-weight: 800; color: var(--success); }
+
+  /* ===== NAV DOTS ===== */
+  .nav-dots {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 8px;
+  }
+  .nav-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    cursor: pointer;
+  }
+  .nav-dot.active { background: #fff; width: 18px; border-radius: 4px; }
+
+  /* ===== PAGE NAV ===== */
+  .page-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 16px 32px;
+    justify-content: center;
+    background: rgba(0,0,0,0.2);
+  }
+  .page-nav-btn {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    direction: rtl;
+  }
+  .page-nav-btn:hover { background: rgba(255,255,255,0.25); }
+  .page-nav-btn.current { background: white; color: #2563EB; }
+
+  /* ===== SECTION DIVIDER ===== */
+  .section-divider {
+    text-align: center;
+    color: rgba(255,255,255,0.4);
+    font-size: 12px;
+    padding: 8px;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>🌐 amirnet</h1>
+  <p>הדמיית מסכי האפליקציה · 15 מסכים</p>
+</div>
+
+<!-- NAV -->
+<div class="page-nav">
+  <button class="page-nav-btn" onclick="scrollTo('s-landing')">דף נחיתה</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-login')">כניסה</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-register')">הרשמה</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-home')">בית</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-topics')">נושאים</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-topic-detail')">פרטי נושא</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-quiz-setup')">הגדרת בחינה</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-quiz')">בחינה</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-results')">תוצאות</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-progress')">התקדמות</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-admin')">ניהול</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-settings')">הגדרות</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-studyplan')">תוכניות לימוד</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-qperf')">ביצועי שאלות</button>
+  <button class="page-nav-btn" onclick="scrollTo('s-calendar')">לוח פעילות</button>
+</div>
+
+<div class="screens-gallery">
+
+  <!-- ===== 1. LANDING ===== -->
+  <div class="phone-wrap" id="s-landing">
+    <div class="screen-label">דף נחיתה</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area" style="background: #1D4ED8;">
+          <div class="landing-hero">
+            <div class="landing-blob"></div>
+            <div class="landing-logo">🌐</div>
+            <div class="landing-title">amirnet</div>
+            <div class="landing-sub">הכן את עצמך לבחינת רשתות<br>עם שאלות מקצועיות ומותאמות</div>
+          </div>
+          <div class="landing-features">
+            <div class="feature-card">
+              <div style="text-align:right; flex:1;">
+                <div class="feature-title">📚 בנק שאלות עשיר</div>
+                <div class="feature-sub">מאות שאלות בנושאי IT ורשתות</div>
+              </div>
+              <div class="feature-icon">❓</div>
+            </div>
+            <div class="feature-card">
+              <div style="text-align:right; flex:1;">
+                <div class="feature-title">📊 מעקב התקדמות</div>
+                <div class="feature-sub">גרפים וסטטיסטיקות מפורטות</div>
+              </div>
+              <div class="feature-icon">📈</div>
+            </div>
+            <div class="feature-card">
+              <div style="text-align:right; flex:1;">
+                <div class="feature-title">🎯 בחינות מותאמות</div>
+                <div class="feature-sub">למידה חכמה לפי רמת הקושי שלך</div>
+              </div>
+              <div class="feature-icon">🏆</div>
+            </div>
+          </div>
+          <div class="landing-cta">
+            <button class="landing-cta-btn">התחל עכשיו ←</button>
+            <div class="landing-login-link">כבר יש לך חשבון? <span style="color:rgba(255,255,255,0.9); font-weight:700;">התחבר</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 2. LOGIN ===== -->
+  <div class="phone-wrap" id="s-login">
+    <div class="screen-label">כניסה למערכת</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area" style="background: var(--background);">
+          <div class="scroll-content">
+            <div class="login-hero">
+              <div class="login-logo">🌐</div>
+              <div class="login-hero-title">amirnet</div>
+              <div class="login-hero-sub">ברוך הבא! התחבר לחשבונך</div>
+            </div>
+            <div class="form-card">
+              <div class="form-field">
+                <div class="form-label">שם משתמש</div>
+                <div class="form-input">admin</div>
+              </div>
+              <div class="form-field">
+                <div class="form-label">סיסמה</div>
+                <div class="form-input" style="letter-spacing:4px;">••••••••</div>
+              </div>
+              <div class="credentials-hint">
+                👑 כניסת מנהל:<br>
+                שם משתמש: <strong>admin</strong><br>
+                סיסמה: <strong>admin123</strong>
+              </div>
+              <button class="btn btn-primary">כניסה ←</button>
+              <div style="text-align:center; font-size:12px; color:var(--text-secondary);">
+                אין חשבון? <span style="color:var(--primary); font-weight:700;">הירשם כאן</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 3. REGISTER ===== -->
+  <div class="phone-wrap" id="s-register">
+    <div class="screen-label">הרשמה</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="scroll-content">
+            <div class="register-hero">
+              <div class="back-btn-hero">‹ חזרה</div>
+              <div style="width:64px;height:64px;background:rgba(255,255,255,0.18);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:6px;">🎓</div>
+              <div style="color:#fff;font-size:24px;font-weight:800;">יצירת חשבון</div>
+              <div style="color:rgba(255,255,255,0.75);font-size:13px;">הצטרף ל-amirnet</div>
+            </div>
+            <div class="form-card" style="margin-top:-20px;">
+              <div class="form-field">
+                <div class="form-label">שם מלא</div>
+                <div class="form-input">אמיר כהן</div>
+              </div>
+              <div class="form-field">
+                <div class="form-label">שם משתמש</div>
+                <div class="form-input">amir123</div>
+              </div>
+              <div class="form-field">
+                <div class="form-label">סיסמה (מינימום 6 תווים)</div>
+                <div class="form-input" style="letter-spacing:4px;">••••••••</div>
+              </div>
+              <div class="form-field">
+                <div class="form-label">אימות סיסמה</div>
+                <div class="form-input" style="letter-spacing:4px;">••••••••</div>
+              </div>
+              <button class="btn btn-secondary">צור חשבון →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 4. HOME ===== -->
+  <div class="phone-wrap" id="s-home">
+    <div class="screen-label">מסך הבית</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="home-top">
+            <div class="home-avatar">👤</div>
+            <div style="text-align:right;">
+              <div class="home-greeting">שלום, 👋</div>
+              <div class="home-name">אמיר כהן</div>
+            </div>
+          </div>
+          <div class="scroll-content">
+            <!-- stats -->
+            <div class="stats-row">
+              <div class="stat-box"><div class="stat-val">42</div><div class="stat-lbl">בחינות</div></div>
+              <div class="stat-box"><div class="stat-val">78%</div><div class="stat-lbl">ממוצע</div></div>
+              <div class="stat-box"><div class="stat-val">7</div><div class="stat-lbl">ימים רצוף</div></div>
+              <div class="stat-box"><div class="stat-val">3</div><div class="stat-lbl">עלייה ב%</div></div>
+            </div>
+            <!-- quick actions -->
+            <div class="section-title">⚡ פעולות מהירות</div>
+            <div class="quick-actions">
+              <div class="quick-action-card" style="border-right:3px solid #2563EB;">
+                <div class="qa-icon">📝</div>
+                <div class="qa-title">בחינה מהירה</div>
+                <div class="qa-sub">10 שאלות אקראיות</div>
+                <div class="qa-accent" style="background:#2563EB;"></div>
+              </div>
+              <div class="quick-action-card" style="border-right:3px solid #7C3AED;">
+                <div class="qa-icon">🎯</div>
+                <div class="qa-title">בחינה אדפטיבית</div>
+                <div class="qa-sub">מותאמת אישית</div>
+                <div class="qa-accent" style="background:#7C3AED;"></div>
+              </div>
+              <div class="quick-action-card" style="border-right:3px solid #16A34A;">
+                <div class="qa-icon">🔖</div>
+                <div class="qa-title">שאלות שמורות</div>
+                <div class="qa-sub">8 שאלות</div>
+                <div class="qa-accent" style="background:#16A34A;"></div>
+              </div>
+              <div class="quick-action-card" style="border-right:3px solid #EA580C;">
+                <div class="qa-icon">📊</div>
+                <div class="qa-title">ניתוח חולשות</div>
+                <div class="qa-sub">שיפור ממוקד</div>
+                <div class="qa-accent" style="background:#EA580C;"></div>
+              </div>
+            </div>
+            <!-- topics overview -->
+            <div class="section-title">📚 נושאים</div>
+            <div class="card" style="padding:0;overflow:hidden;">
+              <div class="topic-row"><div class="topic-name">רשתות</div><div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:85%;background:#2563EB;"></div></div><div class="topic-pct">85%</div></div>
+              <div class="topic-row"><div class="topic-name">אבטחה</div><div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:62%;background:#DC2626;"></div></div><div class="topic-pct">62%</div></div>
+              <div class="topic-row"><div class="topic-name">מערכות הפעלה</div><div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:70%;background:#16A34A;"></div></div><div class="topic-pct">70%</div></div>
+              <div class="topic-row" style="border-bottom:none;"><div class="topic-name">ענן</div><div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:45%;background:#0891B2;"></div></div><div class="topic-pct">45%</div></div>
+            </div>
+            <div style="height:12px;"></div>
+          </div>
+          <div class="bottom-tabs">
+            <div class="tab-item active"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+            <div class="tab-item"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+            <div class="tab-item"><div class="tab-icon">📝</div><div class="tab-label">בחינה</div></div>
+            <div class="tab-item"><div class="tab-icon">📊</div><div class="tab-label">התקדמות</div></div>
+            <div class="tab-item"><div class="tab-icon">⚙️</div><div class="tab-label">הגדרות</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 5. TOPICS ===== -->
+  <div class="phone-wrap" id="s-topics">
+    <div class="screen-label">נושאים</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="screen-header" style="justify-content:flex-end;">
+            <div class="header-title">נושאים 📚</div>
+          </div>
+          <div class="scroll-content">
+            <div class="topics-search">🔍  חפש נושא...</div>
+            <div class="topic-card">
+              <div class="topic-icon-wrap" style="background:#DBEAFE;"><span>🌐</span></div>
+              <div class="topic-info">
+                <div class="topic-card-name">רשתות מחשבים</div>
+                <div class="topic-card-count">124 שאלות · 85% הושלם</div>
+                <div class="topic-card-bar"><div class="topic-card-fill" style="width:85%;background:#2563EB;"></div></div>
+              </div>
+              <div class="topic-chevron">›</div>
+            </div>
+            <div class="topic-card">
+              <div class="topic-icon-wrap" style="background:#FEE2E2;"><span>🔐</span></div>
+              <div class="topic-info">
+                <div class="topic-card-name">אבטחת מידע</div>
+                <div class="topic-card-count">96 שאלות · 62% הושלם</div>
+                <div class="topic-card-bar"><div class="topic-card-fill" style="width:62%;background:#DC2626;"></div></div>
+              </div>
+              <div class="topic-chevron">›</div>
+            </div>
+            <div class="topic-card">
+              <div class="topic-icon-wrap" style="background:#DCFCE7;"><span>💻</span></div>
+              <div class="topic-info">
+                <div class="topic-card-name">מערכות הפעלה</div>
+                <div class="topic-card-count">88 שאלות · 70% הושלם</div>
+                <div class="topic-card-bar"><div class="topic-card-fill" style="width:70%;background:#16A34A;"></div></div>
+              </div>
+              <div class="topic-chevron">›</div>
+            </div>
+            <div class="topic-card">
+              <div class="topic-icon-wrap" style="background:#CFFAFE;"><span>☁️</span></div>
+              <div class="topic-info">
+                <div class="topic-card-name">מחשוב ענן</div>
+                <div class="topic-card-count">72 שאלות · 45% הושלם</div>
+                <div class="topic-card-bar"><div class="topic-card-fill" style="width:45%;background:#0891B2;"></div></div>
+              </div>
+              <div class="topic-chevron">›</div>
+            </div>
+            <div class="topic-card">
+              <div class="topic-icon-wrap" style="background:#FED7AA;"><span>📋</span></div>
+              <div class="topic-info">
+                <div class="topic-card-name">ניהול IT</div>
+                <div class="topic-card-count">56 שאלות · 30% הושלם</div>
+                <div class="topic-card-bar"><div class="topic-card-fill" style="width:30%;background:#EA580C;"></div></div>
+              </div>
+              <div class="topic-chevron">›</div>
+            </div>
+            <div style="height:12px;"></div>
+          </div>
+          <div class="bottom-tabs">
+            <div class="tab-item"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+            <div class="tab-item active"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+            <div class="tab-item"><div class="tab-icon">📝</div><div class="tab-label">בחינה</div></div>
+            <div class="tab-item"><div class="tab-icon">📊</div><div class="tab-label">התקדמות</div></div>
+            <div class="tab-item"><div class="tab-icon">⚙️</div><div class="tab-label">הגדרות</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 6. TOPIC DETAIL ===== -->
+  <div class="phone-wrap" id="s-topic-detail">
+    <div class="screen-label">פרטי נושא</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="scroll-content">
+            <div class="topic-detail-hero" style="background:linear-gradient(135deg,#1D4ED8,#3B82F6);">
+              <div class="topic-detail-back">‹ חזרה</div>
+              <div class="topic-detail-icon">🌐</div>
+              <div class="topic-detail-title">רשתות מחשבים</div>
+              <div class="topic-detail-sub">124 שאלות · ממוצע 85%</div>
+              <div class="difficulty-pills">
+                <div class="diff-pill diff-easy">קל 48</div>
+                <div class="diff-pill diff-medium">בינוני 56</div>
+                <div class="diff-pill diff-hard">קשה 20</div>
+              </div>
+            </div>
+            <div style="margin:-20px 16px 12px; background:#fff; border-radius:16px; padding:14px; box-shadow:0 4px 16px rgba(0,0,0,0.08); position:relative; z-index:1; display:flex; gap:0;">
+              <div style="flex:1;text-align:center;"><div style="font-size:20px;font-weight:800;color:#2563EB;">85%</div><div style="font-size:9px;color:#6B7280;">ממוצע</div></div>
+              <div style="width:1px;background:#E5E7EB;"></div>
+              <div style="flex:1;text-align:center;"><div style="font-size:20px;font-weight:800;color:#16A34A;">38</div><div style="font-size:9px;color:#6B7280;">הושלמו</div></div>
+              <div style="width:1px;background:#E5E7EB;"></div>
+              <div style="flex:1;text-align:center;"><div style="font-size:20px;font-weight:800;color:#EA580C;">7</div><div style="font-size:9px;color:#6B7280;">ימי רצף</div></div>
+            </div>
+            <div class="question-preview">
+              <div class="q-text">מהו פרוטוקול המשמש להקצאת כתובות IP אוטומטית לרשת?</div>
+              <div class="q-meta">
+                <div class="q-badge" style="background:#DCFCE7;color:#16A34A;">קל</div>
+                <div class="q-badge" style="background:#DBEAFE;color:#2563EB;">רשתות</div>
+              </div>
+            </div>
+            <div class="question-preview">
+              <div class="q-text">איזה שכבת OSI אחראית על פניות TCP ו-UDP?</div>
+              <div class="q-meta">
+                <div class="q-badge" style="background:#FEF3C7;color:#D97706;">בינוני</div>
+                <div class="q-badge" style="background:#DBEAFE;color:#2563EB;">רשתות</div>
+              </div>
+            </div>
+            <div class="question-preview">
+              <div class="q-text">מהו ההבדל בין TCP ל-UDP מבחינת אמינות?</div>
+              <div class="q-meta">
+                <div class="q-badge" style="background:#FEE2E2;color:#DC2626;">קשה</div>
+                <div class="q-badge" style="background:#DBEAFE;color:#2563EB;">רשתות</div>
+              </div>
+            </div>
+            <div style="padding:0 16px 16px;">
+              <button class="btn btn-primary">📝 התחל בחינה בנושא זה</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 7. QUIZ SETUP ===== -->
+  <div class="phone-wrap" id="s-quiz-setup">
+    <div class="screen-label">הגדרת בחינה</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="scroll-content">
+            <div class="quiz-setup-hero">
+              <div class="quiz-setup-title">📝 הגדרת בחינה</div>
+              <div class="quiz-setup-sub">בחר נושאים, רמה וסוג בחינה</div>
+            </div>
+            <div class="setup-card">
+              <div class="setup-card-title">📚 נושאים</div>
+              <div class="topic-grid">
+                <div class="topic-chip selected">🌐 רשתות</div>
+                <div class="topic-chip">🔐 אבטחה</div>
+                <div class="topic-chip selected">💻 מ. הפעלה</div>
+                <div class="topic-chip">☁️ ענן</div>
+                <div class="topic-chip">📋 ניהול IT</div>
+                <div class="topic-chip">🔌 פרוטוקולים</div>
+              </div>
+            </div>
+            <div class="setup-card" style="margin-top:0;">
+              <div class="setup-card-title">🎯 רמת קושי</div>
+              <div style="display:flex;gap:6px;">
+                <div class="topic-chip selected" style="flex:1;">כל הרמות</div>
+                <div class="topic-chip" style="flex:1;">קל</div>
+                <div class="topic-chip" style="flex:1;">בינוני</div>
+                <div class="topic-chip" style="flex:1;">קשה</div>
+              </div>
+            </div>
+            <div class="setup-card" style="margin-top:0;">
+              <div class="setup-card-title">⚙️ סוג בחינה</div>
+              <div class="mode-cards">
+                <div class="mode-card selected">
+                  <div class="mode-icon">📝</div>
+                  <div class="mode-name">מחקר</div>
+                </div>
+                <div class="mode-card">
+                  <div class="mode-icon">⏱️</div>
+                  <div class="mode-name">מתוזמן</div>
+                </div>
+                <div class="mode-card">
+                  <div class="mode-icon">🔄</div>
+                  <div class="mode-name">אינסוף</div>
+                </div>
+              </div>
+            </div>
+            <div style="padding:0 0 16px;">
+              <button class="btn btn-primary" style="margin:0 16px;width:calc(100% - 32px);">📝 התחל בחינה (20 שאלות)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 8. QUIZ ===== -->
+  <div class="phone-wrap" id="s-quiz">
+    <div class="screen-label">בחינה פעילה</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="quiz-top">
+            <div class="quiz-progress-row">
+              <div class="quiz-timer">⏱️ 18:42</div>
+              <div class="quiz-q-num">שאלה 7 מתוך 20</div>
+            </div>
+            <div class="quiz-progress-bar">
+              <div class="quiz-progress-fill" style="width:35%;"></div>
+            </div>
+          </div>
+          <div class="scroll-content">
+            <div class="question-card">
+              <div class="question-number-badge">שאלה 7</div>
+              <div class="question-text">
+                באיזה שכבת מודל OSI פועל פרוטוקול IP?
+              </div>
+              <div style="clear:both; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); display:flex; gap:6px; justify-content:flex-end;">
+                <div class="q-badge" style="background:#FEF3C7;color:#D97706;padding:3px 10px;border-radius:8px;font-size:10px;font-weight:600;">בינוני</div>
+                <div class="q-badge" style="background:#DBEAFE;color:#2563EB;padding:3px 10px;border-radius:8px;font-size:10px;font-weight:600;">🌐 רשתות</div>
+              </div>
+            </div>
+            <div class="options-list">
+              <div class="option-item">
+                <div class="option-text">שכבת יישום (Application Layer)</div>
+                <div class="option-badge">א</div>
+              </div>
+              <div class="option-item">
+                <div class="option-text">שכבת תעבורה (Transport Layer)</div>
+                <div class="option-badge">ב</div>
+              </div>
+              <div class="option-item selected">
+                <div class="option-text">שכבת רשת (Network Layer)</div>
+                <div class="option-badge selected">ג</div>
+              </div>
+              <div class="option-item">
+                <div class="option-text">שכבת קישור (Data Link Layer)</div>
+                <div class="option-badge">ד</div>
+              </div>
+            </div>
+            <div style="padding:8px 16px 16px;">
+              <button class="btn btn-primary">הבא ←</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 9. RESULTS ===== -->
+  <div class="phone-wrap" id="s-results">
+    <div class="screen-label">תוצאות בחינה</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="scroll-content">
+            <div class="results-hero" style="background:linear-gradient(135deg,#16A34A,#22C55E);">
+              <div class="results-ring">
+                <div class="results-pct">84%</div>
+              </div>
+              <div class="results-title">🎉 כל הכבוד!</div>
+              <div class="results-sub">עברת את הבחינה בהצלחה</div>
+            </div>
+            <div class="results-stats-row">
+              <div class="r-stat"><div class="r-stat-val" style="color:#16A34A;">17</div><div class="r-stat-lbl">✅ נכון</div></div>
+              <div class="r-divider"></div>
+              <div class="r-stat"><div class="r-stat-val" style="color:#DC2626;">3</div><div class="r-stat-lbl">❌ שגוי</div></div>
+              <div class="r-divider"></div>
+              <div class="r-stat"><div class="r-stat-val" style="color:#D97706;">4:18</div><div class="r-stat-lbl">⏱️ זמן</div></div>
+              <div class="r-divider"></div>
+              <div class="r-stat"><div class="r-stat-val" style="color:#7C3AED;">84</div><div class="r-stat-lbl">📊 ניקוד</div></div>
+            </div>
+            <div class="section-title">🔍 סקירת תשובות</div>
+            <div class="answer-review-item" style="border-right-color:#16A34A;">
+              <div class="ar-q">באיזה שכבת OSI פועל פרוטוקול IP?</div>
+              <div class="ar-a" style="color:#16A34A;">✅ שכבת רשת (Network Layer)</div>
+            </div>
+            <div class="answer-review-item" style="border-right-color:#DC2626;">
+              <div class="ar-q">מהו פרוטוקול להקצאת IP אוטומטית?</div>
+              <div class="ar-a" style="color:#DC2626;">❌ DHCP (בחרת: ARP)</div>
+            </div>
+            <div class="answer-review-item" style="border-right-color:#16A34A;">
+              <div class="ar-q">כמה ביטים בכתובת IPv6?</div>
+              <div class="ar-a" style="color:#16A34A;">✅ 128 ביטים</div>
+            </div>
+            <div style="padding:8px 16px 16px; display:flex; flex-direction:column; gap:8px;">
+              <button class="btn btn-primary">📝 בחינה נוספת</button>
+              <button class="btn" style="background:#F3F4F6;color:#374151;">🏠 חזרה לבית</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 10. PROGRESS ===== -->
+  <div class="phone-wrap" id="s-progress">
+    <div class="screen-label">התקדמות</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="scroll-content">
+            <div class="progress-hero">
+              <div class="progress-hero-title">📊 התקדמות</div>
+              <div class="progress-hero-sub">מעקב ביצועים ופעילות</div>
+            </div>
+            <div class="big-stats-card">
+              <div class="big-stat"><div class="big-stat-val">42</div><div class="big-stat-lbl">בחינות</div></div>
+              <div class="big-stat"><div class="big-stat-val">78%</div><div class="big-stat-lbl">ממוצע</div></div>
+              <div class="big-stat"><div class="big-stat-val">7</div><div class="big-stat-lbl">רצף ימים</div></div>
+            </div>
+            <div class="section-title">📜 היסטוריית בחינות</div>
+            <div class="history-item">
+              <div class="history-info">
+                <div class="history-name">בחינה כללית – רשתות</div>
+                <div class="history-date">היום · 20 שאלות</div>
+              </div>
+              <div class="history-score" style="background:#DCFCE7;color:#16A34A;">84%</div>
+            </div>
+            <div class="history-item">
+              <div class="history-info">
+                <div class="history-name">אבטחת מידע – בינוני</div>
+                <div class="history-date">אתמול · 15 שאלות</div>
+              </div>
+              <div class="history-score" style="background:#FEF3C7;color:#D97706;">67%</div>
+            </div>
+            <div class="history-item">
+              <div class="history-info">
+                <div class="history-name">מ. הפעלה – מהיר</div>
+                <div class="history-date">לפני יומיים · 10 שאלות</div>
+              </div>
+              <div class="history-score" style="background:#DCFCE7;color:#16A34A;">90%</div>
+            </div>
+            <div class="history-item">
+              <div class="history-info">
+                <div class="history-name">מחשוב ענן – קשה</div>
+                <div class="history-date">לפני 3 ימים · 20 שאלות</div>
+              </div>
+              <div class="history-score" style="background:#FEE2E2;color:#DC2626;">55%</div>
+            </div>
+            <div style="height:12px;"></div>
+          </div>
+          <div class="bottom-tabs">
+            <div class="tab-item"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+            <div class="tab-item"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+            <div class="tab-item"><div class="tab-icon">📝</div><div class="tab-label">בחינה</div></div>
+            <div class="tab-item active"><div class="tab-icon">📊</div><div class="tab-label">התקדמות</div></div>
+            <div class="tab-item"><div class="tab-icon">⚙️</div><div class="tab-label">הגדרות</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 11. ADMIN ===== -->
+  <div class="phone-wrap" id="s-admin">
+    <div class="screen-label">ניהול (אדמין)</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="admin-header-row">
+            <div class="admin-badge">מנהל</div>
+            <div class="admin-title">ניהול 👑</div>
+          </div>
+          <div class="admin-sub">ניהול מערכת amirnet</div>
+          <div class="scroll-content">
+            <div class="admin-stats-row">
+              <div class="admin-stat"><div class="admin-stat-val">436</div><div class="admin-stat-lbl">שאלות</div></div>
+              <div class="admin-stat"><div class="admin-stat-val">8</div><div class="admin-stat-lbl">פרקים</div></div>
+              <div class="admin-stat"><div class="admin-stat-val">5</div><div class="admin-stat-lbl">בחינות</div></div>
+              <div class="admin-stat"><div class="admin-stat-val">12</div><div class="admin-stat-lbl">משתמשים</div></div>
+              <div class="admin-stat"><div class="admin-stat-val">3</div><div class="admin-stat-lbl">הכרזות</div></div>
+            </div>
+            <div class="section-accent-row"><div class="section-accent-bar"></div><div class="section-accent-lbl">ניהול תוכן</div></div>
+            <div class="menu-item">
+              <div class="menu-chevron">›</div>
+              <div class="menu-content"><div class="menu-label">ניהול שאלות</div><div class="menu-sub">436 שאלות סה"כ</div></div>
+              <div class="menu-icon-wrap" style="background:#DBEAFE;">❓</div>
+            </div>
+            <div class="menu-item">
+              <div class="menu-chevron">›</div>
+              <div class="menu-content"><div class="menu-label">ייבוא שאלות</div><div class="menu-sub">CSV / JSON</div></div>
+              <div class="menu-icon-wrap" style="background:#DCFCE7;">📥</div>
+            </div>
+            <div class="menu-item">
+              <div class="menu-chevron">›</div>
+              <div class="menu-content"><div class="menu-label">ניהול פרקים</div><div class="menu-sub">8 פרקים</div></div>
+              <div class="menu-icon-wrap" style="background:#FED7AA;">📚</div>
+            </div>
+            <div class="section-accent-row"><div class="section-accent-bar"></div><div class="section-accent-lbl">משתמשים ותקשורת</div></div>
+            <div class="menu-item">
+              <div class="menu-chevron">›</div>
+              <div class="menu-content"><div class="menu-label">ניהול משתמשים</div><div class="menu-sub">12 משתמשים</div></div>
+              <div class="menu-icon-wrap" style="background:#CFFAFE;">👥</div>
+            </div>
+            <div class="menu-item">
+              <div class="menu-chevron">›</div>
+              <div class="menu-content"><div class="menu-label">הכרזות</div><div class="menu-sub">3 פעילות</div></div>
+              <div class="menu-icon-wrap" style="background:#FEF3C7;">📢</div>
+            </div>
+            <div class="section-accent-row"><div class="section-accent-bar"></div><div class="section-accent-lbl">ניתוח ומערכת</div></div>
+            <div class="menu-item">
+              <div class="menu-chevron">›</div>
+              <div class="menu-content"><div class="menu-label">סטטיסטיקות מתקדמות</div><div class="menu-sub">ניתוח ביצועים</div></div>
+              <div class="menu-icon-wrap" style="background:#EDE9FE;">📊</div>
+            </div>
+            <div class="menu-item">
+              <div class="menu-chevron">›</div>
+              <div class="menu-content"><div class="menu-label">גיבוי ושחזור</div><div class="menu-sub">ייצוא / ייבוא נתונים</div></div>
+              <div class="menu-icon-wrap" style="background:#DCFCE7;">💾</div>
+            </div>
+            <div style="height:12px;"></div>
+          </div>
+          <div class="bottom-tabs">
+            <div class="tab-item"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+            <div class="tab-item"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+            <div class="tab-item"><div class="tab-icon">📝</div><div class="tab-label">בחינה</div></div>
+            <div class="tab-item"><div class="tab-icon">📊</div><div class="tab-label">התקדמות</div></div>
+            <div class="tab-item active"><div class="tab-icon">👑</div><div class="tab-label">ניהול</div></div>
+            <div class="tab-item"><div class="tab-icon">⚙️</div><div class="tab-label">הגדרות</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 12. SETTINGS ===== -->
+  <div class="phone-wrap" id="s-settings">
+    <div class="screen-label">הגדרות</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="scroll-content">
+            <div class="settings-hero">
+              <div class="settings-avatar">👤</div>
+              <div class="settings-name">אמיר כהן</div>
+              <div class="settings-role">🎓 תלמיד</div>
+            </div>
+            <div class="settings-quick-stats">
+              <div class="sq-stat"><div class="sq-stat-val">42</div><div class="sq-stat-lbl">בחינות</div></div>
+              <div class="sq-divider"></div>
+              <div class="sq-stat"><div class="sq-stat-val">78%</div><div class="sq-stat-lbl">ממוצע</div></div>
+              <div class="sq-divider"></div>
+              <div class="sq-stat"><div class="sq-stat-val">7🔥</div><div class="sq-stat-lbl">רצף</div></div>
+            </div>
+            <div class="section-title">⚙️ הגדרות בחינה</div>
+            <div class="settings-row">
+              <div class="settings-item">
+                <div class="si-value">20 שאלות</div>
+                <div class="si-label">מספר שאלות ברירת מחדל</div>
+              </div>
+              <div class="settings-item">
+                <div class="si-value">70%</div>
+                <div class="si-label">ציון עובר</div>
+              </div>
+              <div class="settings-item">
+                <div class="si-value">מחקר</div>
+                <div class="si-label">מצב ברירת מחדל</div>
+              </div>
+            </div>
+            <div class="section-title">🎨 תצוגה</div>
+            <div class="settings-row">
+              <div class="settings-item">
+                <div class="si-toggle"></div>
+                <div class="si-label">מצב לילה</div>
+              </div>
+              <div class="settings-item">
+                <div class="si-toggle"></div>
+                <div class="si-label">רטט ב-הנפשות</div>
+              </div>
+            </div>
+            <div class="section-title">📊 נתונים</div>
+            <div style="padding:0 16px; display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+              <button class="btn" style="background:#F3F4F6;color:#374151;">📤 יצא דוח התקדמות</button>
+              <button class="btn btn-danger">🗑️ אפס נתוני התקדמות</button>
+              <button class="btn" style="background:#F3F4F6;color:#DC2626;">🚪 התנתק</button>
+            </div>
+          </div>
+          <div class="bottom-tabs">
+            <div class="tab-item"><div class="tab-icon">🏠</div><div class="tab-label">בית</div></div>
+            <div class="tab-item"><div class="tab-icon">📚</div><div class="tab-label">נושאים</div></div>
+            <div class="tab-item"><div class="tab-icon">📝</div><div class="tab-label">בחינה</div></div>
+            <div class="tab-item"><div class="tab-icon">📊</div><div class="tab-label">התקדמות</div></div>
+            <div class="tab-item active"><div class="tab-icon">⚙️</div><div class="tab-label">הגדרות</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 13. STUDY PLAN MANAGER ===== -->
+  <div class="phone-wrap" id="s-studyplan">
+    <div class="screen-label">תוכניות לימוד (אדמין)</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="screen-header">
+            <div class="header-back">‹ חזרה</div>
+            <div class="header-title">תוכניות לימוד</div>
+            <div style="color:var(--primary);font-size:22px;cursor:pointer;">＋</div>
+          </div>
+          <div class="scroll-content">
+            <div style="padding:12px 16px 8px; background:#DBEAFE; margin:10px 16px; border-radius:12px; text-align:right;">
+              <div style="font-size:12px;font-weight:700;color:var(--primary);">📅 3 תוכניות פעילות · 1 הושלמה</div>
+            </div>
+            <div class="plan-card" style="border-right-color:#2563EB;">
+              <div class="plan-title">📚 תוכנית מקיפה – רשתות ואבטחה</div>
+              <div class="plan-meta">מטרה: 15 שאלות ביום · 18 ימים נותרו</div>
+              <div class="plan-progress-row">
+                <div class="plan-pct">67%</div>
+                <div class="plan-progress-bar" style="direction:ltr;"><div class="plan-progress-fill" style="width:67%;"></div></div>
+              </div>
+              <div class="plan-tags">
+                <div class="plan-tag">רשתות</div>
+                <div class="plan-tag">אבטחה</div>
+              </div>
+            </div>
+            <div class="plan-card" style="border-right-color:#7C3AED;">
+              <div class="plan-title">🎯 בחינת כניסה – ענן ו-IT</div>
+              <div class="plan-meta">מטרה: 10 שאלות ביום · 7 ימים נותרו</div>
+              <div class="plan-progress-row">
+                <div class="plan-pct">40%</div>
+                <div class="plan-progress-bar" style="direction:ltr;"><div class="plan-progress-fill" style="width:40%;background:#7C3AED;"></div></div>
+              </div>
+              <div class="plan-tags">
+                <div class="plan-tag" style="background:#EDE9FE;color:#7C3AED;">ענן</div>
+                <div class="plan-tag" style="background:#EDE9FE;color:#7C3AED;">ניהול IT</div>
+              </div>
+            </div>
+            <div class="plan-card" style="border-right-color:#16A34A;">
+              <div class="plan-title">🚀 תוכנית אינטנסיבית – כל הנושאים</div>
+              <div class="plan-meta">מטרה: 25 שאלות ביום · 30 ימים נותרו</div>
+              <div class="plan-progress-row">
+                <div class="plan-pct">12%</div>
+                <div class="plan-progress-bar" style="direction:ltr;"><div class="plan-progress-fill" style="width:12%;background:#16A34A;"></div></div>
+              </div>
+              <div class="plan-tags">
+                <div class="plan-tag" style="background:#DCFCE7;color:#16A34A;">כל הנושאים</div>
+              </div>
+            </div>
+            <div class="plan-card" style="border-right-color:#9CA3AF;opacity:0.6;">
+              <div class="plan-title">✅ מבוא לרשתות – בסיסי</div>
+              <div class="plan-meta">הושלמה · 14/14 ימים</div>
+              <div class="plan-progress-row">
+                <div class="plan-pct" style="color:#16A34A;">100%</div>
+                <div class="plan-progress-bar" style="direction:ltr;"><div class="plan-progress-fill" style="width:100%;background:#16A34A;"></div></div>
+              </div>
+            </div>
+            <div style="height:12px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 14. QUESTION PERFORMANCE ===== -->
+  <div class="phone-wrap" id="s-qperf">
+    <div class="screen-label">ביצועי שאלות (אדמין)</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="screen-header">
+            <div class="header-back">‹ חזרה</div>
+            <div class="header-title">ביצועי שאלות</div>
+            <div style="width:50px;"></div>
+          </div>
+          <div class="scroll-content">
+            <div style="display:flex;gap:8px;margin:10px 16px;background:#fff;border-radius:14px;padding:12px;box-shadow:0 2px 6px rgba(0,0,0,0.05);">
+              <div style="flex:1;text-align:center;"><div style="font-size:18px;font-weight:800;color:#DC2626;">35%</div><div style="font-size:9px;color:#6B7280;">שאלה קשה</div></div>
+              <div style="width:1px;background:#E5E7EB;"></div>
+              <div style="flex:1;text-align:center;"><div style="font-size:18px;font-weight:800;color:#2563EB;">78%</div><div style="font-size:9px;color:#6B7280;">ממוצע כללי</div></div>
+              <div style="width:1px;background:#E5E7EB;"></div>
+              <div style="flex:1;text-align:center;"><div style="font-size:18px;font-weight:800;color:#16A34A;">436</div><div style="font-size:9px;color:#6B7280;">שאלות</div></div>
+            </div>
+            <div class="perf-tabs">
+              <div class="perf-tab active">הכי קשות</div>
+              <div class="perf-tab">הכי קלות</div>
+              <div class="perf-tab">הכי נענות</div>
+            </div>
+            <div class="perf-question-row">
+              <div class="pq-text">מהו ה-MTU של Ethernet II?</div>
+              <div class="pq-bar-row">
+                <div class="pq-pct" style="color:#DC2626;">28%</div>
+                <div class="pq-bar"><div class="pq-fill" style="width:28%;background:#DC2626;"></div></div>
+                <div style="font-size:10px;color:#6B7280;min-width:30px;text-align:right;">89 נ'</div>
+              </div>
+            </div>
+            <div class="perf-question-row">
+              <div class="pq-text">כיצד פועל OSPF בבחירת ה-DR?</div>
+              <div class="pq-bar-row">
+                <div class="pq-pct" style="color:#DC2626;">31%</div>
+                <div class="pq-bar"><div class="pq-fill" style="width:31%;background:#DC2626;"></div></div>
+                <div style="font-size:10px;color:#6B7280;min-width:30px;text-align:right;">74 נ'</div>
+              </div>
+            </div>
+            <div class="perf-question-row">
+              <div class="pq-text">מהו הפרוטוקול המשמש לניהול ARP Spoofing?</div>
+              <div class="pq-bar-row">
+                <div class="pq-pct" style="color:#D97706;">38%</div>
+                <div class="pq-bar"><div class="pq-fill" style="width:38%;background:#D97706;"></div></div>
+                <div style="font-size:10px;color:#6B7280;min-width:30px;text-align:right;">62 נ'</div>
+              </div>
+            </div>
+            <div class="perf-question-row">
+              <div class="pq-text">מה ההבדל בין NAT ל-PAT?</div>
+              <div class="pq-bar-row">
+                <div class="pq-pct" style="color:#D97706;">42%</div>
+                <div class="pq-bar"><div class="pq-fill" style="width:42%;background:#D97706;"></div></div>
+                <div style="font-size:10px;color:#6B7280;min-width:30px;text-align:right;">55 נ'</div>
+              </div>
+            </div>
+            <div class="perf-question-row">
+              <div class="pq-text">איזה פרוטוקול מספק הצפנת E2E?</div>
+              <div class="pq-bar-row">
+                <div class="pq-pct" style="color:#D97706;">45%</div>
+                <div class="pq-bar"><div class="pq-fill" style="width:45%;background:#D97706;"></div></div>
+                <div style="font-size:10px;color:#6B7280;min-width:30px;text-align:right;">48 נ'</div>
+              </div>
+            </div>
+            <div style="height:12px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 15. ACTIVITY CALENDAR ===== -->
+  <div class="phone-wrap" id="s-calendar">
+    <div class="screen-label">לוח פעילות (אדמין)</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="safe-area">
+          <div class="screen-header">
+            <div class="header-back">‹ חזרה</div>
+            <div class="header-title">לוח פעילות</div>
+            <div style="width:50px;"></div>
+          </div>
+          <div class="scroll-content">
+            <div class="cal-nav">
+              <div class="cal-arrow">‹</div>
+              <div class="cal-month">יוני 2026</div>
+              <div class="cal-arrow">›</div>
+            </div>
+            <div class="cal-grid">
+              <div class="cal-weekdays">
+                <div class="cal-weekday">א'</div>
+                <div class="cal-weekday">ב'</div>
+                <div class="cal-weekday">ג'</div>
+                <div class="cal-weekday">ד'</div>
+                <div class="cal-weekday">ה'</div>
+                <div class="cal-weekday">ו'</div>
+                <div class="cal-weekday">ש'</div>
+              </div>
+              <div class="cal-days">
+                <!-- Week 1: starts on Monday (ב') -->
+                <div class="cal-day empty"></div>
+                <div class="cal-day level-1">2</div>
+                <div class="cal-day level-0">3</div>
+                <div class="cal-day level-2">4</div>
+                <div class="cal-day level-1">5</div>
+                <div class="cal-day level-0">6</div>
+                <div class="cal-day level-0">7</div>
+                <!-- Week 2 -->
+                <div class="cal-day level-3">8</div>
+                <div class="cal-day level-2">9</div>
+                <div class="cal-day level-1">10</div>
+                <div class="cal-day level-3">11</div>
+                <div class="cal-day level-2">12</div>
+                <div class="cal-day level-0">13</div>
+                <div class="cal-day level-0">14</div>
+                <!-- Week 3 -->
+                <div class="cal-day level-1">15</div>
+                <div class="cal-day level-2">16</div>
+                <div class="cal-day level-3">17</div>
+                <div class="cal-day level-2">18</div>
+                <div class="cal-day level-1">19</div>
+                <div class="cal-day level-0">20</div>
+                <div class="cal-day level-0">21</div>
+                <!-- Week 4 -->
+                <div class="cal-day level-3">22</div>
+                <div class="cal-day level-2">23</div>
+                <div class="cal-day level-1">24</div>
+                <div class="cal-day level-3">25</div>
+                <div class="cal-day level-2">26</div>
+                <div class="cal-day level-0">27</div>
+                <div class="cal-day level-0">28</div>
+                <!-- Week 5 -->
+                <div class="cal-day level-1">29</div>
+                <div class="cal-day level-2 today">30</div>
+              </div>
+            </div>
+            <!-- Legend -->
+            <div style="display:flex;align-items:center;gap:6px;padding:8px 16px;justify-content:flex-end;">
+              <div style="font-size:10px;color:#6B7280;">פעילות:</div>
+              <div style="width:14px;height:14px;border-radius:3px;background:#E5E7EB;"></div>
+              <div style="width:14px;height:14px;border-radius:3px;background:#BFDBFE;"></div>
+              <div style="width:14px;height:14px;border-radius:3px;background:#60A5FA;"></div>
+              <div style="width:14px;height:14px;border-radius:3px;background:#2563EB;"></div>
+            </div>
+            <div class="section-title">📋 פעילות אחרונה</div>
+            <div class="activity-list-item">
+              <div class="al-score" style="color:#2563EB;">25 ש'</div>
+              <div class="al-info">
+                <div class="al-date">היום, 2 יוני</div>
+                <div class="al-count">2 בחינות · 84% ממוצע</div>
+              </div>
+            </div>
+            <div class="activity-list-item">
+              <div class="al-score">18 ש'</div>
+              <div class="al-info">
+                <div class="al-date">אתמול, 1 יוני</div>
+                <div class="al-count">1 בחינה · 67% ממוצע</div>
+              </div>
+            </div>
+            <div class="activity-list-item">
+              <div class="al-score">32 ש'</div>
+              <div class="al-info">
+                <div class="al-date">31 מאי</div>
+                <div class="al-count">3 בחינות · 91% ממוצע</div>
+              </div>
+            </div>
+            <div style="height:12px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section-divider">· · · amirnet mockup · 15 screens · ©2026 · · ·</div>
+
+<script>
+  function scrollTo(id) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+</script>
+</body>
+</html>
