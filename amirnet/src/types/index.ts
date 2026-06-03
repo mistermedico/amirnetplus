@@ -160,5 +160,5 @@ export interface SystemSettings {
   defaultQuestionCount: number;
   defaultPassingScore: number;
   defaultMode: 'exam' | 'study';
-  defaultDifficulty: string;
+  defaultDifficulty: Difficulty | 'all';
 }

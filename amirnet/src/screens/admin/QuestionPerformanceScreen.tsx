@@ -33,8 +33,8 @@ export default function QuestionPerformanceScreen({ navigation }: any) {
       })
       .filter(x => x.p && x.p.timesAnswered > 0)
       .sort((a, b) => {
-        if (sort === 'hardest')       return (a.accuracy ?? 1) - (b.accuracy ?? 1);
-        if (sort === 'easiest')       return (b.accuracy ?? 0) - (a.accuracy ?? 0);
+        if (sort === 'hardest')       return (a.accuracy ?? 0) - (b.accuracy ?? 0);
+        if (sort === 'easiest')       return (b.accuracy ?? 1) - (a.accuracy ?? 1);
         return (b.p?.timesAnswered ?? 0) - (a.p?.timesAnswered ?? 0);
       });
   }, [allQ, state.progress.questionPerformance, sort]);

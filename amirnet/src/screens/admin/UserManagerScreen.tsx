@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   userMain: { flex: 1, gap: 2, alignItems: 'flex-end' },
   userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   userName: { fontSize: 15, fontWeight: '700', color: COLORS.text, textAlign: 'right' },
-  meTag: { backgroundColor: COLORS.primaryLight, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  meTag: { backgroundColor: COLORS.primaryLight, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, color: COLORS.primary, fontSize: 11, fontWeight: '700' },
   userUsername: { fontSize: 12, color: COLORS.textSecondary },
   userDate: { fontSize: 11, color: COLORS.textTertiary },
   userRight: { alignItems: 'center', gap: 3 },

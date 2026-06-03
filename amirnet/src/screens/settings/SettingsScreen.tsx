@@ -7,6 +7,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { useApp } from '../../store/AppContext';
 import { COLORS } from '../../utils/colors';
+import { hashPassword } from '../../utils/hashUtils';
 
 export default function SettingsScreen() {
   const { state, dispatch, logout, changePassword } = useApp();
@@ -27,9 +28,8 @@ export default function SettingsScreen() {
 
   function handleChangePwd() {
     if (!oldPwd || !newPwd || newPwd.length < 6) { Alert.alert('שגיאה', 'יש למלא שדות תקינים'); return; }
-    const { hashPassword } = require('../../utils/hashUtils');
-    if (hashPassword(oldPwd) !== user?.passwordHash) { Alert.alert('שגיאה', 'הסיסמה הנוכחית שגויה'); return; }
-    if (user) changePassword(user.id, newPwd);
+    if (!user || hashPassword(oldPwd) !== user.passwordHash) { Alert.alert('שגיאה', 'הסיסמה הנוכחית שגויה'); return; }
+    changePassword(user.id, newPwd);
     setShowPwdModal(false); setOldPwd(''); setNewPwd('');
     Alert.alert('הצלחה', 'הסיסמה שונתה בהצלחה');
   }
@@ -49,7 +49,7 @@ export default function SettingsScreen() {
       ),
     ];
     try {
-      const path = FileSystem.cacheDirectory + 'amirnet_report.txt';
+      const path = (FileSystem.cacheDirectory ?? '') + 'amirnet_report.txt';
       await FileSystem.writeAsStringAsync(path, lines.join('\n'));
       if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(path, { dialogTitle: 'ייצוא נתונים' });
       else Alert.alert('דוח', lines.join('\n'));

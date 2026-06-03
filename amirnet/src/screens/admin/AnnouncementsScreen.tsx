@@ -66,7 +66,7 @@ export default function AnnouncementsScreen({ navigation }: any) {
           </View>
         }
         renderItem={({ item: ann }) => {
-          const t = TYPE_OPTIONS.find(o => o.type === ann.type)!;
+          const t = TYPE_OPTIONS.find(o => o.type === ann.type) ?? TYPE_OPTIONS[0];
           return (
             <View style={[styles.annCard, { borderLeftColor: t.color, borderLeftWidth: 4 }]}>
               <View style={styles.annTop}>
